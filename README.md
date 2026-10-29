@@ -1,36 +1,143 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# GBC Inbound Intelligence
 
-## Getting Started
+Aplikasi web untuk **OCR Surat Jalan**, **NKB (Notifikasi Kedatangan Barang)**, mapping SKU, **PP (Pesanan Pembelian)**, **penerimaan barang**, discrepancy, **Master Harga Beli**, invoice, dan **Accounts Payable** — fondasi modular untuk operasi inbound GBC.
 
-First, run the development server:
+> **Pilot supplier:** SSC (data demo — bukan harga/kode produksi nyata).
 
-```bash
+## Tech stack
+
+- **Next.js 16** (App Router) + **React** + **TypeScript**
+- **Tailwind CSS 4**
+- **PostgreSQL** + **Prisma ORM**
+- Auth: **cookie session (JWT)** + **bcrypt**
+- Storage: adapter **local** (dev); siap diganti object storage
+- OCR: **Google Gemini Vision** (schema Surat Jalan sama seperti Apps Script) + fallback **demo** jika API key kosong
+
+## Cara menjalankan (local)
+
+### Prasyarat
+
+- Node.js 20+
+- **PostgreSQL** — via Docker Desktop (`docker compose up -d`) **atau** PostgreSQL terinstall lokal / cloud (Neon, Supabase, dll.)
+
+> Di mesin development ini Docker belum terdeteksi. Anda tetap bisa install PostgreSQL for Windows, buat database `gbc_inbound`, lalu sesuaikan `DATABASE_URL` di `.env`.
+
+### Langkah
+
+```powershell
+cd "d:\Engku Yanto\2 - GBC OCR\gbc-inbound-intelligence"
+
+# 1. Environment
+copy .env.example .env
+# Edit SESSION_SECRET (min. 32 karakter) jika perlu
+
+# 2. Database PostgreSQL (pilih salah satu)
+
+# Opsi A — Docker (hanya jika `docker` dikenali di PowerShell)
+docker compose up -d
+
+# Opsi B — Tanpa Docker (Windows, jika muncul error "docker is not recognized")
+# 1) Install PostgreSQL, mis. via winget:
+#    winget install PostgreSQL.PostgreSQL.16
+# 2) Buat database & user (pgAdmin atau psql), atau pakai user postgres default.
+# 3) Sesuaikan DATABASE_URL di .env, contoh:
+#    DATABASE_URL="postgresql://postgres:PASSWORD_ANDA@localhost:5432/gbc_inbound?schema=public"
+# 4) Buat database kosong: CREATE DATABASE gbc_inbound;
+
+# Opsi C — Cloud gratis (Neon / Supabase): copy connection string ke DATABASE_URL
+
+# 3. Install & migrate
+npm install
+npx prisma migrate dev --name init
+npm run db:seed
+
+# 4. Jalankan app
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Buka:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Internal:** http://localhost:3000/login  
+- **Supplier portal:** http://localhost:3000/supplier/login  
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Akun demo (dari seed — ganti di production)
 
-## Learn More
+| Role | Username | Password (default `.env.example`) |
+|------|----------|-----------------------------------|
+| Admin / DBM | `admin` | `AdminGBC!2026` |
+| Supplier SSC | `fauzi_ssc` | `SupplierSSC!2026` |
+| Warehouse | `warehouse_demo` | `Warehouse!2026` |
 
-To learn more about Next.js, take a look at the following resources:
+## Alur uji end-to-end (demo)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Login **fauzi_ssc** → upload foto Surat Jalan → dapat **submission ref** + **NKB ref**.
+2. Login **admin** → **Surat Jalan** / **OCR Review** → koreksi baris → mapping SKU (line 2 perlu approve manual via API/UI suggest).
+3. **Prepare PP** → **Approve PP**.
+4. Login **warehouse_demo** (atau admin) → **Goods Receiving** → input qty received.
+5. **Prepare Purchase Invoice** → pilih **payment term** → **Verify** → record **Accounts Payable**.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Environment variables
 
-## Deploy on Vercel
+Lihat [.env.example](./.env.example).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Variable | Fungsi |
+|----------|--------|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `SESSION_SECRET` | Signing session cookie |
+| `OCR_PROVIDER` | `demo` \| `manual` \| (cloud placeholder) |
+| `OCR_CONFIDENCE_THRESHOLD` | Ambang confidence |
+| `STORAGE_LOCAL_PATH` | Folder upload lokal |
+| `TELEGRAM_*` / `WHATSAPP_*` | Opsional — kosong = not configured |
+| `ACCURATE_INTEGRATION_ENABLED` | `false` sampai API diverifikasi |
+| `GOOGLE_EXPORT_*` | Drive folder + Sheet ID + path JSON service account (lihat `.env.example`) |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Google Drive + Sheet (Opsi A)
+
+1. Buat **service account** di Google Cloud → enable **Drive API** & **Sheets API** → download JSON.
+2. Simpan JSON di `secrets/google-service-account.json` (folder di-gitignore).
+3. **Share** folder Drive dan spreadsheet ke email service account (`...@....iam.gserviceaccount.com`) sebagai **Editor**.
+4. Di `.env`: `GOOGLE_EXPORT_ENABLED=true`, ID folder/sheet (sudah ada contoh di `.env.example`).
+5. Cek: `npm run google:test` → lalu **Integrations** di app menampilkan email SA.
+6. Setelah OCR Gemini sukses: foto di-upload ke Drive + baris per item di sheet (kolom template GBC). Retry export: hapus `googleSheetExportedAt` di DB atau fitur re-export belum ada — dokumen hanya export sekali.
+
+## Integrasi: real vs demo
+
+| Integrasi | Status v1 |
+|-----------|-----------|
+| OCR Gemini Vision | **Live** jika `GEMINI_API_KEY` + `OCR_PROVIDER=gemini` |
+| OCR demo | Aktif hanya jika `OCR_PROVIDER=demo` dan key kosong |
+| Telegram / WhatsApp | **Not configured** — in-app notifications aktif |
+| Accurate API | **Export CSV PP** — bukan sync/API claim |
+| Google Drive + Sheets | **Live** jika `GOOGLE_EXPORT_ENABLED=true` + service account (export otomatis setelah OCR) |
+
+## Tests
+
+```powershell
+npm test
+```
+
+## Production build
+
+```powershell
+npm run build
+npm start
+```
+
+Gunakan PostgreSQL managed + object storage persisten untuk file Surat Jalan (bukan filesystem ephemeral).
+
+## Struktur penting
+
+- `prisma/schema.prisma` — schema DB lengkap
+- `src/lib/providers/` — OCR, storage, notifications
+- `src/lib/workflow/` — state machine Surat Jalan
+- `src/app/supplier/` — portal eksternal terpisah
+- `storage/uploads/` — file lokal (gitignored)
+
+## Limitasi & next steps
+
+- OCR cloud, bounding-box highlight, preprocessing gambar advanced
+- UI approve mapping one-click + semantic AI adapter
+- Accurate / WhatsApp / Telegram test-connection nyata
+- Partial receipt aggregation per line PP
+- Encryption at-rest untuk integration secrets
+- Hardening production (rate limit, CSRF, virus scan)

@@ -1,0 +1,714 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  LOCKED
+}
+
+enum MappingStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  NEEDS_REVIEW
+}
+
+enum IntegrationStatus {
+  NOT_CONFIGURED
+  CONFIGURATION_REQUIRED
+  CONNECTED
+  ERROR
+  DISABLED
+}
+
+enum SuratJalanStatus {
+  UPLOADED
+  QUEUED_FOR_OCR
+  PROCESSING
+  OCR_COMPLETED
+  NEEDS_REVIEW
+  SKU_MAPPING_INCOMPLETE
+  READY_FOR_PP
+  PP_PENDING_APPROVAL
+  PP_APPROVED
+  PARTIALLY_RECEIVED
+  FULLY_RECEIVED
+  DISCREPANCY_OPEN
+  READY_FOR_PRICE_VERIFICATION
+  PRICE_VERIFIED
+  INVOICE_PREPARED
+  COMPLETED
+  REJECTED
+  CANCELLED
+}
+
+enum OcrJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  MANUAL
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  RETURNED
+  CANCELLED
+}
+
+enum GoodsReceiptStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  CANCELLED
+}
+
+enum DiscrepancyStatus {
+  NONE
+  PENDING_REVIEW
+  AWAITING_SUPPLIER
+  AWAITING_REVISED_DOC
+  PARTIALLY_RESOLVED
+  RESOLVED
+  REJECTED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  PENDING_VERIFICATION
+  VERIFIED
+  FINALIZED
+  CANCELLED
+}
+
+enum PayableStatus {
+  OPEN
+  PARTIAL
+  PAID
+  CANCELLED
+}
+
+enum NotificationChannel {
+  IN_APP
+  TELEGRAM
+  WHATSAPP
+  EMAIL
+}
+
+enum NotificationDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+enum PermissionAction {
+  VIEW
+  CREATE
+  EDIT
+  SUBMIT
+  APPROVE
+  EXPORT
+  MANAGE
+}
+
+model User {
+  id           String     @id @default(cuid())
+  username     String     @unique
+  email        String?    @unique
+  passwordHash String
+  fullName     String
+  status       UserStatus @default(ACTIVE)
+  supplierId   String?
+  supplier     Supplier?  @relation(fields: [supplierId], references: [id])
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  userRoles            UserRole[]
+  uploadedDocuments    SuratJalanDocument[] @relation("UploadedBy")
+  auditLogs            AuditLog[]
+  notifications        Notification[]
+  createdMappings      SupplierProductMapping[] @relation("MappingCreatedBy")
+  verifiedMappings     SupplierProductMapping[] @relation("MappingVerifiedBy")
+  purchaseOrders       PurchaseOrder[]          @relation("PPCreatedBy")
+  approvedPOs          PurchaseOrder[]          @relation("PPApprovedBy")
+  goodsReceipts        GoodsReceipt[]
+  discrepancies        Discrepancy[]
+  priceUpdates         PurchasePriceHistory[]
+  invoices             PurchaseInvoice[]
+}
+
+model Role {
+  id          String           @id @default(cuid())
+  code        String           @unique
+  name        String
+  description String?
+  userRoles   UserRole[]
+  permissions RolePermission[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model Permission {
+  id              String           @id @default(cuid())
+  module          String
+  action          PermissionAction
+  description     String?
+  rolePermissions RolePermission[]
+
+  @@unique([module, action])
+}
+
+model RolePermission {
+  id           String     @id @default(cuid())
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+}
+
+model UserRole {
+  id     String @id @default(cuid())
+  userId String
+  roleId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+}
+
+model Supplier {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  isActive  Boolean  @default(true)
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users            User[]
+  shipments        InboundShipment[]
+  documents        SuratJalanDocument[]
+  mappings         SupplierProductMapping[]
+  purchaseOrders   PurchaseOrder[]
+  priceHistory     PurchasePriceHistory[]
+  invoices         PurchaseInvoice[]
+  payableRecords   AccountsPayableRecord[]
+}
+
+model Warehouse {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  address   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shipments InboundShipment[]
+  documents SuratJalanDocument[]
+}
+
+model InboundShipment {
+  id              String   @id @default(cuid())
+  referenceNumber String   @unique
+  supplierId      String
+  warehouseId     String?
+  submittedAt     DateTime @default(now())
+  notes           String?
+  vehicleInfo     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  supplier  Supplier             @relation(fields: [supplierId], references: [id])
+  warehouse Warehouse?           @relation(fields: [warehouseId], references: [id])
+  documents SuratJalanDocument[]
+}
+
+model SuratJalanDocument {
+  id                String           @id @default(cuid())
+  shipmentId        String
+  supplierId        String
+  warehouseId       String?
+  uploadedById      String
+  status            SuratJalanStatus @default(UPLOADED)
+  submissionRef     String           @unique
+  supplierNotes     String?
+  fileFingerprint   String?
+  duplicateOfId     String?
+  suratJalanNumber  String?
+  documentDate      DateTime?
+  destinationText   String?
+  poReference       String?
+  vehicleInfo       String?
+  totalItemCount    Int?
+  printedTotal      Decimal?         @db.Decimal(18, 4)
+  verifiedAt        DateTime?
+  googleDriveFileId     String?
+  googleDriveFileUrl    String?
+  googleSheetExportedAt DateTime?
+  googleExportLastError String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  shipment      InboundShipment      @relation(fields: [shipmentId], references: [id])
+  supplier      Supplier             @relation(fields: [supplierId], references: [id])
+  warehouse     Warehouse?           @relation(fields: [warehouseId], references: [id])
+  uploadedBy    User                 @relation("UploadedBy", fields: [uploadedById], references: [id])
+  duplicateOf   SuratJalanDocument?  @relation("DuplicateDocs", fields: [duplicateOfId], references: [id])
+  duplicates    SuratJalanDocument[] @relation("DuplicateDocs")
+  images        DocumentImage[]
+  ocrJobs       OcrJob[]
+  lineItems     OcrLineItem[]
+  extractedFields OcrExtractedField[]
+  purchaseOrders PurchaseOrder[]
+  statusHistory DocumentStatusHistory[]
+
+  @@index([supplierId, suratJalanNumber])
+  @@index([status])
+  @@index([fileFingerprint])
+}
+
+model DocumentStatusHistory {
+  id             String           @id @default(cuid())
+  documentId     String
+  previousStatus SuratJalanStatus?
+  newStatus      SuratJalanStatus
+  reason         String?
+  changedById    String?
+  createdAt      DateTime         @default(now())
+
+  document SuratJalanDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+}
+
+model DocumentImage {
+  id               String   @id @default(cuid())
+  documentId       String
+  storageKey       String
+  originalFilename String
+  mimeType         String
+  sizeBytes        Int
+  pageNumber       Int      @default(1)
+  isOriginal       Boolean  @default(true)
+  createdAt        DateTime @default(now())
+
+  document SuratJalanDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+}
+
+model OcrJob {
+  id              String       @id @default(cuid())
+  documentId      String
+  status          OcrJobStatus @default(PENDING)
+  providerKey     String
+  idempotencyKey  String       @unique
+  rawOutput       Json?
+  structuredOutput Json?
+  confidenceScore Decimal?     @db.Decimal(5, 4)
+  warnings        Json?
+  errorMessage    String?
+  progressPercent Int          @default(0)
+  progressMessage String?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime     @default(now())
+
+  document SuratJalanDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+}
+
+model OcrExtractedField {
+  id              String   @id @default(cuid())
+  documentId      String
+  fieldKey        String
+  rawValue        String?
+  correctedValue  String?
+  verifiedValue   String?
+  confidence      Decimal? @db.Decimal(5, 4)
+  needsReview     Boolean  @default(false)
+  source          String   @default("ocr")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  document SuratJalanDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, fieldKey])
+}
+
+model OcrLineItem {
+  id                    String   @id @default(cuid())
+  documentId            String
+  lineNumber            Int
+  pageNumber            Int?
+  supplierProductName   String?
+  supplierProductCode   String?
+  quantityRaw           String?
+  quantityVerified      Decimal? @db.Decimal(18, 4)
+  unitRaw               String?
+  unitPriceRaw          String?
+  unitPriceVerified     Decimal? @db.Decimal(18, 4)
+  lineTotalRaw          String?
+  lineTotalVerified     Decimal? @db.Decimal(18, 4)
+  confidence            Decimal? @db.Decimal(5, 4)
+  needsReview           Boolean  @default(true)
+  internalProductId     String?
+  mappingId             String?
+  mappingStatus         MappingStatus @default(PENDING)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  document        SuratJalanDocument      @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  internalProduct InternalProduct?        @relation(fields: [internalProductId], references: [id])
+  mapping         SupplierProductMapping? @relation(fields: [mappingId], references: [id])
+  poItems         PurchaseOrderItem[]
+  receiptItems    GoodsReceiptItem[]
+  discrepancies   Discrepancy[]
+  invoiceItems    PurchaseInvoiceItem[]
+
+  @@index([documentId, lineNumber])
+}
+
+model InternalProduct {
+  id           String   @id @default(cuid())
+  sku          String   @unique
+  name         String
+  defaultUnit  String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  mappings     SupplierProductMapping[]
+  lineItems    OcrLineItem[]
+  poItems      PurchaseOrderItem[]
+  priceHistory PurchasePriceHistory[]
+  receiptItems GoodsReceiptItem[]
+  invoiceItems PurchaseInvoiceItem[]
+}
+
+model SupplierProductMapping {
+  id                   String        @id @default(cuid())
+  supplierId           String
+  internalProductId    String
+  supplierProductCode  String?
+  supplierProductName  String
+  alternativeNames     String?
+  unit                 String
+  conversionRule       String?
+  status               MappingStatus @default(PENDING)
+  lastVerifiedAt       DateTime?
+  createdById          String?
+  verifiedById         String?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  supplier        Supplier        @relation(fields: [supplierId], references: [id])
+  internalProduct InternalProduct @relation(fields: [internalProductId], references: [id])
+  createdBy       User?           @relation("MappingCreatedBy", fields: [createdById], references: [id])
+  verifiedBy      User?           @relation("MappingVerifiedBy", fields: [verifiedById], references: [id])
+  lineItems       OcrLineItem[]
+  auditEntries    MappingAuditLog[]
+
+  @@index([supplierId, supplierProductCode])
+  @@index([supplierId, supplierProductName])
+}
+
+model MappingAuditLog {
+  id        String   @id @default(cuid())
+  mappingId String
+  action    String
+  before    Json?
+  after     Json?
+  actorId   String?
+  createdAt DateTime @default(now())
+
+  mapping SupplierProductMapping @relation(fields: [mappingId], references: [id], onDelete: Cascade)
+}
+
+model ProductUnit {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  createdAt DateTime @default(now())
+}
+
+model PurchaseOrder {
+  id              String              @id @default(cuid())
+  ppNumber        String              @unique
+  supplierId      String
+  documentId      String
+  status          PurchaseOrderStatus @default(DRAFT)
+  createdById     String
+  approvedById    String?
+  approvedAt      DateTime?
+  notes           String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  supplier   Supplier           @relation(fields: [supplierId], references: [id])
+  document   SuratJalanDocument @relation(fields: [documentId], references: [id])
+  createdBy  User               @relation("PPCreatedBy", fields: [createdById], references: [id])
+  approvedBy User?              @relation("PPApprovedBy", fields: [approvedById], references: [id])
+  items      PurchaseOrderItem[]
+  receipts   GoodsReceipt[]
+  discrepancies Discrepancy[]
+  invoices   PurchaseInvoice[]
+}
+
+model PurchaseOrderItem {
+  id                String   @id @default(cuid())
+  purchaseOrderId   String
+  ocrLineItemId     String?
+  internalProductId String
+  supplierDescription String?
+  quantity          Decimal  @db.Decimal(18, 4)
+  unit              String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  purchaseOrder   PurchaseOrder   @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  ocrLineItem     OcrLineItem?    @relation(fields: [ocrLineItemId], references: [id])
+  internalProduct InternalProduct @relation(fields: [internalProductId], references: [id])
+  receiptItems    GoodsReceiptItem[]
+}
+
+model GoodsReceipt {
+  id              String             @id @default(cuid())
+  grNumber        String             @unique
+  purchaseOrderId String
+  status          GoodsReceiptStatus @default(DRAFT)
+  receivedById    String
+  receivedAt      DateTime           @default(now())
+  notes           String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  purchaseOrder PurchaseOrder      @relation(fields: [purchaseOrderId], references: [id])
+  receivedBy    User               @relation(fields: [receivedById], references: [id])
+  items         GoodsReceiptItem[]
+  discrepancies Discrepancy[]
+}
+
+model GoodsReceiptItem {
+  id                   String   @id @default(cuid())
+  goodsReceiptId       String
+  purchaseOrderItemId  String
+  internalProductId    String
+  ocrLineItemId        String?
+  qtySuratJalan        Decimal? @db.Decimal(18, 4)
+  qtyPurchaseOrder     Decimal  @db.Decimal(18, 4)
+  qtyReceived          Decimal  @db.Decimal(18, 4)
+  differenceQty        Decimal  @db.Decimal(18, 4)
+  differenceStatus     String?
+  explanation          String?
+  evidencePaths        Json?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  goodsReceipt      GoodsReceipt      @relation(fields: [goodsReceiptId], references: [id], onDelete: Cascade)
+  purchaseOrderItem PurchaseOrderItem @relation(fields: [purchaseOrderItemId], references: [id])
+  internalProduct   InternalProduct   @relation(fields: [internalProductId], references: [id])
+  ocrLineItem       OcrLineItem?      @relation(fields: [ocrLineItemId], references: [id])
+}
+
+model Discrepancy {
+  id                    String            @id @default(cuid())
+  discrepancyNumber     String            @unique
+  purchaseOrderId       String
+  goodsReceiptId        String?
+  ocrLineItemId         String?
+  internalProductId     String?
+  expectedQty           Decimal           @db.Decimal(18, 4)
+  actualQty             Decimal           @db.Decimal(18, 4)
+  differenceQty         Decimal           @db.Decimal(18, 4)
+  reasonCategory        String?
+  status                DiscrepancyStatus @default(PENDING_REVIEW)
+  supplierConfirmStatus String?
+  resolutionNotes       String?
+  resolvedAt            DateTime?
+  reportedById          String
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  purchaseOrder PurchaseOrder         @relation(fields: [purchaseOrderId], references: [id])
+  goodsReceipt  GoodsReceipt?         @relation(fields: [goodsReceiptId], references: [id])
+  ocrLineItem   OcrLineItem?          @relation(fields: [ocrLineItemId], references: [id])
+  reportedBy    User                  @relation(fields: [reportedById], references: [id])
+  evidence      DiscrepancyEvidence[]
+  statusHistory DiscrepancyStatusHistory[]
+}
+
+model DiscrepancyEvidence {
+  id            String   @id @default(cuid())
+  discrepancyId String
+  storageKey    String
+  description   String?
+  createdAt     DateTime @default(now())
+
+  discrepancy Discrepancy @relation(fields: [discrepancyId], references: [id], onDelete: Cascade)
+}
+
+model DiscrepancyStatusHistory {
+  id            String            @id @default(cuid())
+  discrepancyId String
+  previousStatus DiscrepancyStatus?
+  newStatus     DiscrepancyStatus
+  reason        String?
+  createdAt     DateTime          @default(now())
+
+  discrepancy Discrepancy @relation(fields: [discrepancyId], references: [id], onDelete: Cascade)
+}
+
+model PurchasePriceHistory {
+  id                String   @id @default(cuid())
+  internalProductId String
+  supplierId        String
+  unit              String
+  unitPrice         Decimal  @db.Decimal(18, 4)
+  currency          String   @default("IDR")
+  effectiveFrom     DateTime
+  effectiveTo       DateTime?
+  sourceReference   String?
+  verificationStatus String  @default("pending")
+  updatedById       String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  internalProduct InternalProduct @relation(fields: [internalProductId], references: [id])
+  supplier        Supplier        @relation(fields: [supplierId], references: [id])
+  updatedBy       User?           @relation(fields: [updatedById], references: [id])
+
+  @@index([internalProductId, supplierId, effectiveFrom])
+}
+
+model PurchaseInvoice {
+  id              String        @id @default(cuid())
+  invoiceNumber   String        @unique
+  supplierId      String
+  purchaseOrderId String
+  status          InvoiceStatus @default(DRAFT)
+  invoiceDate     DateTime?
+  subtotal        Decimal?      @db.Decimal(18, 4)
+  adjustments     Decimal?      @db.Decimal(18, 4)
+  totalAmount     Decimal?      @db.Decimal(18, 4)
+  verifiedById    String?
+  verifiedAt      DateTime?
+  notes           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  supplier      Supplier              @relation(fields: [supplierId], references: [id])
+  purchaseOrder PurchaseOrder         @relation(fields: [purchaseOrderId], references: [id])
+  verifiedBy    User?                 @relation(fields: [verifiedById], references: [id])
+  items         PurchaseInvoiceItem[]
+  payable       AccountsPayableRecord?
+}
+
+model PurchaseInvoiceItem {
+  id                String   @id @default(cuid())
+  invoiceId         String
+  internalProductId String
+  ocrLineItemId     String?
+  quantity          Decimal  @db.Decimal(18, 4)
+  unit              String
+  priceFromSuratJalan Decimal? @db.Decimal(18, 4)
+  priceFromMaster   Decimal? @db.Decimal(18, 4)
+  priceManual       Decimal? @db.Decimal(18, 4)
+  priceFinal        Decimal? @db.Decimal(18, 4)
+  lineTotal         Decimal? @db.Decimal(18, 4)
+  createdAt         DateTime @default(now())
+
+  invoice         PurchaseInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  internalProduct InternalProduct @relation(fields: [internalProductId], references: [id])
+  ocrLineItem     OcrLineItem?    @relation(fields: [ocrLineItemId], references: [id])
+}
+
+model PaymentTerm {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  daysUntilDue Int
+  description String?
+  createdAt   DateTime @default(now())
+
+  payableRecords AccountsPayableRecord[]
+}
+
+model AccountsPayableRecord {
+  id              String        @id @default(cuid())
+  apNumber        String        @unique
+  supplierId      String
+  invoiceId       String        @unique
+  invoiceReference String
+  amount          Decimal       @db.Decimal(18, 4)
+  outstanding     Decimal       @db.Decimal(18, 4)
+  paymentTermId   String?
+  invoiceDate     DateTime?
+  dueDate         DateTime?
+  paymentStatus   PayableStatus @default(OPEN)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  supplier    Supplier        @relation(fields: [supplierId], references: [id])
+  invoice     PurchaseInvoice @relation(fields: [invoiceId], references: [id])
+  paymentTerm PaymentTerm?    @relation(fields: [paymentTermId], references: [id])
+}
+
+model Notification {
+  id             String                     @id @default(cuid())
+  userId         String?
+  channel        NotificationChannel
+  title          String
+  body           String
+  link           String?
+  deliveryStatus NotificationDeliveryStatus @default(PENDING)
+  metadata       Json?
+  readAt         DateTime?
+  createdAt      DateTime                   @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+}
+
+model IntegrationSetting {
+  id           String              @id @default(cuid())
+  providerKey  String              @unique
+  displayName  String
+  status       IntegrationStatus   @default(NOT_CONFIGURED)
+  configJson   Json?
+  lastTestedAt DateTime?
+  lastError    String?
+  updatedAt    DateTime            @updatedAt
+  createdAt    DateTime            @default(now())
+}
+
+model SystemSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String
+  before     Json?
+  after      Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
