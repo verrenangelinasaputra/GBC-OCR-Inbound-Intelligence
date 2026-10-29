@@ -60,12 +60,17 @@ function loadServiceAccountCredentials(): { client_email: string; private_key: s
     }
   }
 
+  // Vercel has no secrets/ files — use GOOGLE_SERVICE_ACCOUNT_JSON env instead.
+  if (process.env.VERCEL === "1") return null;
+
   const filePath =
     process.env.GOOGLE_SERVICE_ACCOUNT_JSON_PATH?.trim() ||
     process.env.GOOGLE_APPLICATION_CREDENTIALS?.trim();
   if (!filePath) return null;
 
-  const resolved = path.isAbsolute(filePath) ? filePath : path.join(process.cwd(), filePath);
+  const resolved = path.isAbsolute(filePath)
+    ? filePath
+    : path.join(process.cwd(), "secrets", path.basename(filePath));
   if (!fs.existsSync(resolved)) return null;
 
   const parsed = JSON.parse(fs.readFileSync(resolved, "utf8")) as {

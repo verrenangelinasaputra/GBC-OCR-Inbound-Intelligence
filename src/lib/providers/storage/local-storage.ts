@@ -12,8 +12,24 @@ export interface DocumentStorageProvider {
   getHealth(): Promise<{ status: string; message?: string }>;
 }
 
-function getStorageRoot(): string {
-  return process.env.STORAGE_LOCAL_PATH ?? "./storage/uploads";
+/** Static paths only — dynamic fs paths break Turbopack/Vercel deployment tracing. */
+function uploadsBaseDir(): string {
+  if (process.env.VERCEL === "1") {
+    return path.join("/tmp", "gbc-uploads");
+  }
+  return path.join(process.cwd(), "storage", "uploads");
+}
+
+function assertSafeStorageKey(storageKey: string): string {
+  const base = path.basename(storageKey);
+  if (!base || base !== storageKey || base.includes("..")) {
+    throw new Error("Invalid storage key");
+  }
+  return base;
+}
+
+function filePathForKey(storageKey: string): string {
+  return path.join(uploadsBaseDir(), assertSafeStorageKey(storageKey));
 }
 
 export class LocalDocumentStorageProvider implements DocumentStorageProvider {
@@ -22,21 +38,26 @@ export class LocalDocumentStorageProvider implements DocumentStorageProvider {
     originalFilename: string;
     mimeType: string;
   }) {
-    const root = path.resolve(getStorageRoot());
+    const root = uploadsBaseDir();
     await fs.mkdir(root, { recursive: true });
     const ext = path.extname(params.originalFilename).toLowerCase() || ".bin";
     const storageKey = `${randomUUID()}${ext}`;
-    const fullPath = path.join(root, storageKey);
+    const fullPath = path.join(root, assertSafeStorageKey(storageKey));
     await fs.writeFile(fullPath, params.buffer);
     return { storageKey, sizeBytes: params.buffer.length };
   }
 
   async readFile(storageKey: string): Promise<Buffer> {
-    const fullPath = path.join(path.resolve(getStorageRoot()), storageKey);
-    return fs.readFile(fullPath);
+    return fs.readFile(filePathForKey(storageKey));
   }
 
   async getHealth() {
+    if (process.env.VERCEL === "1") {
+      return {
+        status: "CONNECTED",
+        message: "Uploads di /tmp (ephemeral — gunakan object storage untuk production)",
+      };
+    }
     return { status: "CONNECTED", message: "Local storage aktif (development)" };
   }
 }
