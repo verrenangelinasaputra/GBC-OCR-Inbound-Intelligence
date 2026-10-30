@@ -47,17 +47,43 @@ export function getGoogleExportConfig(): GoogleExportConfig {
   return cfg;
 }
 
+function normalizePrivateKey(key: string): string {
+  const trimmed = key.trim();
+  if (trimmed.includes("\\n")) {
+    return trimmed.replace(/\\n/g, "\n");
+  }
+  return trimmed;
+}
+
+function parseServiceAccountJson(raw: string): { client_email: string; private_key: string } | null {
+  try {
+    const parsed = JSON.parse(raw) as { client_email?: string; private_key?: string };
+    if (!parsed.client_email || !parsed.private_key) return null;
+    return {
+      client_email: parsed.client_email,
+      private_key: normalizePrivateKey(parsed.private_key),
+    };
+  } catch {
+    return null;
+  }
+}
+
 function loadServiceAccountCredentials(): { client_email: string; private_key: string } | null {
+  const base64 = process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64?.trim();
+  if (base64) {
+    try {
+      const raw = Buffer.from(base64, "base64").toString("utf8");
+      const creds = parseServiceAccountJson(raw);
+      if (creds) return creds;
+    } catch {
+      /* fall through */
+    }
+  }
+
   const inline = process.env.GOOGLE_SERVICE_ACCOUNT_JSON?.trim();
   if (inline) {
-    try {
-      const parsed = JSON.parse(inline) as { client_email?: string; private_key?: string };
-      if (parsed.client_email && parsed.private_key) {
-        return { client_email: parsed.client_email, private_key: parsed.private_key };
-      }
-    } catch {
-      return null;
-    }
+    const creds = parseServiceAccountJson(inline);
+    if (creds) return creds;
   }
 
   // Vercel has no secrets/ files — use GOOGLE_SERVICE_ACCOUNT_JSON env instead.
@@ -73,10 +99,6 @@ function loadServiceAccountCredentials(): { client_email: string; private_key: s
     : path.join(process.cwd(), "secrets", path.basename(filePath));
   if (!fs.existsSync(resolved)) return null;
 
-  const parsed = JSON.parse(fs.readFileSync(resolved, "utf8")) as {
-    client_email?: string;
-    private_key?: string;
-  };
-  if (!parsed.client_email || !parsed.private_key) return null;
-  return { client_email: parsed.client_email, private_key: parsed.private_key };
+  const creds = parseServiceAccountJson(fs.readFileSync(resolved, "utf8"));
+  return creds;
 }

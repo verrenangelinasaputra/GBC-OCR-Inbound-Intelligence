@@ -22,12 +22,14 @@ export async function getGoogleWorkspaceHealth(): Promise<ProviderHealth & { ser
 
   const cfg = getGoogleExportConfigOptional();
   if (!cfg) {
+    const onVercel = process.env.VERCEL === "1";
     return {
       providerKey: "google_workspace",
       displayName: "Google Drive + Sheets export",
       status: "NOT_CONFIGURED",
-      message:
-        "Set GOOGLE_SERVICE_ACCOUNT_JSON_PATH (atau JSON inline), GOOGLE_DRIVE_FOLDER_ID, GOOGLE_SHEET_ID",
+      message: onVercel
+        ? "Di Vercel: isi GOOGLE_SERVICE_ACCOUNT_JSON (isi penuh file .json) atau GOOGLE_SERVICE_ACCOUNT_JSON_BASE64 — path ke secrets/ tidak ikut deploy."
+        : "Set GOOGLE_SERVICE_ACCOUNT_JSON (inline), GOOGLE_SERVICE_ACCOUNT_JSON_PATH, GOOGLE_DRIVE_FOLDER_ID, GOOGLE_SHEET_ID",
     };
   }
 

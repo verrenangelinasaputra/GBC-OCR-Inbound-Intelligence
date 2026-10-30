@@ -125,6 +125,31 @@ npm start
 
 Gunakan PostgreSQL managed + object storage persisten untuk file Surat Jalan (bukan filesystem ephemeral).
 
+### Deploy Vercel — environment variables
+
+File di `secrets/` **tidak** ikut deploy. Copy-paste **hanya path** (`GOOGLE_SERVICE_ACCOUNT_JSON_PATH=./secrets/....json`) di Vercel **tidak akan jalan**.
+
+| Variable | Vercel |
+|----------|--------|
+| `DATABASE_URL` | Connection string **Neon / Supabase** (bukan `localhost`) |
+| `SESSION_SECRET` | Min. 32 karakter random |
+| `GEMINI_API_KEY` | Key dari [Google AI Studio](https://aistudio.google.com/apikey) — biasanya **`AIza...`**, bukan format `AQ....` |
+| `OCR_PROVIDER` | `gemini` |
+| `GOOGLE_EXPORT_ENABLED` | `true` jika perlu export |
+| `GOOGLE_DRIVE_FOLDER_ID` / `GOOGLE_SHEET_ID` / `GOOGLE_SHEET_TAB` | Sama seperti lokal |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | **Isi penuh** file service account (JSON), atau pakai `GOOGLE_SERVICE_ACCOUNT_JSON_BASE64` |
+| `GOOGLE_SERVICE_ACCOUNT_JSON_PATH` | Hanya untuk **lokal** — abaikan di Vercel |
+
+Setelah DB cloud terhubung, jalankan sekali dari mesin Anda:
+
+```powershell
+$env:DATABASE_URL="postgresql://..."   # URL production
+npx prisma migrate deploy
+npm run db:seed
+```
+
+Tanpa migrate + seed, login `admin` / password seed akan gagal (user belum ada di DB production).
+
 ## Struktur penting
 
 - `prisma/schema.prisma` — schema DB lengkap
