@@ -131,7 +131,7 @@ File di `secrets/` **tidak** ikut deploy. Copy-paste **hanya path** (`GOOGLE_SER
 
 | Variable | Vercel |
 |----------|--------|
-| `DATABASE_URL` | Connection string **Neon / Supabase** (bukan `localhost`) |
+| `DATABASE_URL` | Supabase: pakai **Connection pooling** (port **6543**) + `?pgbouncer=true` — lihat bawah |
 | `SESSION_SECRET` | Min. 32 karakter random |
 | `GEMINI_API_KEY` | Key dari [Google AI Studio](https://aistudio.google.com/apikey) — biasanya **`AIza...`**, bukan format `AQ....` |
 | `OCR_PROVIDER` | `gemini` |
@@ -149,6 +149,18 @@ npm run db:seed
 ```
 
 Tanpa migrate + seed, login `admin` / password seed akan gagal (user belum ada di DB production).
+
+#### Supabase + Vercel: `Can't reach database server`
+
+Penyebab umum:
+
+1. **Project Supabase paused** (gratis) — buka [Supabase Dashboard](https://supabase.com/dashboard) → project → **Restore project**.
+2. **Direct connection (port 5432)** sering gagal dari Vercel serverless — ganti `DATABASE_URL` di Vercel ke **Pooler**:
+   - Supabase → **Connect** (atau Settings → Database) → **Connection string** → mode **URI**
+   - Pilih **Transaction pooler** (port **6543**), bukan "Direct"
+   - Contoh bentuk: `postgresql://postgres.gfikhmkiplymxilbwfyj:PASSWORD@....pooler.supabase.com:6543/postgres?pgbouncer=true`
+   - Password dengan `!` → `%21` di URL
+3. Untuk **migrate/seed dari laptop**, boleh tetap pakai **Direct** (`db....supabase.co:5432`) + `?sslmode=require`.
 
 ## Struktur penting
 

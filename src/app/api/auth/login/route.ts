@@ -45,7 +45,38 @@ export async function POST(request: Request) {
         : "/dashboard";
 
     return Response.json({ ok: true, redirect, roles });
-  } catch {
-    return Response.json({ error: "Login gagal" }, { status: 500 });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    console.error("[auth.login]", message);
+
+    if (message.includes("SESSION_SECRET")) {
+      return Response.json(
+        {
+          error:
+            "SESSION_SECRET belum valid di server (Vercel → Environment Variables, min. 32 karakter, lalu Redeploy).",
+        },
+        { status: 500 }
+      );
+    }
+    if (message.includes("Can't reach database server")) {
+      return Response.json(
+        {
+          error:
+            "Database tidak terjangkau dari Vercel. Supabase: Restore project jika paused, ganti DATABASE_URL ke Transaction pooler (port 6543 + pgbouncer=true).",
+        },
+        { status: 500 }
+      );
+    }
+    if (/authentication failed|password authentication/i.test(message)) {
+      return Response.json(
+        {
+          error:
+            "Password di DATABASE_URL salah (encode ! jadi %21). Cek env Vercel lalu Redeploy.",
+        },
+        { status: 500 }
+      );
+    }
+
+    return Response.json({ error: "Login gagal — buka /api/health untuk diagnosa." }, { status: 500 });
   }
 }
