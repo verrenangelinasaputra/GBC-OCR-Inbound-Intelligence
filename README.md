@@ -178,7 +178,7 @@ Env **Vercel** (Production):
 | `MAIL_FROM` | `GBC Supplier Portal <nomarcengkareng@gmail.com>` |
 | `ADMIN_NOTIFY_EMAIL` | `nomarcengkareng@gmail.com` |
 
-**Hapus atau abaikan** `DATABASE_URL` di Vercel untuk mode ini.
+**Hapus atau abaikan** `DATABASE_URL` di Vercel untuk mode ini. `npm install` tidak lagi memanggil Prisma; `prisma generate` hanya saat `npm run build` (tanpa koneksi DB nyata). Login admin di `/login` butuh Supabase lagi jika `DATABASE_URL` diisi.
 
 Urutan setup (jangan dilewati):
 

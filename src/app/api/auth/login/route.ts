@@ -1,10 +1,19 @@
-import { prisma } from "@/lib/db";
+import { hasDatabase, prisma } from "@/lib/db";
 import { verifyPassword } from "@/lib/auth/password";
 import { createSessionToken, setSessionCookie } from "@/lib/auth/session";
 import { writeAuditLog } from "@/lib/services/audit";
 
 export async function POST(request: Request) {
   try {
+    if (!hasDatabase()) {
+      return Response.json(
+        {
+          error:
+            "Login admin/internal membutuhkan DATABASE_URL (Supabase). Tanpa database, gunakan /supplier/login untuk akun spreadsheet.",
+        },
+        { status: 503 }
+      );
+    }
     const body = await request.json();
     const username = String(body.username ?? "").trim();
     const password = String(body.password ?? "");
