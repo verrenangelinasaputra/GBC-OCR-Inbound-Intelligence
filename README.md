@@ -110,7 +110,25 @@ Lihat [.env.example](./.env.example).
 
 **Kalau upload sukses tapi sheet target kosong:** cek env `GOOGLE_SHEET_ID` di Vercel — jika masih ID lama `1XDSWH-...`, data masuk spreadsheet **salah**. Gunakan `1o2No4lV_...` atau hapus variable itu (default kode + deploy terbaru mengabaikan ID legacy). Setelah submit, portal supplier menampilkan link **Buka spreadsheet hasil OCR**.
 
-**Kalau Drive error *storage quota*:** service account tidak punya kuota My Drive. Folder `1_eQPA9BXJj1RjLgfyCPnlgZEsJdpjHnA` harus di **Shared Drive** dengan service account sebagai **Content manager**, atau pakai `GOOGLE_WORKSPACE_DELEGATED_USER` (delegasi Workspace). Spreadsheet tetap jalan tanpa foto di Drive.
+**Kalau Drive error *storage quota*:** lihat bagian [Upload foto ke Drive](#upload-foto-ke-drive-gmail--workspace) di bawah.
+
+## Upload foto ke Drive (Gmail / Workspace)
+
+Service account **tidak bisa** mengisi folder **My Drive** biasa. Spreadsheet tetap jalan; untuk foto pilih **Opsi A** (Gmail) atau **Opsi B** (Workspace).
+
+#### Opsi A — Gmail (mis. nomarcengkareng@gmail.com) — disarankan
+
+1. Google Cloud → **OAuth consent screen** → test user = email pemilik folder Drive.
+2. **Credentials** → OAuth client **Desktop** → `GOOGLE_DRIVE_OAUTH_CLIENT_ID` + `SECRET`.
+3. `npm run drive:oauth-setup` → dapat `GOOGLE_DRIVE_OAUTH_REFRESH_TOKEN`.
+4. Vercel: tambahkan 3 var OAuth + `GOOGLE_DRIVE_UPLOAD_AUTH=oauth` → redeploy.
+5. `npm run drive:upload-test` untuk cek lokal.
+
+Tanpa langkah 4, setelah OAuth terisi deploy terbaru bisa **otomatis fallback** ke OAuth saat service account kena quota.
+
+#### Opsi B — Google Workspace
+
+Shared Drive + service account **Content manager**, atau `GOOGLE_WORKSPACE_DELEGATED_USER` + domain-wide delegation.
 
 ## Integrasi: real vs demo
 

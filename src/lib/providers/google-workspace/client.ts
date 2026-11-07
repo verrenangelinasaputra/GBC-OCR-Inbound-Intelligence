@@ -1,6 +1,7 @@
 import { Readable } from "node:stream";
 import { google } from "googleapis";
 import type { GoogleExportConfig } from "./config";
+import { createDriveOAuthClient, isDriveOAuthConfigured } from "./drive-oauth";
 
 function driveScopes(config: GoogleExportConfig): string[] {
   return [
@@ -18,19 +19,24 @@ export function createGoogleAuthClient(config: GoogleExportConfig) {
   });
 }
 
-export async function uploadFileToDrive(params: {
-  config: GoogleExportConfig;
-  buffer: Buffer;
-  fileName: string;
-  mimeType: string;
-}): Promise<{ fileId: string; fileUrl: string }> {
-  const auth = createGoogleAuthClient(params.config);
+function preferOAuthDriveUpload(): boolean {
+  const mode = process.env.GOOGLE_DRIVE_UPLOAD_AUTH?.trim().toLowerCase();
+  if (mode === "oauth") return isDriveOAuthConfigured();
+  if (mode === "service_account") return false;
+  return false;
+}
+
+async function driveUploadWithAuth(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  auth: any,
+  params: { folderId: string; buffer: Buffer; fileName: string; mimeType: string }
+): Promise<{ fileId: string; fileUrl: string }> {
   const drive = google.drive({ version: "v3", auth });
 
   const res = await drive.files.create({
     requestBody: {
       name: params.fileName,
-      parents: [params.config.driveFolderId],
+      parents: [params.folderId],
     },
     media: {
       mimeType: params.mimeType,
@@ -48,6 +54,42 @@ export async function uploadFileToDrive(params: {
     fileId,
     fileUrl: `https://drive.google.com/file/d/${fileId}/view?usp=drivesdk`,
   };
+}
+
+export async function uploadFileToDrive(params: {
+  config: GoogleExportConfig;
+  buffer: Buffer;
+  fileName: string;
+  mimeType: string;
+}): Promise<{ fileId: string; fileUrl: string }> {
+  const payload = {
+    folderId: params.config.driveFolderId,
+    buffer: params.buffer,
+    fileName: params.fileName,
+    mimeType: params.mimeType,
+  };
+
+  if (preferOAuthDriveUpload()) {
+    const oauth = createDriveOAuthClient();
+    if (!oauth) {
+      throw new Error(
+        "GOOGLE_DRIVE_UPLOAD_AUTH=oauth tapi GOOGLE_DRIVE_OAUTH_* belum lengkap — jalankan npm run drive:oauth-setup"
+      );
+    }
+    return driveUploadWithAuth(oauth, payload);
+  }
+
+  const jwt = createGoogleAuthClient(params.config);
+  try {
+    return await driveUploadWithAuth(jwt, payload);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const oauth = createDriveOAuthClient();
+    if (oauth && (msg.includes("storage quota") || msg.includes("Service Accounts"))) {
+      return driveUploadWithAuth(oauth, payload);
+    }
+    throw err;
+  }
 }
 
 export async function resolveSheetTabName(config: GoogleExportConfig): Promise<string> {
