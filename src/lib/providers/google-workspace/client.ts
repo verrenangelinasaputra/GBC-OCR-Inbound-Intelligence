@@ -2,7 +2,7 @@ import { Readable } from "node:stream";
 import { google } from "googleapis";
 import type { GoogleExportConfig } from "./config";
 import { createDriveOAuthClient, isDriveOAuthConfigured } from "./drive-oauth";
-import { OCR_SHEET_HEADERS } from "./google-sj-export-rows";
+import { nextOcrDataRowNumber, OCR_SHEET_HEADERS } from "./google-sj-export-rows";
 
 function driveScopes(config: GoogleExportConfig): string[] {
   return [
@@ -196,21 +196,25 @@ export async function appendRowsToSheet(params: {
   const auth = createGoogleAuthClient(params.config);
   const sheets = google.sheets({ version: "v4", auth });
   const sheetTab = await resolveSheetTabName(params.config);
-  const range = `${sheetTab}!A:O`;
 
   await ensureOcrSheetHeaders(params.config);
 
-  const res = await sheets.spreadsheets.values.append({
+  const existing = await sheets.spreadsheets.values.get({
+    spreadsheetId: params.config.sheetId,
+    range: `${sheetTab}!A:O`,
+  });
+  const startRow = nextOcrDataRowNumber(existing.data.values ?? []);
+  const endRow = startRow + params.rows.length - 1;
+  const range = `${sheetTab}!A${startRow}:O${endRow}`;
+
+  const res = await sheets.spreadsheets.values.update({
     spreadsheetId: params.config.sheetId,
     range,
     valueInputOption: "USER_ENTERED",
-    insertDataOption: "INSERT_ROWS",
-    requestBody: {
-      values: params.rows,
-    },
+    requestBody: { values: params.rows },
   });
 
-  return { updatedRange: res.data.updates?.updatedRange ?? undefined, sheetTab };
+  return { updatedRange: res.data.updatedRange ?? undefined, sheetTab };
 }
 
 function bufferToStream(buffer: Buffer) {

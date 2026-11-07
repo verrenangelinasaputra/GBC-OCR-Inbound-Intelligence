@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildGoogleSheetRows, buildSuratJalanFileName } from "./google-sj-export-rows";
+import {
+  buildGoogleSheetRows,
+  buildSuratJalanFileName,
+  nextOcrDataRowNumber,
+  OCR_SHEET_HEADERS,
+} from "./google-sj-export-rows";
 
 describe("buildSuratJalanFileName", () => {
   it("formats like legacy Apps Script", () => {
@@ -47,5 +52,24 @@ describe("buildGoogleSheetRows", () => {
     expect(rows[0][8]).toBe("144 PCS");
     expect(rows[0][10]).toBe("16704 PCS");
     expect(rows[0][14]).toBe("OK");
+  });
+});
+
+describe("nextOcrDataRowNumber", () => {
+  it("starts after header when sheet is empty", () => {
+    expect(nextOcrDataRowNumber([Array.from(OCR_SHEET_HEADERS)])).toBe(2);
+  });
+
+  it("ignores junk rows that only fill Status", () => {
+    const rows = [
+      Array.from(OCR_SHEET_HEADERS),
+      buildGoogleSheetRows({
+        payload: { no_surat_jalan: "P7461", items: [{ nama_barang: "X", is_subtotal: false, ragu: false }] },
+        fileName: "f.jpeg",
+        fileUrl: "",
+      })[0],
+      ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "07/11/2026"],
+    ];
+    expect(nextOcrDataRowNumber(rows)).toBe(3);
   });
 });

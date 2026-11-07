@@ -159,3 +159,25 @@ export function parseGeminiPayloadFromStructured(structured: unknown): GeminiSJP
   }
   return null;
 }
+
+/** Baris data OCR valid (abaikan baris sampah cuma kolom Status). */
+export function isMeaningfulOcrDataRow(row: string[] | undefined): boolean {
+  if (!row?.length) return false;
+  const exported = String(row[0] ?? "").trim();
+  if (exported && /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(exported)) return true;
+  const noSj = String(row[2] ?? "").trim();
+  if (noSj) return true;
+  const fileName = String(row[12] ?? "").trim();
+  return fileName.length > 0;
+}
+
+/** Baris 1-based untuk tulis data OCR berikutnya (setelah header + baris data terakhir). */
+export function nextOcrDataRowNumber(rows: string[][]): number {
+  let lastData = 1;
+  for (let i = 0; i < rows.length; i += 1) {
+    const row = rows[i];
+    if (i === 0 && String(row?.[0] ?? "").trim() === OCR_SHEET_HEADERS[0]) continue;
+    if (isMeaningfulOcrDataRow(row)) lastData = i + 1;
+  }
+  return lastData + 1;
+}
