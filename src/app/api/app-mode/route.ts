@@ -1,0 +1,11 @@
+import { isSheetOnlyMode } from "@/lib/config/app-mode";
+import { isGoogleExportConfigured } from "@/lib/providers/google-workspace";
+
+export async function GET() {
+  return Response.json({
+    sheetOnly: isSheetOnlyMode(),
+    googleExport: isGoogleExportConfigured(),
+    ocr: process.env.OCR_PROVIDER ?? "auto",
+    hasGeminiKey: Boolean(process.env.GEMINI_API_KEY?.trim()),
+  });
+}

@@ -1,6 +1,27 @@
+import { isSheetOnlyMode } from "@/lib/config/app-mode";
+import { isGoogleExportConfigured } from "@/lib/providers/google-workspace";
 import { prisma } from "@/lib/db";
 
 export async function GET() {
+  if (isSheetOnlyMode()) {
+    const google = isGoogleExportConfigured();
+    const gemini = Boolean(process.env.GEMINI_API_KEY?.trim());
+    const ok = google && gemini;
+    return Response.json(
+      {
+        ok,
+        mode: "sheet-only",
+        vercel: process.env.VERCEL === "1",
+        checks: {
+          sheetOnly: { ok: true, detail: "Aktif — PostgreSQL tidak dipakai" },
+          googleExport: { ok: google, detail: google ? "OK" : "Google export belum lengkap" },
+          gemini: { ok: gemini, detail: gemini ? "OK" : "GEMINI_API_KEY kosong" },
+        },
+      },
+      { status: ok ? 200 : 503 }
+    );
+  }
+
   const sessionSecret = process.env.SESSION_SECRET?.trim() ?? "";
   const dbUrl = process.env.DATABASE_URL ?? "";
   const hostHint = dbUrl.replace(/:[^:@]+@/, ":****@").split("?")[0];

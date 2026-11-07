@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function SupplierUploadPage() {
+  const [sheetOnly, setSheetOnly] = useState(false);
   const [files, setFiles] = useState<FileList | null>(null);
   const [notes, setNotes] = useState("");
   const [vehicleInfo, setVehicleInfo] = useState("");
@@ -12,9 +13,20 @@ export default function SupplierUploadPage() {
     shipmentRef?: string;
     duplicateDetected?: boolean;
     ocrError?: string;
+    sheetRowCount?: number;
+    driveFileUrl?: string;
+    driveWarning?: string;
+    message?: string;
   } | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/app-mode")
+      .then((r) => r.json())
+      .then((d) => setSheetOnly(Boolean(d.sheetOnly)))
+      .catch(() => setSheetOnly(false));
+  }, []);
 
   function onFilesChange(list: FileList | null) {
     setFiles(list);
@@ -38,14 +50,24 @@ export default function SupplierUploadPage() {
     Array.from(files).forEach((f) => form.append("files", f));
     form.append("notes", notes);
     form.append("vehicleInfo", vehicleInfo);
-    const res = await fetch("/api/supplier/upload", { method: "POST", body: form });
+    const uploadUrl = sheetOnly ? "/api/supplier/upload-sheet-only" : "/api/supplier/upload";
+    const res = await fetch(uploadUrl, { method: "POST", body: form });
     const data = await res.json();
     setLoading(false);
     if (!res.ok) {
       setError(data.error ?? "Upload gagal");
       return;
     }
-    setResult(data);
+    setResult({
+      submissionRef: data.submissionRef,
+      shipmentRef: data.shipmentRef,
+      duplicateDetected: data.duplicateDetected,
+      ocrError: data.ocrError,
+      sheetRowCount: data.sheetRowCount,
+      driveFileUrl: data.driveFileUrl,
+      driveWarning: data.driveWarning,
+      message: data.message,
+    });
   }
 
   return (
@@ -53,6 +75,7 @@ export default function SupplierUploadPage() {
       <h1 className="text-2xl font-semibold">Upload Surat Jalan</h1>
       <p className="mt-1 text-sm text-slate-400">
         JPG, JPEG, PNG, PDF (scan). Preview sebelum submit.
+        {sheetOnly && " Mode spreadsheet: 1 file per submit → langsung ke Google Sheet."}
       </p>
 
       <form onSubmit={onSubmit} className="mt-6 space-y-4 rounded-xl border border-slate-700 bg-slate-800/50 p-6">
@@ -95,7 +118,17 @@ export default function SupplierUploadPage() {
           <div className="rounded-lg bg-emerald-900/40 p-4 text-sm">
             <p className="font-medium text-emerald-300">Berhasil disubmit</p>
             <p>Referensi: {result.submissionRef}</p>
-            <p>Shipment (NKB): {result.shipmentRef}</p>
+            {result.shipmentRef && <p>Shipment (NKB): {result.shipmentRef}</p>}
+            {result.sheetRowCount != null && <p>Baris di Sheet: {result.sheetRowCount}</p>}
+            {result.driveFileUrl && (
+              <p>
+                <a href={result.driveFileUrl} className="text-blue-300 underline" target="_blank" rel="noreferrer">
+                  Buka file di Drive
+                </a>
+              </p>
+            )}
+            {result.message && <p className="mt-1 text-slate-300">{result.message}</p>}
+            {result.driveWarning && <p className="mt-2 text-amber-300">{result.driveWarning}</p>}
             {result.duplicateDetected && (
               <p className="mt-2 text-amber-300">Peringatan: kemungkinan duplikat file — tim GBC akan review.</p>
             )}

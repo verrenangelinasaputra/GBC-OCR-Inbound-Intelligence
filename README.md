@@ -150,6 +150,47 @@ npm run db:seed
 
 Tanpa migrate + seed, login `admin` / password seed akan gagal (user belum ada di DB production).
 
+#### Mode tanpa Supabase — `SHEET_ONLY_MODE=true`
+
+Cocok untuk **pilot upload Surat Jalan di Vercel** tanpa PostgreSQL:
+
+- **Bisa:** `/supplier/register` → kode email dari **nomarcengkareng@gmail.com** → login username + password → upload → OCR Gemini → spreadsheet operasional + Drive.
+- Akun supplier di [Supplier Credentials](https://docs.google.com/spreadsheets/d/156m4HFAUnqubtCJumBJZ9BCCel_kNVcU_ZV9kHi4HtY), tab **Users**. Kode disimpan sebagai hash di tab **AuthCodes** (pola yang sama dengan GBC Expense Hub).
+- **Tidak bisa** di mode ini: dashboard internal, PP, penerimaan, invoice, audit di app — itu butuh PostgreSQL.
+
+Env **Vercel** (Production):
+
+| Variable | Value |
+|----------|--------|
+| `SHEET_ONLY_MODE` | `true` |
+| `SESSION_SECRET` | Min. 32 karakter random (wajib, untuk cookie login) |
+| `OCR_PROVIDER` | `gemini` |
+| `GEMINI_API_KEY` | Key AI Studio (`AIza...`) |
+| `GOOGLE_EXPORT_ENABLED` | `true` |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | Isi penuh JSON service account |
+| `GOOGLE_DRIVE_FOLDER_ID` / `GOOGLE_SHEET_ID` / `GOOGLE_SHEET_TAB` | Sheet hasil OCR + folder Drive |
+| `SUPPLIER_SHEET_ID` | `156m4HFAUnqubtCJumBJZ9BCCel_kNVcU_ZV9kHi4HtY` |
+| `SMTP_HOST` | `smtp.gmail.com` |
+| `SMTP_PORT` | `587` |
+| `SMTP_USER` | `nomarcengkareng@gmail.com` |
+| `SMTP_PASS` | App Password Gmail akun itu (16 karakter) |
+| `MAIL_FROM` | `GBC Supplier Portal <nomarcengkareng@gmail.com>` |
+| `ADMIN_NOTIFY_EMAIL` | `nomarcengkareng@gmail.com` |
+
+**Hapus atau abaikan** `DATABASE_URL` di Vercel untuk mode ini.
+
+Urutan setup (jangan dilewati):
+
+1. Spreadsheet Supplier Credentials → **Share** → ubah dari *Anyone with the link* menjadi **Restricted**.
+2. Share sheet itu sebagai **Editor** ke email `client_email` di JSON service account (bukan ke email pribadi saja).
+3. Di Google Account **nomarcengkareng@gmail.com**: aktifkan 2-Step Verification → **App passwords** → buat password untuk Mail → tempel ke `SMTP_PASS` (bukan password login Gmail).
+4. Isi env di atas, **Redeploy**.
+5. Supplier buka `/supplier/register`, isi perusahaan, kontak, username, email, telepon, dan password. Kode 6 digit masuk ke email mereka, pengirimnya nomarcengkareng@gmail.com.
+6. Setelah verifikasi, baris `ACTIVE` muncul di tab **Users**. Login berikutnya: username + password. Lupa password: `/supplier/forgot-password`.
+7. Untuk menonaktifkan supplier, ubah kolom `status` di tab Users menjadi `DISABLED`. Inbox nomarcengkareng@gmail.com juga menerima pemberitahuan akun baru.
+
+Buka: `https://your-app.vercel.app/supplier/login`.
+
 #### Supabase + Vercel: `Can't reach database server`
 
 Penyebab umum:

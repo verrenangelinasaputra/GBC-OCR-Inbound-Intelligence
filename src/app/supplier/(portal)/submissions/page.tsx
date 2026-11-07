@@ -1,9 +1,22 @@
 import { getSession } from "@/lib/auth/session";
+import { isSheetOnlyMode } from "@/lib/config/app-mode";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { StatusBadge } from "@/components/ui/status-badge";
 
 export default async function SupplierSubmissionsPage() {
+  if (isSheetOnlyMode()) {
+    return (
+      <div>
+        <h1 className="text-2xl font-semibold">Status Pengiriman</h1>
+        <p className="mt-2 text-sm text-slate-400">
+          Setelah upload, hasil OCR masuk ke spreadsheet operasional GBC dan foto masuk Drive. Portal ini
+          tidak menyimpan status di database.
+        </p>
+      </div>
+    );
+  }
+
   const session = await getSession();
   if (!session?.supplierId) redirect("/supplier/login");
 

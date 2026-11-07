@@ -68,7 +68,7 @@ function parseServiceAccountJson(raw: string): { client_email: string; private_k
   }
 }
 
-function loadServiceAccountCredentials(): { client_email: string; private_key: string } | null {
+export function loadServiceAccountCredentials(): { client_email: string; private_key: string } | null {
   const base64 = process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64?.trim();
   if (base64) {
     try {
