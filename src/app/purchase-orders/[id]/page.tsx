@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/layout/app-shell";
+import { SpreadsheetModePage, spreadsheetModeActive } from "@/components/layout/spreadsheet-mode-page";
 import { prisma } from "@/lib/db";
 import { GoodsReceiptForm } from "@/components/receiving/goods-receipt-form";
 
@@ -7,6 +8,8 @@ export default async function PurchaseOrderDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  if (spreadsheetModeActive()) return <SpreadsheetModePage title="Purchase Order — detail" />;
+
   const { id } = await params;
   const po = await prisma.purchaseOrder.findUniqueOrThrow({
     where: { id },

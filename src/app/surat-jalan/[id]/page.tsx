@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/layout/app-shell";
+import { SpreadsheetModePage, spreadsheetModeActive } from "@/components/layout/spreadsheet-mode-page";
 import { prisma } from "@/lib/db";
 import { OcrReviewPanel } from "@/components/documents/ocr-review-panel";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -11,6 +12,12 @@ export default async function SuratJalanDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  if (spreadsheetModeActive()) {
+    return (
+      <SpreadsheetModePage title="Surat Jalan — detail review" />
+    );
+  }
+
   const { id } = await params;
   const doc = await prisma.suratJalanDocument.findUniqueOrThrow({
     where: { id },

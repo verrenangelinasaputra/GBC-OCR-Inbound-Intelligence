@@ -1,7 +1,9 @@
 import { ModuleListPage } from "@/components/layout/module-list-page";
+import { SpreadsheetModePage, spreadsheetModeActive } from "@/components/layout/spreadsheet-mode-page";
 import { prisma } from "@/lib/db";
 
 export default async function SuppliersPage() {
+  if (spreadsheetModeActive()) return <SpreadsheetModePage title="Supplier Management" />;
   const suppliers = await prisma.supplier.findMany({ include: { users: true } });
   return (
     <ModuleListPage title="Supplier Management" description="Kelola supplier terdaftar (SSC pilot).">

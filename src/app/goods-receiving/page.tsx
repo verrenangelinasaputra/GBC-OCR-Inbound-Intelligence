@@ -1,8 +1,11 @@
 import { ModuleListPage } from "@/components/layout/module-list-page";
+import { SpreadsheetModePage, spreadsheetModeActive } from "@/components/layout/spreadsheet-mode-page";
 import { prisma } from "@/lib/db";
 import Link from "next/link";
 
 export default async function GoodsReceivingPage() {
+  if (spreadsheetModeActive()) return <SpreadsheetModePage title="Goods Receiving" />;
+
   const approved = await prisma.purchaseOrder.findMany({
     where: { status: "APPROVED" },
     include: { supplier: true, receipts: true },

@@ -1,7 +1,9 @@
 import { ModuleListPage } from "@/components/layout/module-list-page";
+import { SpreadsheetModePage, spreadsheetModeActive } from "@/components/layout/spreadsheet-mode-page";
 import { prisma } from "@/lib/db";
 
 export default async function AccountsPayablePage() {
+  if (spreadsheetModeActive()) return <SpreadsheetModePage title="Accounts Payable" />;
   const rows = await prisma.accountsPayableRecord.findMany({
     include: { supplier: true, paymentTerm: true, invoice: true },
     orderBy: { createdAt: "desc" },

@@ -1,11 +1,12 @@
 import { getSession } from "@/lib/auth/session";
 import { isSheetOnlyMode } from "@/lib/config/app-mode";
+import { spreadsheetModeActive } from "@/components/layout/spreadsheet-mode-page";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { StatusBadge } from "@/components/ui/status-badge";
 
 export default async function SupplierSubmissionsPage() {
-  if (isSheetOnlyMode()) {
+  if (isSheetOnlyMode() || spreadsheetModeActive()) {
     return (
       <div>
         <h1 className="text-2xl font-semibold">Status Pengiriman</h1>

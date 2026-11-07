@@ -1,7 +1,9 @@
 import { ModuleListPage } from "@/components/layout/module-list-page";
+import { SpreadsheetModePage, spreadsheetModeActive } from "@/components/layout/spreadsheet-mode-page";
 import { prisma } from "@/lib/db";
 
 export default async function MasterPricesPage() {
+  if (spreadsheetModeActive()) return <SpreadsheetModePage title="Master Harga Beli" />;
   const prices = await prisma.purchasePriceHistory.findMany({
     include: { internalProduct: true, supplier: true },
     orderBy: { effectiveFrom: "desc" },

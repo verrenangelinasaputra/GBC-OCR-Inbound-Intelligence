@@ -1,4 +1,5 @@
 import { ModuleListPage } from "@/components/layout/module-list-page";
+import { spreadsheetModeActive } from "@/components/layout/spreadsheet-mode-page";
 import { prisma } from "@/lib/db";
 import { getOCRProvider } from "@/lib/providers/ocr";
 import { getTelegramProvider } from "@/lib/providers/notifications";
@@ -7,7 +8,9 @@ import { getGoogleWorkspaceHealth } from "@/lib/providers/google-workspace";
 import { StatusBadge } from "@/components/ui/status-badge";
 
 export default async function IntegrationsPage() {
-  const settings = await prisma.integrationSetting.findMany({ orderBy: { providerKey: "asc" } });
+  const settings = spreadsheetModeActive()
+    ? []
+    : await prisma.integrationSetting.findMany({ orderBy: { providerKey: "asc" } });
   const [ocr, telegram, storage, google] = await Promise.all([
     getOCRProvider().getHealth(),
     getTelegramProvider().getHealth(),

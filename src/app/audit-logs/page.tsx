@@ -1,7 +1,9 @@
 import { ModuleListPage } from "@/components/layout/module-list-page";
+import { SpreadsheetModePage, spreadsheetModeActive } from "@/components/layout/spreadsheet-mode-page";
 import { prisma } from "@/lib/db";
 
 export default async function AuditLogsPage() {
+  if (spreadsheetModeActive()) return <SpreadsheetModePage title="Audit Logs" />;
   const logs = await prisma.auditLog.findMany({
     include: { actor: true },
     orderBy: { createdAt: "desc" },

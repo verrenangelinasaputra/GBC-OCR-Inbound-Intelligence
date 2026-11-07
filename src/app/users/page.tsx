@@ -1,8 +1,11 @@
 import { ModuleListPage } from "@/components/layout/module-list-page";
+import { SpreadsheetModePage, spreadsheetModeActive } from "@/components/layout/spreadsheet-mode-page";
 import { prisma } from "@/lib/db";
 import { CreateUserForm } from "@/components/admin/create-user-form";
 
 export default async function UsersPage() {
+  if (spreadsheetModeActive()) return <SpreadsheetModePage title="User & Role Management" />;
+
   const users = await prisma.user.findMany({
     include: { userRoles: { include: { role: true } }, supplier: true },
     orderBy: { username: "asc" },

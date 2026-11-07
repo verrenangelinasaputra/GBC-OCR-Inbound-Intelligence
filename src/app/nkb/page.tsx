@@ -1,8 +1,11 @@
 import { ModuleListPage } from "@/components/layout/module-list-page";
+import { SpreadsheetModePage, spreadsheetModeActive } from "@/components/layout/spreadsheet-mode-page";
 import { prisma } from "@/lib/db";
 import Link from "next/link";
 
 export default async function NkbPage() {
+  if (spreadsheetModeActive()) return <SpreadsheetModePage title="Incoming Shipments / NKB" />;
+
   const shipments = await prisma.inboundShipment.findMany({
     orderBy: { submittedAt: "desc" },
     include: { supplier: true, documents: true },

@@ -1,7 +1,9 @@
 import { ModuleListPage } from "@/components/layout/module-list-page";
+import { SpreadsheetModePage, spreadsheetModeActive } from "@/components/layout/spreadsheet-mode-page";
 import { prisma } from "@/lib/db";
 
 export default async function DiscrepanciesPage() {
+  if (spreadsheetModeActive()) return <SpreadsheetModePage title="Discrepancy Management" />;
   const rows = await prisma.discrepancy.findMany({
     include: { purchaseOrder: true },
     orderBy: { createdAt: "desc" },

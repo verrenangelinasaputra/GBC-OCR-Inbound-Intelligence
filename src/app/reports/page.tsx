@@ -1,7 +1,9 @@
 import { ModuleListPage } from "@/components/layout/module-list-page";
+import { SpreadsheetModePage, spreadsheetModeActive } from "@/components/layout/spreadsheet-mode-page";
 import { prisma } from "@/lib/db";
 
 export default async function ReportsPage() {
+  if (spreadsheetModeActive()) return <SpreadsheetModePage title="Reports & Analytics" />;
   const [docCount, poCount, discCount] = await Promise.all([
     prisma.suratJalanDocument.count(),
     prisma.purchaseOrder.count(),

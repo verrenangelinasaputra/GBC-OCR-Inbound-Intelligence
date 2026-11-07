@@ -1,8 +1,10 @@
 import { ModuleListPage } from "@/components/layout/module-list-page";
+import { SpreadsheetModeFallback } from "@/components/layout/spreadsheet-mode-fallback";
+import { spreadsheetModeActive } from "@/components/layout/spreadsheet-mode-page";
 import { prisma } from "@/lib/db";
 
 export default async function SettingsPage() {
-  const settings = await prisma.systemSetting.findMany();
+  const settings = spreadsheetModeActive() ? [] : await prisma.systemSetting.findMany();
   return (
     <ModuleListPage title="System Settings" description="Konfigurasi aplikasi — threshold OCR, dll via env + DB.">
       <ul className="rounded-xl border bg-white p-4 text-sm">
@@ -13,9 +15,15 @@ export default async function SettingsPage() {
         <li>STORAGE_PROVIDER: {process.env.STORAGE_PROVIDER ?? "local"}</li>
         <li>ACCURATE_INTEGRATION_ENABLED: {process.env.ACCURATE_INTEGRATION_ENABLED ?? "false"}</li>
       </ul>
-      <pre className="mt-4 rounded bg-slate-900 p-4 text-xs text-slate-200">
-        {JSON.stringify(settings, null, 2)}
-      </pre>
+      {spreadsheetModeActive() ? (
+        <div className="mt-4">
+          <SpreadsheetModeFallback moduleTitle="System Settings (DB)" />
+        </div>
+      ) : (
+        <pre className="mt-4 rounded bg-slate-900 p-4 text-xs text-slate-200">
+          {JSON.stringify(settings, null, 2)}
+        </pre>
+      )}
     </ModuleListPage>
   );
 }

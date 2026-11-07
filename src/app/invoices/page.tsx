@@ -1,8 +1,11 @@
 import { ModuleListPage } from "@/components/layout/module-list-page";
+import { SpreadsheetModePage, spreadsheetModeActive } from "@/components/layout/spreadsheet-mode-page";
 import { prisma } from "@/lib/db";
 import Link from "next/link";
 
 export default async function InvoicesPage() {
+  if (spreadsheetModeActive()) return <SpreadsheetModePage title="Purchase Invoices" />;
+
   const invoices = await prisma.purchaseInvoice.findMany({
     include: { supplier: true, purchaseOrder: true },
     orderBy: { createdAt: "desc" },

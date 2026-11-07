@@ -1,9 +1,26 @@
 import { AppShell } from "@/components/layout/app-shell";
+import { SpreadsheetModePage, spreadsheetModeActive } from "@/components/layout/spreadsheet-mode-page";
+import { SheetExportTable } from "@/components/surat-jalan/sheet-export-table";
 import { prisma } from "@/lib/db";
+import { listOcrDocumentsFromSheet } from "@/lib/services/ocr-sheet-list";
 import Link from "next/link";
 import { StatusBadge } from "@/components/ui/status-badge";
 
 export default async function SuratJalanListPage() {
+  if (spreadsheetModeActive()) {
+    let docs: Awaited<ReturnType<typeof listOcrDocumentsFromSheet>> = [];
+    try {
+      docs = await listOcrDocumentsFromSheet();
+    } catch {
+      return <SpreadsheetModePage title="Surat Jalan Documents" />;
+    }
+    return (
+      <AppShell title="Surat Jalan Documents">
+        <SheetExportTable docs={docs} />
+      </AppShell>
+    );
+  }
+
   const docs = await prisma.suratJalanDocument.findMany({
     orderBy: { createdAt: "desc" },
     include: { supplier: true, shipment: true },

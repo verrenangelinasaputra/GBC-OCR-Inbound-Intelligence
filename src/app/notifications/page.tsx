@@ -1,8 +1,11 @@
 import { ModuleListPage } from "@/components/layout/module-list-page";
+import { SpreadsheetModePage, spreadsheetModeActive } from "@/components/layout/spreadsheet-mode-page";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
 
 export default async function NotificationsPage() {
+  if (spreadsheetModeActive()) return <SpreadsheetModePage title="Notifications" />;
+
   const session = await getSession();
   const notifications = await prisma.notification.findMany({
     where: session ? { OR: [{ userId: session.userId }, { userId: null }] } : {},
