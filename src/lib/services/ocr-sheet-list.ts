@@ -1,5 +1,5 @@
 import { google } from "googleapis";
-import { createGoogleAuthClient } from "@/lib/providers/google-workspace/client";
+import { createGoogleAuthClient, resolveSheetTabName } from "@/lib/providers/google-workspace/client";
 import { getGoogleExportConfigOptional } from "@/lib/providers/google-workspace";
 
 export type OcrSheetDocument = {
@@ -19,7 +19,8 @@ export async function listOcrDocumentsFromSheet(limit = 80): Promise<OcrSheetDoc
 
   const auth = createGoogleAuthClient(config);
   const sheets = google.sheets({ version: "v4", auth });
-  const range = `${config.sheetTab}!A:O`;
+  const sheetTab = await resolveSheetTabName(config);
+  const range = `${sheetTab}!A:O`;
 
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: config.sheetId,

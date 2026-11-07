@@ -52,10 +52,16 @@ export async function POST(request: Request) {
       submissionRef: result.submissionRef,
       suratJalanNumber: result.suratJalanNumber,
       sheetRowCount: result.sheetRowCount,
+      sheetId: result.sheetId,
+      sheetTab: result.sheetTab,
+      sheetUrl: result.sheetUrl,
+      sheetUpdatedRange: result.sheetUpdatedRange,
       driveFileUrl: result.driveFileUrl,
       driveWarning: result.driveWarning,
       ocrWarnings: result.ocrWarnings,
-      message: "Data tersimpan di Google Spreadsheet" + (result.driveFileUrl ? " + Drive" : ""),
+      message:
+        `Data ditulis ke spreadsheet (tab ${result.sheetTab}, ${result.sheetRowCount} baris)` +
+        (result.driveFileUrl ? " + foto di Drive" : ""),
     });
   } catch (e) {
     return jsonError(e instanceof Error ? e : new Error("Upload gagal"));

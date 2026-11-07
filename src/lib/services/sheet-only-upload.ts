@@ -1,5 +1,6 @@
 import { GeminiOCRProvider } from "@/lib/providers/ocr/gemini-ocr";
 import type { GeminiSJPayload } from "@/lib/providers/ocr/gemini-surat-jalan";
+import { ocrExportSheetUrl } from "@/lib/config/ocr-export-target";
 import {
   appendRowsToSheet,
   buildGoogleSheetRows,
@@ -13,6 +14,10 @@ export type SheetOnlyUploadResult = {
   submissionRef: string;
   suratJalanNumber?: string;
   sheetRowCount: number;
+  sheetId: string;
+  sheetTab: string;
+  sheetUrl: string;
+  sheetUpdatedRange?: string;
   driveFileUrl?: string;
   driveWarning?: string;
   ocrWarnings: string[];
@@ -69,8 +74,10 @@ export async function processSheetOnlyUpload(params: {
     });
     fileUrl = uploaded.fileUrl;
   } catch (err) {
-    driveWarning =
-      err instanceof Error ? err.message : "Upload Drive gagal — baris Sheet tetap ditambah jika Sheet OK.";
+    const raw = err instanceof Error ? err.message : "Upload Drive gagal";
+    driveWarning = raw.includes("storage quota")
+      ? `${raw} — Pindahkan folder ke Shared Drive (Drive bersama) & jadikan service account Content manager, atau set GOOGLE_WORKSPACE_DELEGATED_USER. Data OCR tetap masuk spreadsheet.`
+      : raw;
     fileUrl = "";
   }
 
@@ -87,12 +94,16 @@ export async function processSheetOnlyUpload(params: {
     },
   });
 
-  await appendRowsToSheet({ config, rows });
+  const sheetAppend = await appendRowsToSheet({ config, rows });
 
   return {
     submissionRef,
     suratJalanNumber: result.suratJalanNumber,
     sheetRowCount: rows.length,
+    sheetId: config.sheetId,
+    sheetTab: sheetAppend.sheetTab,
+    sheetUrl: ocrExportSheetUrl(config.sheetId),
+    sheetUpdatedRange: sheetAppend.updatedRange,
     driveFileUrl: fileUrl || undefined,
     driveWarning,
     ocrWarnings: result.warnings,

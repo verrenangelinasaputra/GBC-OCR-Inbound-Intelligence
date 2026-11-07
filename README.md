@@ -108,6 +108,10 @@ Lihat [.env.example](./.env.example).
 5. Cek: `npm run google:test` → menu **Integrations** menampilkan status Google.
 6. Setelah upload supplier + OCR Gemini: **baris per item** di sheet + **foto** di folder Drive (nama file `Surat Jalan_<tanggal>_<no SJ>.jpeg`).
 
+**Kalau upload sukses tapi sheet target kosong:** cek env `GOOGLE_SHEET_ID` di Vercel — jika masih ID lama `1XDSWH-...`, data masuk spreadsheet **salah**. Gunakan `1o2No4lV_...` atau hapus variable itu (default kode + deploy terbaru mengabaikan ID legacy). Setelah submit, portal supplier menampilkan link **Buka spreadsheet hasil OCR**.
+
+**Kalau Drive error *storage quota*:** service account tidak punya kuota My Drive. Folder `1_eQPA9BXJj1RjLgfyCPnlgZEsJdpjHnA` harus di **Shared Drive** dengan service account sebagai **Content manager**, atau pakai `GOOGLE_WORKSPACE_DELEGATED_USER` (delegasi Workspace). Spreadsheet tetap jalan tanpa foto di Drive.
+
 ## Integrasi: real vs demo
 
 | Integrasi | Status v1 |

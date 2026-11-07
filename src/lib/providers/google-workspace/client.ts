@@ -3,11 +3,8 @@ import { google } from "googleapis";
 import type { GoogleExportConfig } from "./config";
 
 function driveScopes(config: GoogleExportConfig): string[] {
-  if (config.impersonateUserEmail) {
-    return ["https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/spreadsheets"];
-  }
   return [
-    "https://www.googleapis.com/auth/drive.file",
+    "https://www.googleapis.com/auth/drive",
     "https://www.googleapis.com/auth/spreadsheets",
   ];
 }
@@ -41,6 +38,7 @@ export async function uploadFileToDrive(params: {
     },
     fields: "id",
     supportsAllDrives: true,
+    enforceSingleParent: true,
   });
 
   const fileId = res.data.id;
@@ -52,17 +50,31 @@ export async function uploadFileToDrive(params: {
   };
 }
 
+export async function resolveSheetTabName(config: GoogleExportConfig): Promise<string> {
+  const auth = createGoogleAuthClient(config);
+  const sheets = google.sheets({ version: "v4", auth });
+  const meta = await sheets.spreadsheets.get({
+    spreadsheetId: config.sheetId,
+    fields: "sheets.properties.title",
+  });
+  const titles = meta.data.sheets?.map((s) => s.properties?.title).filter(Boolean) as string[];
+  if (titles.includes(config.sheetTab)) return config.sheetTab;
+  if (titles[0]) return titles[0];
+  return config.sheetTab;
+}
+
 export async function appendRowsToSheet(params: {
   config: GoogleExportConfig;
   rows: string[][];
-}): Promise<void> {
-  if (params.rows.length === 0) return;
+}): Promise<{ updatedRange?: string; sheetTab: string }> {
+  if (params.rows.length === 0) return { sheetTab: params.config.sheetTab };
 
   const auth = createGoogleAuthClient(params.config);
   const sheets = google.sheets({ version: "v4", auth });
-  const range = `${params.config.sheetTab}!A:O`;
+  const sheetTab = await resolveSheetTabName(params.config);
+  const range = `${sheetTab}!A:O`;
 
-  await sheets.spreadsheets.values.append({
+  const res = await sheets.spreadsheets.values.append({
     spreadsheetId: params.config.sheetId,
     range,
     valueInputOption: "USER_ENTERED",
@@ -71,6 +83,8 @@ export async function appendRowsToSheet(params: {
       values: params.rows,
     },
   });
+
+  return { updatedRange: res.data.updates?.updatedRange ?? undefined, sheetTab };
 }
 
 function bufferToStream(buffer: Buffer) {

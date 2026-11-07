@@ -13,7 +13,7 @@ export {
   buildSuratJalanFileName,
   parseGeminiPayloadFromStructured,
 } from "./google-sj-export-rows";
-export { uploadFileToDrive, appendRowsToSheet } from "./client";
+export { uploadFileToDrive, appendRowsToSheet, resolveSheetTabName } from "./client";
 
 export async function getGoogleWorkspaceHealth(): Promise<ProviderHealth & { serviceAccountEmail?: string }> {
   if (!isGoogleExportEnabled()) {

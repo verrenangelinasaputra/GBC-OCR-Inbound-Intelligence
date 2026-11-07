@@ -14,6 +14,9 @@ export default function SupplierUploadPage() {
     duplicateDetected?: boolean;
     ocrError?: string;
     sheetRowCount?: number;
+    sheetUrl?: string;
+    sheetTab?: string;
+    sheetUpdatedRange?: string;
     driveFileUrl?: string;
     driveWarning?: string;
     message?: string;
@@ -64,6 +67,9 @@ export default function SupplierUploadPage() {
       duplicateDetected: data.duplicateDetected,
       ocrError: data.ocrError,
       sheetRowCount: data.sheetRowCount,
+      sheetUrl: data.sheetUrl,
+      sheetTab: data.sheetTab,
+      sheetUpdatedRange: data.sheetUpdatedRange,
       driveFileUrl: data.driveFileUrl,
       driveWarning: data.driveWarning,
       message: data.message,
@@ -120,6 +126,17 @@ export default function SupplierUploadPage() {
             <p>Referensi: {result.submissionRef}</p>
             {result.shipmentRef && <p>Shipment (NKB): {result.shipmentRef}</p>}
             {result.sheetRowCount != null && <p>Baris di Sheet: {result.sheetRowCount}</p>}
+            {result.sheetUrl && (
+              <p>
+                <a href={result.sheetUrl} className="text-blue-300 underline" target="_blank" rel="noreferrer">
+                  Buka spreadsheet hasil OCR
+                </a>
+                {result.sheetTab ? ` (tab ${result.sheetTab})` : ""}
+              </p>
+            )}
+            {result.sheetUpdatedRange && (
+              <p className="text-slate-400 text-xs">Range: {result.sheetUpdatedRange}</p>
+            )}
             {result.driveFileUrl && (
               <p>
                 <a href={result.driveFileUrl} className="text-blue-300 underline" target="_blank" rel="noreferrer">
