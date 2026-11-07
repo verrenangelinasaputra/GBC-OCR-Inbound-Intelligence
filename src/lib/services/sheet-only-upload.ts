@@ -1,6 +1,7 @@
 import { GeminiOCRProvider } from "@/lib/providers/ocr/gemini-ocr";
 import type { GeminiSJPayload } from "@/lib/providers/ocr/gemini-surat-jalan";
 import { ocrExportSheetUrl } from "@/lib/config/ocr-export-target";
+import { isDriveOAuthConfigured } from "@/lib/providers/google-workspace/drive-oauth";
 import {
   appendRowsToSheet,
   buildGoogleSheetRows,
@@ -75,9 +76,13 @@ export async function processSheetOnlyUpload(params: {
     fileUrl = uploaded.fileUrl;
   } catch (err) {
     const raw = err instanceof Error ? err.message : "Upload Drive gagal";
-    driveWarning = raw.includes("storage quota")
-      ? `${raw} — Pindahkan folder ke Shared Drive (Drive bersama) & jadikan service account Content manager, atau set GOOGLE_WORKSPACE_DELEGATED_USER. Data OCR tetap masuk spreadsheet.`
-      : raw;
+    const vercelHint =
+      process.env.VERCEL === "1" && !isDriveOAuthConfigured()
+        ? " Di Vercel: tambahkan GOOGLE_DRIVE_OAUTH_CLIENT_ID, GOOGLE_DRIVE_OAUTH_CLIENT_SECRET, GOOGLE_DRIVE_OAUTH_REFRESH_TOKEN (dari npm run drive:oauth-setup), lalu redeploy."
+        : "";
+    driveWarning = raw.includes("storage quota") || raw.includes("Service Accounts")
+      ? `Upload Drive gagal (service account).${vercelHint || " Pastikan OAuth Drive sudah di env production."} Spreadsheet tetap terisi.`
+      : `${raw}${vercelHint}`;
     fileUrl = "";
   }
 

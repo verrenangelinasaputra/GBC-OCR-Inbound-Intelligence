@@ -22,9 +22,10 @@ export function createGoogleAuthClient(config: GoogleExportConfig) {
 
 function preferOAuthDriveUpload(): boolean {
   const mode = process.env.GOOGLE_DRIVE_UPLOAD_AUTH?.trim().toLowerCase();
-  if (mode === "oauth") return isDriveOAuthConfigured();
   if (mode === "service_account") return false;
-  return false;
+  if (mode === "oauth") return isDriveOAuthConfigured();
+  // Default: pakai OAuth jika env lengkap (hindari quota error service account di Vercel)
+  return isDriveOAuthConfigured();
 }
 
 async function driveUploadWithAuth(
