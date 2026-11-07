@@ -1,9 +1,11 @@
 import { AppShell } from "@/components/layout/app-shell";
+import { hasDatabase } from "@/lib/db";
 import { getDashboardMetrics } from "@/lib/services/dashboard-metrics";
 import { StatusBadge } from "@/components/ui/status-badge";
 
 export default async function DashboardPage() {
   const metrics = await getDashboardMetrics();
+  const spreadsheetMode = !hasDatabase();
   const cards = [
     { label: "Incoming shipments hari ini", value: metrics.cards.incomingToday, tone: "info" as const },
     { label: "Surat Jalan awaiting OCR", value: metrics.cards.awaitingOcr, tone: "warning" as const },
@@ -17,6 +19,12 @@ export default async function DashboardPage() {
 
   return (
     <AppShell title="Dashboard">
+      {spreadsheetMode && (
+        <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Mode spreadsheet — login admin dari Google Sheet. Data operasional Surat Jalan ada di spreadsheet
+          export OCR; menu di bawah butuh Supabase jika ingin dipakai penuh.
+        </div>
+      )}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map((c) => (
           <div key={c.label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">

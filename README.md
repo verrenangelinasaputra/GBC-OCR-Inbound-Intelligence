@@ -156,8 +156,9 @@ Cocok untuk **pilot upload Surat Jalan di Vercel** tanpa PostgreSQL:
 
 - **Bisa:** `/supplier/register` → kode email dari **nomarcengkareng@gmail.com** → login username + password → upload → OCR Gemini → spreadsheet operasional + Drive.
 - Akun supplier di [Supplier Credentials](https://docs.google.com/spreadsheets/d/156m4HFAUnqubtCJumBJZ9BCCel_kNVcU_ZV9kHi4HtY), tab **Users**. Kode disimpan sebagai hash di tab **AuthCodes** (pola yang sama dengan GBC Expense Hub).
-- **Supplier** pakai spreadsheet; **admin internal** tetap di `/login` → dashboard jika `DATABASE_URL` + seed aktif (user `admin` dari seed).
-- Fitur penuh (PP, penerimaan, invoice) tetap butuh PostgreSQL yang bisa dijangkau dari Vercel.
+- **Supplier** → spreadsheet `SUPPLIER_SHEET_ID`; **admin internal** → `/login` + spreadsheet [Internal Users](https://docs.google.com/spreadsheets/d/1PTxO6HbOccYn30g1l7SaGpGIcV0PBcuLmqzC3me5GYM) (`INTERNAL_SHEET_ID`), tanpa Supabase.
+- Buat user `admin` sekali: `npm run internal:setup` (butuh service account + share Editor ke sheet).
+- Menu PP / invoice / dll. tetap butuh Supabase jika ingin data live di app; dashboard mode spreadsheet menampilkan angka 0 + petunjuk.
 
 Env **Vercel** (Production):
 
@@ -171,6 +172,8 @@ Env **Vercel** (Production):
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | Isi penuh JSON service account |
 | `GOOGLE_DRIVE_FOLDER_ID` / `GOOGLE_SHEET_ID` / `GOOGLE_SHEET_TAB` | Sheet hasil OCR + folder Drive |
 | `SUPPLIER_SHEET_ID` | `156m4HFAUnqubtCJumBJZ9BCCel_kNVcU_ZV9kHi4HtY` |
+| `INTERNAL_SHEET_ID` | `1PTxO6HbOccYn30g1l7SaGpGIcV0PBcuLmqzC3me5GYM` |
+| `INTERNAL_SHEET_TAB` | `Sheet1` (sesuaikan nama tab) |
 | `SMTP_HOST` | `smtp.gmail.com` |
 | `SMTP_PORT` | `587` |
 | `SMTP_USER` | `nomarcengkareng@gmail.com` |

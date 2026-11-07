@@ -1,22 +1,43 @@
 import { hasDatabase, prisma } from "@/lib/db";
 import { verifyPassword } from "@/lib/auth/password";
 import { createSessionToken, setSessionCookie } from "@/lib/auth/session";
+import { isInternalSheetAuthEnabled } from "@/lib/config/internal-sheet";
+import { loginInternalFromSheet } from "@/lib/internal-auth/login";
 import { writeAuditLog } from "@/lib/services/audit";
+import { SupplierAuthError } from "@/lib/supplier-auth/errors";
 
 export async function POST(request: Request) {
   try {
+    const body = await request.json();
+    const username = String(body.username ?? "").trim();
+    const password = String(body.password ?? "");
+
+    if (isInternalSheetAuthEnabled()) {
+      const account = await loginInternalFromSheet(username, password);
+      const roles = account.roles;
+      const token = await createSessionToken({
+        userId: account.userId,
+        username: account.username,
+        roles,
+        supplierId: null,
+      });
+      await setSessionCookie(token);
+      const redirect =
+        roles.includes("SUPPLIER_USER") && !roles.includes("SUPER_ADMIN")
+          ? "/supplier"
+          : "/dashboard";
+      return Response.json({ ok: true, redirect, roles, auth: "internal-sheet" });
+    }
+
     if (!hasDatabase()) {
       return Response.json(
         {
           error:
-            "Login admin/internal membutuhkan DATABASE_URL (Supabase). Tanpa database, gunakan /supplier/login untuk akun spreadsheet.",
+            "Login internal membutuhkan spreadsheet Users (INTERNAL_SHEET_ID) atau DATABASE_URL.",
         },
         { status: 503 }
       );
     }
-    const body = await request.json();
-    const username = String(body.username ?? "").trim();
-    const password = String(body.password ?? "");
 
     const user = await prisma.user.findUnique({
       where: { username },
@@ -86,6 +107,9 @@ export async function POST(request: Request) {
       );
     }
 
+    if (e instanceof SupplierAuthError) {
+      return Response.json({ error: e.message }, { status: e.status });
+    }
     return Response.json({ error: "Login gagal — buka /api/health untuk diagnosa." }, { status: 500 });
   }
 }

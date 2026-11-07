@@ -1,7 +1,26 @@
+import { hasDatabase } from "@/lib/db";
 import { prisma } from "@/lib/db";
 import { startOfDay } from "date-fns";
 
+const EMPTY_METRICS = {
+  cards: {
+    incomingToday: 0,
+    awaitingOcr: 0,
+    awaitingVerification: 0,
+    unmatchedLines: 0,
+    poAwaitingApproval: 0,
+    awaitingReceiving: 0,
+    openDiscrepancies: 0,
+    invoicesAwaitingVerification: 0,
+  },
+  statusDistribution: [] as { status: string; _count: { _all: number } }[],
+  shipmentsByDay: [] as { submittedAt: Date | null }[],
+};
+
 export async function getDashboardMetrics() {
+  if (!hasDatabase()) {
+    return EMPTY_METRICS;
+  }
   const today = startOfDay(new Date());
 
   const [
