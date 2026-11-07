@@ -1,5 +1,24 @@
 import type { GeminiSJItem, GeminiSJPayload } from "@/lib/providers/ocr/gemini-surat-jalan";
 
+/** Kolom A–O — harus selaras dengan `buildGoogleSheetRows` dan pembacaan `ocr-sheet-list`. */
+export const OCR_SHEET_HEADERS = [
+  "Tanggal Ekspor",
+  "Tanggal SJ",
+  "No. Surat Jalan",
+  "No. Kendaraan",
+  "No. PO",
+  "Nama Penerima",
+  "Alamat",
+  "Banyaknya",
+  "Isi",
+  "Nama Barang",
+  "Jumlah",
+  "Keterangan",
+  "Nama File",
+  "Link Drive",
+  "Status",
+] as const;
+
 function formatQtySatuan(qty: number | null | undefined, satuan: string | undefined): string {
   if (qty === null || qty === undefined) return "";
   const s = (satuan || "").trim();

@@ -2,6 +2,7 @@ import { Readable } from "node:stream";
 import { google } from "googleapis";
 import type { GoogleExportConfig } from "./config";
 import { createDriveOAuthClient, isDriveOAuthConfigured } from "./drive-oauth";
+import { OCR_SHEET_HEADERS } from "./google-sj-export-rows";
 
 function driveScopes(config: GoogleExportConfig): string[] {
   return [
@@ -92,6 +93,87 @@ export async function uploadFileToDrive(params: {
   }
 }
 
+function firstRowIsOcrHeader(row: string[] | undefined): boolean {
+  if (!row?.length) return false;
+  return String(row[0] ?? "").trim() === OCR_SHEET_HEADERS[0];
+}
+
+function firstRowLooksLikeOcrData(row: string[] | undefined): boolean {
+  if (!row?.length) return false;
+  const exported = String(row[0] ?? "").trim();
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(exported)) return true;
+  const status = String(row[14] ?? "").trim().toUpperCase();
+  return status === "OK" || status === "CEK";
+}
+
+async function resolveSheetGridId(
+  sheets: ReturnType<typeof google.sheets>,
+  spreadsheetId: string,
+  sheetTab: string
+): Promise<number> {
+  const meta = await sheets.spreadsheets.get({
+    spreadsheetId,
+    fields: "sheets.properties(sheetId,title)",
+  });
+  const match = meta.data.sheets?.find((s) => s.properties?.title === sheetTab);
+  const sheetId = match?.properties?.sheetId;
+  if (sheetId == null) throw new Error(`Tab sheet tidak ditemukan: ${sheetTab}`);
+  return sheetId;
+}
+
+/** Sisipkan baris header jika sheet sudah berisi data tanpa header (row 1 langsung ekspor OCR). */
+export async function ensureOcrSheetHeaders(config: GoogleExportConfig): Promise<void> {
+  const auth = createGoogleAuthClient(config);
+  const sheets = google.sheets({ version: "v4", auth });
+  const sheetTab = await resolveSheetTabName(config);
+  const sheetId = await resolveSheetGridId(sheets, config.sheetId, sheetTab);
+
+  const head = await sheets.spreadsheets.values.get({
+    spreadsheetId: config.sheetId,
+    range: `${sheetTab}!A1:O1`,
+  });
+  const first = head.data.values?.[0];
+  if (firstRowIsOcrHeader(first)) return;
+
+  const hasContent = (first ?? []).some((c) => String(c ?? "").trim() !== "");
+  if (hasContent && (firstRowLooksLikeOcrData(first) || first)) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: config.sheetId,
+      requestBody: {
+        requests: [
+          {
+            insertDimension: {
+              range: { sheetId, dimension: "ROWS", startIndex: 0, endIndex: 1 },
+              inheritFromBefore: false,
+            },
+          },
+        ],
+      },
+    });
+  }
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: config.sheetId,
+    requestBody: {
+      requests: [
+        {
+          updateSheetProperties: {
+            properties: { sheetId, gridProperties: { frozenRowCount: 1 } },
+            fields: "gridProperties.frozenRowCount",
+          },
+        },
+      ],
+    },
+  });
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: config.sheetId,
+    range: `${sheetTab}!A1:O1`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [Array.from(OCR_SHEET_HEADERS)] },
+  });
+}
+
 export async function resolveSheetTabName(config: GoogleExportConfig): Promise<string> {
   const auth = createGoogleAuthClient(config);
   const sheets = google.sheets({ version: "v4", auth });
@@ -115,6 +197,8 @@ export async function appendRowsToSheet(params: {
   const sheets = google.sheets({ version: "v4", auth });
   const sheetTab = await resolveSheetTabName(params.config);
   const range = `${sheetTab}!A:O`;
+
+  await ensureOcrSheetHeaders(params.config);
 
   const res = await sheets.spreadsheets.values.append({
     spreadsheetId: params.config.sheetId,

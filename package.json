@@ -14,6 +14,7 @@
     "db:studio": "prisma studio",
     "gemini:models": "tsx scripts/list-gemini-models.ts",
     "google:test": "tsx scripts/test-google-export.ts",
+    "sheet:headers": "tsx scripts/setup-ocr-sheet-headers.ts",
     "drive:oauth-setup": "tsx scripts/setup-drive-oauth.ts",
     "drive:upload-test": "tsx scripts/test-drive-upload.ts",
     "internal:setup": "tsx scripts/setup-internal-admin.ts"
