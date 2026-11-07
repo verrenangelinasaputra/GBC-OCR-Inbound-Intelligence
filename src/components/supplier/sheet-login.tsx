@@ -60,6 +60,12 @@ export function SupplierSheetLogin() {
             Forgot password
           </Link>
         </div>
+        <p className="mt-4 text-center text-xs text-slate-400">
+          Tim GBC (admin / DBM)?{" "}
+          <Link href="/login" className="text-blue-300 hover:underline">
+            Login internal
+          </Link>
+        </p>
       </div>
     </div>
   );

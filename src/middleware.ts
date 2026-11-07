@@ -12,10 +12,16 @@ const PUBLIC_PATHS = [
   "/api/auth/logout",
 ];
 
+const INTERNAL_ROLES = ["SUPER_ADMIN", "DBM_OPERATOR", "WAREHOUSE_OPERATOR", "MANAGEMENT_VIEWER"] as const;
+
 function nextWithPath(request: NextRequest) {
   const headers = new Headers(request.headers);
   headers.set("x-gbc-path", request.nextUrl.pathname);
   return NextResponse.next({ request: { headers } });
+}
+
+function isInternalStaff(roles: string[]): boolean {
+  return roles.some((r) => INTERNAL_ROLES.includes(r as (typeof INTERNAL_ROLES)[number]));
 }
 
 export async function middleware(request: NextRequest) {
@@ -24,14 +30,14 @@ export async function middleware(request: NextRequest) {
   if (isSheetOnlyMode()) {
     const token = request.cookies.get(SESSION_COOKIE)?.value;
     const session = token ? await verifySessionToken(token) : null;
-    const supplierSession =
-      session?.roles.includes("SUPPLIER_USER") || session?.roles.includes("SUPER_ADMIN");
 
     const open =
+      pathname === "/login" ||
       pathname === "/supplier/login" ||
       pathname === "/supplier/register" ||
       pathname === "/supplier/forgot-password" ||
       pathname.startsWith("/api/supplier/auth/") ||
+      pathname === "/api/auth/login" ||
       pathname === "/api/auth/logout" ||
       pathname === "/api/app-mode" ||
       pathname === "/api/health" ||
@@ -39,25 +45,56 @@ export async function middleware(request: NextRequest) {
       pathname.startsWith("/favicon");
 
     if (
+      session &&
       (pathname === "/supplier/login" ||
         pathname === "/supplier/register" ||
-        pathname === "/supplier/forgot-password") &&
-      supplierSession
+        pathname === "/supplier/forgot-password")
     ) {
+      if (isInternalStaff(session.roles)) {
+        return NextResponse.redirect(new URL("/dashboard", request.url));
+      }
       return NextResponse.redirect(new URL("/supplier", request.url));
     }
+
+    if (pathname === "/login" && session && isInternalStaff(session.roles)) {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+
     if (open) return nextWithPath(request);
 
-    const supplierArea =
-      pathname === "/supplier" ||
-      pathname.startsWith("/supplier/") ||
-      pathname.startsWith("/api/supplier/");
-    if (supplierArea && supplierSession) return nextWithPath(request);
-    if (pathname.startsWith("/api/")) {
-      return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+    if (session) {
+      if (isInternalStaff(session.roles)) {
+        return nextWithPath(request);
+      }
+      if (session.roles.includes("SUPPLIER_USER")) {
+        const supplierArea =
+          pathname === "/supplier" ||
+          pathname.startsWith("/supplier/") ||
+          pathname.startsWith("/api/supplier/");
+        if (supplierArea) return nextWithPath(request);
+        if (pathname.startsWith("/api/")) {
+          return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+        }
+        return NextResponse.redirect(new URL("/supplier", request.url));
+      }
     }
-    return NextResponse.redirect(new URL("/supplier/login", request.url));
+
+    if (
+      pathname === "/supplier/login" ||
+      pathname === "/supplier/register" ||
+      pathname === "/supplier/forgot-password"
+    ) {
+      return nextWithPath(request);
+    }
+    if (pathname.startsWith("/supplier") || pathname.startsWith("/api/supplier/")) {
+      return NextResponse.redirect(new URL("/supplier/login", request.url));
+    }
+    if (!pathname.startsWith("/api")) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+    return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
+
   if (
     PUBLIC_PATHS.some((p) => pathname === p) ||
     pathname.startsWith("/_next") ||

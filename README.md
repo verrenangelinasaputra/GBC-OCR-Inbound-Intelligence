@@ -156,7 +156,8 @@ Cocok untuk **pilot upload Surat Jalan di Vercel** tanpa PostgreSQL:
 
 - **Bisa:** `/supplier/register` → kode email dari **nomarcengkareng@gmail.com** → login username + password → upload → OCR Gemini → spreadsheet operasional + Drive.
 - Akun supplier di [Supplier Credentials](https://docs.google.com/spreadsheets/d/156m4HFAUnqubtCJumBJZ9BCCel_kNVcU_ZV9kHi4HtY), tab **Users**. Kode disimpan sebagai hash di tab **AuthCodes** (pola yang sama dengan GBC Expense Hub).
-- **Tidak bisa** di mode ini: dashboard internal, PP, penerimaan, invoice, audit di app — itu butuh PostgreSQL.
+- **Supplier** pakai spreadsheet; **admin internal** tetap di `/login` → dashboard jika `DATABASE_URL` + seed aktif (user `admin` dari seed).
+- Fitur penuh (PP, penerimaan, invoice) tetap butuh PostgreSQL yang bisa dijangkau dari Vercel.
 
 Env **Vercel** (Production):
 
