@@ -14,7 +14,16 @@ export {
   buildSuratJalanFileName,
   parseGeminiPayloadFromStructured,
 } from "./google-sj-export-rows";
-export { uploadFileToDrive, appendRowsToSheet, ensureOcrSheetHeaders, resolveSheetTabName } from "./client";
+export {
+  uploadFileToDrive,
+  appendRowsToSheet,
+  ensureOcrSheetHeaders,
+  resolveSheetTabName,
+  parseDriveFileId,
+  findDriveFileInFolder,
+  downloadDriveFile,
+  resolveAndDownloadSuratJalanImage,
+} from "./client";
 
 export async function getGoogleWorkspaceHealth(): Promise<ProviderHealth & { serviceAccountEmail?: string }> {
   if (!isGoogleExportEnabled()) {

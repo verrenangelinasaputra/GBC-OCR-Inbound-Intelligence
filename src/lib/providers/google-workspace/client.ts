@@ -221,3 +221,94 @@ export async function appendRowsToSheet(params: {
 function bufferToStream(buffer: Buffer) {
   return Readable.from(buffer);
 }
+
+export function parseDriveFileId(fileUrl: string): string | null {
+  const trimmed = fileUrl.trim();
+  if (!trimmed) return null;
+  const m =
+    trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) ??
+    trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  return m?.[1] ?? null;
+}
+
+async function createDriveAuthForRead(config: GoogleExportConfig) {
+  if (preferOAuthDriveUpload()) {
+    const oauth = createDriveOAuthClient();
+    if (oauth) return oauth;
+  }
+  const jwt = createGoogleAuthClient(config);
+  try {
+    await jwt.authorize();
+    return jwt;
+  } catch {
+    const oauth = createDriveOAuthClient();
+    if (oauth) return oauth;
+    return jwt;
+  }
+}
+
+function escapeDriveQueryLiteral(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
+
+export async function findDriveFileInFolder(params: {
+  config: GoogleExportConfig;
+  fileName: string;
+}): Promise<{ fileId: string; mimeType: string } | null> {
+  const name = params.fileName.trim();
+  if (!name) return null;
+  const auth = await createDriveAuthForRead(params.config);
+  const drive = google.drive({ version: "v3", auth });
+  const q = `'${params.config.driveFolderId}' in parents and name = '${escapeDriveQueryLiteral(name)}' and trashed = false`;
+  const res = await drive.files.list({
+    q,
+    fields: "files(id,mimeType)",
+    pageSize: 5,
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
+  });
+  const file = res.data.files?.[0];
+  if (!file?.id) return null;
+  return { fileId: file.id, mimeType: file.mimeType || "image/jpeg" };
+}
+
+export async function downloadDriveFile(params: {
+  config: GoogleExportConfig;
+  fileId: string;
+}): Promise<{ buffer: Buffer; mimeType: string }> {
+  const auth = await createDriveAuthForRead(params.config);
+  const drive = google.drive({ version: "v3", auth });
+  const meta = await drive.files.get({
+    fileId: params.fileId,
+    fields: "mimeType",
+    supportsAllDrives: true,
+  });
+  const mimeType = meta.data.mimeType || "application/octet-stream";
+  const media = await drive.files.get(
+    { fileId: params.fileId, alt: "media", supportsAllDrives: true },
+    { responseType: "arraybuffer" }
+  );
+  return { buffer: Buffer.from(media.data as ArrayBuffer), mimeType };
+}
+
+export async function resolveAndDownloadSuratJalanImage(params: {
+  config: GoogleExportConfig;
+  fileUrl: string;
+  fileName: string;
+}): Promise<{ buffer: Buffer; mimeType: string; fileId: string }> {
+  let fileId = parseDriveFileId(params.fileUrl);
+  let mimeType = "image/jpeg";
+  if (!fileId && params.fileName) {
+    const found = await findDriveFileInFolder({ config: params.config, fileName: params.fileName });
+    if (!found) {
+      throw new Error(`File tidak ditemukan di Drive: ${params.fileName}`);
+    }
+    fileId = found.fileId;
+    mimeType = found.mimeType;
+  }
+  if (!fileId) {
+    throw new Error("Tidak ada link Drive atau nama file untuk foto Surat Jalan");
+  }
+  const downloaded = await downloadDriveFile({ config: params.config, fileId });
+  return { ...downloaded, fileId };
+}

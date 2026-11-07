@@ -25,6 +25,7 @@ export function SheetOcrReviewPanel({
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [imageError, setImageError] = useState(false);
 
   const save = useCallback(async () => {
     setSaving(true);
@@ -75,6 +76,10 @@ export function SheetOcrReviewPanel({
     setLines((prev) => prev.map((l) => (l.sheetRow === sheetRow ? { ...l, ...patch } : l)));
   }
 
+  const imageSrc = `/api/ocr-sheet/documents/${docKey}/image`;
+  const isPdf = (doc.fileName || "").toLowerCase().endsWith(".pdf");
+  const canShowMedia = (doc.fileUrl || doc.fileName) && !imageError;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
@@ -96,18 +101,40 @@ export function SheetOcrReviewPanel({
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="rounded-xl border border-slate-200 bg-white p-4">
           <h2 className="font-medium">Foto Surat Jalan</h2>
-          {doc.fileUrl ? (
-            <a
-              href={doc.fileUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-2 inline-block text-sm text-blue-600 hover:underline"
-            >
-              Buka di Google Drive
-            </a>
+          <p className="mt-1 text-xs text-slate-500">{doc.fileName || "—"}</p>
+          {canShowMedia ? (
+            <>
+              {isPdf ? (
+                <iframe
+                  title={doc.fileName || "Surat Jalan PDF"}
+                  src={imageSrc}
+                  className="mt-3 h-[70vh] w-full rounded-lg border border-slate-200 bg-slate-100"
+                />
+              ) : (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={imageSrc}
+                  alt={doc.fileName || "Surat Jalan"}
+                  className="mt-3 max-h-[70vh] w-full rounded-lg border border-slate-200 bg-slate-100 object-contain"
+                  onError={() => setImageError(true)}
+                />
+              )}
+              {doc.fileUrl && (
+                <a
+                  href={doc.fileUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 inline-block text-sm text-blue-600 hover:underline"
+                >
+                  Buka di Google Drive
+                </a>
+              )}
+            </>
           ) : (
-            <p className="mt-2 text-sm text-slate-500">
-              {doc.fileName || "Belum ada link Drive — isi kolom Nama File di sheet jika perlu."}
+            <p className="mt-3 text-sm text-amber-800">
+              {imageError
+                ? "Foto tidak bisa dimuat — cek folder Drive dibagikan ke service account / OAuth, atau isi kolom Link Drive di spreadsheet."
+                : "Belum ada nama file di sheet — upload ulang atau isi kolom Nama File."}
             </p>
           )}
         </section>
