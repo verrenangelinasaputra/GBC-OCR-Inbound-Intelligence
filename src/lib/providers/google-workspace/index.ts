@@ -1,8 +1,13 @@
 import type { ProviderHealth } from "@/lib/providers/types";
-import { getGoogleExportConfigOptional } from "./config";
+import { getGoogleExportConfigOptional, isGoogleExportEnabled } from "./config";
 import { createGoogleAuthClient } from "./client";
 
-export { isGoogleExportConfigured, getGoogleExportConfigOptional, getGoogleExportConfig } from "./config";
+export {
+  isGoogleExportConfigured,
+  isGoogleExportEnabled,
+  getGoogleExportConfigOptional,
+  getGoogleExportConfig,
+} from "./config";
 export {
   buildGoogleSheetRows,
   buildSuratJalanFileName,
@@ -11,12 +16,12 @@ export {
 export { uploadFileToDrive, appendRowsToSheet } from "./client";
 
 export async function getGoogleWorkspaceHealth(): Promise<ProviderHealth & { serviceAccountEmail?: string }> {
-  if (process.env.GOOGLE_EXPORT_ENABLED !== "true") {
+  if (!isGoogleExportEnabled()) {
     return {
       providerKey: "google_workspace",
       displayName: "Google Drive + Sheets export",
       status: "DISABLED",
-      message: "GOOGLE_EXPORT_ENABLED bukan true",
+      message: "Google export nonaktif — GOOGLE_EXPORT_ENABLED=true atau SHEET_ONLY_MODE=true",
     };
   }
 
@@ -37,7 +42,7 @@ export async function getGoogleWorkspaceHealth(): Promise<ProviderHealth & { ser
     providerKey: "google_workspace",
     displayName: "Google Drive + Sheets export",
     status: "CONNECTED",
-    message: `Export otomatis setelah OCR → tab ${cfg.sheetTab}`,
+    message: `Sheet ${cfg.sheetId} (${cfg.sheetTab}) · Drive folder ${cfg.driveFolderId}`,
     serviceAccountEmail: cfg.credentials.client_email,
   };
 }

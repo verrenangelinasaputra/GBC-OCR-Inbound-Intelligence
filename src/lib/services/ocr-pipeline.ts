@@ -5,6 +5,7 @@ import { getStorageProvider } from "@/lib/providers/storage/local-storage";
 import { canTransition, transitionDocumentStatus } from "@/lib/workflow/document-workflow";
 import { writeAuditLog } from "@/lib/services/audit";
 import { exportDocumentToGoogleAfterOcr } from "@/lib/services/google-export-service";
+import { isGoogleExportEnabled } from "@/lib/providers/google-workspace/config";
 import { findProductMatches, requiresHumanReview } from "@/lib/services/product-matching";
 import { MappingStatus } from "@prisma/client";
 import { updateOcrProgress } from "@/lib/services/ocr-progress";
@@ -267,7 +268,7 @@ export async function processOcrJob(jobId: string, actorId?: string) {
       after: { provider: result.providerKey, isDemo: result.isDemo },
     });
 
-    if (process.env.GOOGLE_EXPORT_ENABLED === "true" && !result.isDemo) {
+    if (isGoogleExportEnabled() && !result.isDemo) {
       await updateOcrProgress(jobId, 92, "Export ke Google Drive & Sheet…");
     }
     await exportDocumentToGoogleAfterOcr({

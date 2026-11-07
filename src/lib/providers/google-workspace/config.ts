@@ -1,5 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
+import {
+  getOcrExportDriveFolderId,
+  getOcrExportSheetId,
+  getOcrExportSheetTab,
+} from "@/lib/config/ocr-export-target";
 
 export type GoogleExportConfig = {
   enabled: boolean;
@@ -11,15 +16,22 @@ export type GoogleExportConfig = {
   impersonateUserEmail?: string;
 };
 
+/** Aktif jika `GOOGLE_EXPORT_ENABLED=true`, atau mode pilot `SHEET_ONLY_MODE=true` (kecuali explicitly false). */
+export function isGoogleExportEnabled(): boolean {
+  if (process.env.GOOGLE_EXPORT_ENABLED === "false") return false;
+  if (process.env.GOOGLE_EXPORT_ENABLED === "true") return true;
+  return process.env.SHEET_ONLY_MODE === "true";
+}
+
 export function isGoogleExportConfigured(): boolean {
   return getGoogleExportConfigOptional() != null;
 }
 
 export function getGoogleExportConfigOptional(): GoogleExportConfig | null {
-  if (process.env.GOOGLE_EXPORT_ENABLED !== "true") return null;
+  if (!isGoogleExportEnabled()) return null;
 
-  const driveFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID?.trim();
-  const sheetId = process.env.GOOGLE_SHEET_ID?.trim();
+  const driveFolderId = getOcrExportDriveFolderId();
+  const sheetId = getOcrExportSheetId();
   if (!driveFolderId || !sheetId) return null;
 
   const creds = loadServiceAccountCredentials();
@@ -31,7 +43,7 @@ export function getGoogleExportConfigOptional(): GoogleExportConfig | null {
     enabled: true,
     driveFolderId,
     sheetId,
-    sheetTab: process.env.GOOGLE_SHEET_TAB?.trim() || "Sheet1",
+    sheetTab: getOcrExportSheetTab(),
     credentials: creds,
     impersonateUserEmail,
   };

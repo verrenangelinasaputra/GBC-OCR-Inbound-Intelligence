@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getGoogleExportConfigOptional } from "@/lib/providers/google-workspace";
 import { getInternalSheetId } from "@/lib/config/internal-sheet";
+import { GBC_OCR_RESULTS_SHEET_URL, GBC_SURAT_JALAN_DRIVE_FOLDER_URL } from "@/lib/config/ocr-export-target";
 
 function sheetUrl(id: string) {
   return `https://docs.google.com/spreadsheets/d/${id}/edit`;
@@ -41,13 +42,21 @@ export function SpreadsheetModeFallback({ moduleTitle }: { moduleTitle: string }
       </ul>
       <p className="mt-4 font-medium text-slate-900">Spreadsheet operasional:</p>
       <ul className="mt-2 space-y-1">
-        {ocr && (
-          <li>
-            <a href={sheetUrl(ocr.sheetId)} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
-              Hasil OCR Surat Jalan
-            </a>
-          </li>
-        )}
+        <li>
+          <a
+            href={ocr ? sheetUrl(ocr.sheetId) : GBC_OCR_RESULTS_SHEET_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="text-blue-600 hover:underline"
+          >
+            Hasil OCR Surat Jalan
+          </a>
+        </li>
+        <li>
+          <a href={GBC_SURAT_JALAN_DRIVE_FOLDER_URL} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
+            Folder foto Surat Jalan (Drive)
+          </a>
+        </li>
         <li>
           <a href={sheetUrl(supplierId)} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
             Akun supplier

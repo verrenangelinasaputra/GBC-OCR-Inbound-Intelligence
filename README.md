@@ -91,14 +91,22 @@ Lihat [.env.example](./.env.example).
 | `ACCURATE_INTEGRATION_ENABLED` | `false` sampai API diverifikasi |
 | `GOOGLE_EXPORT_*` | Drive folder + Sheet ID + path JSON service account (lihat `.env.example`) |
 
-### Google Drive + Sheet (Opsi A)
+### Google Drive + Sheet (hasil OCR)
+
+**Target operasional GBC (default di kode jika env kosong):**
+
+| Tujuan | Link / ID |
+|--------|-----------|
+| Spreadsheet hasil OCR | [Sheet](https://docs.google.com/spreadsheets/d/1o2No4lV_r1Hrfi3qiyKI0ZX-VUaQaZdcxCbo4qJ1LDc/edit) — `GOOGLE_SHEET_ID=1o2No4lV_r1Hrfi3qiyKI0ZX-VUaQaZdcxCbo4qJ1LDc` |
+| Folder foto Surat Jalan | [Drive](https://drive.google.com/drive/u/0/folders/1_eQPA9BXJj1RjLgfyCPnlgZEsJdpjHnA) — `GOOGLE_DRIVE_FOLDER_ID=1_eQPA9BXJj1RjLgfyCPnlgZEsJdpjHnA` |
+| Tab sheet | `GOOGLE_SHEET_TAB=Sheet1` (gid=0) |
 
 1. Buat **service account** di Google Cloud → enable **Drive API** & **Sheets API** → download JSON.
-2. Simpan JSON di `secrets/google-service-account.json` (folder di-gitignore).
-3. **Share** folder Drive dan spreadsheet ke email service account (`...@....iam.gserviceaccount.com`) sebagai **Editor**.
-4. Di `.env`: `GOOGLE_EXPORT_ENABLED=true`, ID folder/sheet (sudah ada contoh di `.env.example`).
-5. Cek: `npm run google:test` → lalu **Integrations** di app menampilkan email SA.
-6. Setelah OCR Gemini sukses: foto di-upload ke Drive + baris per item di sheet (kolom template GBC). Retry export: hapus `googleSheetExportedAt` di DB atau fitur re-export belum ada — dokumen hanya export sekali.
+2. Simpan JSON di `secrets/` (folder di-gitignore) atau paste ke `GOOGLE_SERVICE_ACCOUNT_JSON` di Vercel.
+3. **Share** folder Drive dan spreadsheet di atas ke **`gbc-inbound-export@gbc-inbound-intelligence.iam.gserviceaccount.com`** (atau email SA Anda) sebagai **Editor**.
+4. `GOOGLE_EXPORT_ENABLED=true` **atau** `SHEET_ONLY_MODE=true` (export otomatis aktif di mode pilot).
+5. Cek: `npm run google:test` → menu **Integrations** menampilkan status Google.
+6. Setelah upload supplier + OCR Gemini: **baris per item** di sheet + **foto** di folder Drive (nama file `Surat Jalan_<tanggal>_<no SJ>.jpeg`).
 
 ## Integrasi: real vs demo
 
@@ -168,9 +176,11 @@ Env **Vercel** (Production):
 | `SESSION_SECRET` | Min. 32 karakter random (wajib, untuk cookie login) |
 | `OCR_PROVIDER` | `gemini` |
 | `GEMINI_API_KEY` | Key AI Studio (`AIza...`) |
-| `GOOGLE_EXPORT_ENABLED` | `true` |
+| `GOOGLE_EXPORT_ENABLED` | `true` (opsional jika sudah `SHEET_ONLY_MODE=true`) |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | Isi penuh JSON service account |
-| `GOOGLE_DRIVE_FOLDER_ID` / `GOOGLE_SHEET_ID` / `GOOGLE_SHEET_TAB` | Sheet hasil OCR + folder Drive |
+| `GOOGLE_DRIVE_FOLDER_ID` | `1_eQPA9BXJj1RjLgfyCPnlgZEsJdpjHnA` (default di kode jika dikosongkan) |
+| `GOOGLE_SHEET_ID` | `1o2No4lV_r1Hrfi3qiyKI0ZX-VUaQaZdcxCbo4qJ1LDc` |
+| `GOOGLE_SHEET_TAB` | `Sheet1` |
 | `SUPPLIER_SHEET_ID` | `156m4HFAUnqubtCJumBJZ9BCCel_kNVcU_ZV9kHi4HtY` |
 | `INTERNAL_SHEET_ID` | `1PTxO6HbOccYn30g1l7SaGpGIcV0PBcuLmqzC3me5GYM` |
 | `INTERNAL_SHEET_TAB` | `Sheet1` (sesuaikan nama tab) |
