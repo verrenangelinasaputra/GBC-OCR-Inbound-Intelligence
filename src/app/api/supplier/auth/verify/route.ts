@@ -1,12 +1,8 @@
 import { jsonError } from "@/lib/api/auth-context";
-import { isSheetOnlyMode } from "@/lib/config/app-mode";
 import { supplierAuthStatus } from "@/lib/supplier-auth/errors";
 import { verifyRegisterCode } from "@/lib/supplier-auth/flow";
 
 export async function POST(request: Request) {
-  if (!isSheetOnlyMode()) {
-    return jsonError(new Error("Verifikasi email hanya aktif saat SHEET_ONLY_MODE=true."), 404);
-  }
   try {
     const body = await request.json();
     const result = await verifyRegisterCode(String(body.username ?? ""), String(body.code ?? ""));

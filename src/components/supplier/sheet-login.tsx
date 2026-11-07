@@ -49,13 +49,17 @@ export function SupplierSheetLogin() {
           </div>
           {error && <p className="text-sm text-red-400">{error}</p>}
           <button type="submit" disabled={loading} className="w-full rounded-lg bg-blue-500 py-2.5 text-sm font-medium text-white hover:bg-blue-600 disabled:opacity-50">
-            {loading ? "Memproses..." : "Masuk"}
+            {loading ? "Memproses..." : "Login Supplier"}
           </button>
         </form>
-        <p className="mt-6 space-y-2 text-center text-sm text-slate-400">
-          <Link href="/supplier/register" className="block text-blue-300 hover:underline">Belum punya akun? Daftar</Link>
-          <Link href="/supplier/forgot-password" className="block text-blue-300 hover:underline">Lupa password</Link>
-        </p>
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <Link href="/supplier/register" className="rounded-lg border border-slate-500 py-2.5 text-center text-sm font-medium text-white hover:bg-slate-700">
+            Register
+          </Link>
+          <Link href="/supplier/forgot-password" className="rounded-lg border border-slate-500 py-2.5 text-center text-sm font-medium text-white hover:bg-slate-700">
+            Forgot password
+          </Link>
+        </div>
       </div>
     </div>
   );

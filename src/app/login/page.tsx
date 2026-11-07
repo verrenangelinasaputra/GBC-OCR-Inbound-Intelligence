@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -65,6 +66,20 @@ export default function LoginPage() {
             {loading ? "Memproses..." : "Login"}
           </button>
         </form>
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <Link
+            href="/supplier/register"
+            className="rounded-lg border border-slate-300 py-2.5 text-center text-sm font-medium text-slate-800 hover:bg-slate-50"
+          >
+            Register
+          </Link>
+          <Link
+            href="/supplier/forgot-password"
+            className="rounded-lg border border-slate-300 py-2.5 text-center text-sm font-medium text-slate-800 hover:bg-slate-50"
+          >
+            Forgot password
+          </Link>
+        </div>
         <p className="mt-4 text-center text-xs text-slate-500">
           Supplier?{" "}
           <a href="/supplier/login" className="text-blue-600 hover:underline">
