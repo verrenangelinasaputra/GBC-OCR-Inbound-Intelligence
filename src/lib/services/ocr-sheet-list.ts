@@ -1,8 +1,10 @@
 import { google } from "googleapis";
 import { createGoogleAuthClient, resolveSheetTabName } from "@/lib/providers/google-workspace/client";
 import { getGoogleExportConfigOptional } from "@/lib/providers/google-workspace";
+import { encodeOcrSheetDocKey, isMeaningfulOcrDataRow } from "@/lib/services/ocr-sheet-keys";
 
 export type OcrSheetDocument = {
+  docKey: string;
   exportTimestamp: string;
   tanggal: string;
   noSuratJalan: string;
@@ -32,6 +34,7 @@ export async function listOcrDocumentsFromSheet(limit = 80): Promise<OcrSheetDoc
 
   for (let i = 1; i < rows.length; i += 1) {
     const row = rows[i] ?? [];
+    if (!isMeaningfulOcrDataRow(row)) continue;
     const fileName = String(row[12] ?? "").trim();
     const fileUrl = String(row[13] ?? "").trim();
     const key = fileName || `${row[2] ?? ""}|${row[1] ?? ""}|${i}`;
@@ -43,6 +46,7 @@ export async function listOcrDocumentsFromSheet(limit = 80): Promise<OcrSheetDoc
       continue;
     }
     map.set(key, {
+      docKey: encodeOcrSheetDocKey(key),
       exportTimestamp: String(row[0] ?? ""),
       tanggal: String(row[1] ?? ""),
       noSuratJalan: String(row[2] ?? ""),

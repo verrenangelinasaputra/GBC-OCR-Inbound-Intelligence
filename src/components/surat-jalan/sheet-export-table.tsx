@@ -39,6 +39,7 @@ export function SheetExportTable({ docs }: { docs: OcrSheetDocument[] }) {
               <th className="px-4 py-3">Baris</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">File</th>
+              <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody>
@@ -61,11 +62,19 @@ export function SheetExportTable({ docs }: { docs: OcrSheetDocument[] }) {
                     <span className="text-slate-400">{d.fileName || "—"}</span>
                   )}
                 </td>
+                <td className="px-4 py-3">
+                  <Link
+                    href={`/ocr-review/${d.docKey}`}
+                    className="font-medium text-blue-600 hover:underline"
+                  >
+                    Open review
+                  </Link>
+                </td>
               </tr>
             ))}
             {docs.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-slate-500">
+                <td colSpan={8} className="px-4 py-10 text-center text-slate-500">
                   Belum ada baris di sheet OCR — minta supplier upload di{" "}
                   <Link href="/supplier" className="text-blue-600 hover:underline">
                     portal supplier

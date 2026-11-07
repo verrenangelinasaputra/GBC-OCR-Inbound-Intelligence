@@ -4,6 +4,7 @@ import {
   buildSuratJalanFileName,
   nextOcrDataRowNumber,
   OCR_SHEET_HEADERS,
+  recomputeOcrSheetLineStatus,
 } from "./google-sj-export-rows";
 
 describe("buildSuratJalanFileName", () => {
@@ -71,5 +72,18 @@ describe("nextOcrDataRowNumber", () => {
       ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "07/11/2026"],
     ];
     expect(nextOcrDataRowNumber(rows)).toBe(3);
+  });
+});
+
+describe("recomputeOcrSheetLineStatus", () => {
+  it("flags qty mismatch as CEK", () => {
+    expect(
+      recomputeOcrSheetLineStatus({
+        banyaknya: "116 DUS",
+        isi: "144 PCS",
+        jumlah: "1 PCS",
+        namaBarang: "TEH",
+      })
+    ).toBe("CEK");
   });
 });

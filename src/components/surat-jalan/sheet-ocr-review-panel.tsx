@@ -1,0 +1,230 @@
+"use client";
+
+import { useCallback, useState } from "react";
+import type { OcrSheetDocumentDetail, OcrSheetLine } from "@/lib/services/ocr-sheet-detail";
+import { StatusBadge } from "@/components/ui/status-badge";
+import Link from "next/link";
+
+export function SheetOcrReviewPanel({
+  docKey,
+  initial,
+}: {
+  docKey: string;
+  initial: OcrSheetDocumentDetail;
+}) {
+  const [doc, setDoc] = useState(initial);
+  const [header, setHeader] = useState({
+    tanggal: initial.tanggal,
+    noSuratJalan: initial.noSuratJalan,
+    noKendaraan: initial.noKendaraan,
+    noPo: initial.noPo,
+    namaPenerima: initial.namaPenerima,
+    alamat: initial.alamat,
+  });
+  const [lines, setLines] = useState<OcrSheetLine[]>(initial.lines);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  const save = useCallback(async () => {
+    setSaving(true);
+    setError("");
+    setMessage("");
+    try {
+      const res = await fetch(`/api/ocr-sheet/documents/${docKey}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          header,
+          lines: lines.map((l) => ({
+            sheetRow: l.sheetRow,
+            banyaknya: l.banyaknya,
+            isi: l.isi,
+            namaBarang: l.namaBarang,
+            jumlah: l.jumlah,
+            keterangan: l.keterangan,
+            status: l.status,
+          })),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(typeof data.error === "string" ? data.error : "Gagal menyimpan");
+        return;
+      }
+      const updated = data.doc as OcrSheetDocumentDetail;
+      setDoc(updated);
+      setLines(updated.lines);
+      setHeader({
+        tanggal: updated.tanggal,
+        noSuratJalan: updated.noSuratJalan,
+        noKendaraan: updated.noKendaraan,
+        noPo: updated.noPo,
+        namaPenerima: updated.namaPenerima,
+        alamat: updated.alamat,
+      });
+      setMessage("Tersimpan — spreadsheet diperbarui.");
+    } catch {
+      setError("Gagal menyimpan — cek koneksi.");
+    } finally {
+      setSaving(false);
+    }
+  }, [docKey, header, lines]);
+
+  function patchLine(sheetRow: number, patch: Partial<OcrSheetLine>) {
+    setLines((prev) => prev.map((l) => (l.sheetRow === sheetRow ? { ...l, ...patch } : l)));
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center gap-3">
+        <StatusBadge
+          label={doc.lineStatus}
+          tone={doc.lineStatus === "CEK" ? "warning" : "success"}
+        />
+        <span className="text-sm text-slate-500">
+          {lines.length} baris item · diekspor {doc.exportTimestamp || "—"}
+        </span>
+        <Link href="/ocr-review" className="text-sm text-blue-600 hover:underline">
+          ← Kembali ke queue
+        </Link>
+      </div>
+
+      {message && <p className="text-sm text-green-700">{message}</p>}
+      {error && <p className="text-sm text-red-600">{error}</p>}
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <section className="rounded-xl border border-slate-200 bg-white p-4">
+          <h2 className="font-medium">Foto Surat Jalan</h2>
+          {doc.fileUrl ? (
+            <a
+              href={doc.fileUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 inline-block text-sm text-blue-600 hover:underline"
+            >
+              Buka di Google Drive
+            </a>
+          ) : (
+            <p className="mt-2 text-sm text-slate-500">
+              {doc.fileName || "Belum ada link Drive — isi kolom Nama File di sheet jika perlu."}
+            </p>
+          )}
+        </section>
+
+        <section className="rounded-xl border border-slate-200 bg-white p-4">
+          <h2 className="mb-3 font-medium">Header SJ</h2>
+          <div className="grid gap-3 text-sm sm:grid-cols-2">
+            {(
+              [
+                ["tanggal", "Tanggal SJ"],
+                ["noSuratJalan", "No. Surat Jalan"],
+                ["noKendaraan", "No. Kendaraan"],
+                ["noPo", "No. PO"],
+                ["namaPenerima", "Nama Penerima"],
+                ["alamat", "Alamat"],
+              ] as const
+            ).map(([field, label]) => (
+              <label key={field} className="block">
+                <span className="text-xs text-slate-500">{label}</span>
+                <input
+                  className="mt-1 w-full rounded border border-slate-200 px-2 py-1.5"
+                  value={header[field]}
+                  onChange={(e) => setHeader((h) => ({ ...h, [field]: e.target.value }))}
+                />
+              </label>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <div className="border-b border-slate-100 px-4 py-3">
+          <h2 className="font-medium">Baris item (per baris di spreadsheet)</h2>
+          <p className="text-xs text-slate-500">Edit lalu Simpan — setiap baris = satu produk di sheet.</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-50 text-left text-slate-600">
+              <tr>
+                <th className="px-3 py-2">#</th>
+                <th className="px-3 py-2">Nama Barang</th>
+                <th className="px-3 py-2">Banyaknya</th>
+                <th className="px-3 py-2">Isi</th>
+                <th className="px-3 py-2">Jumlah</th>
+                <th className="px-3 py-2">Keterangan</th>
+                <th className="px-3 py-2">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lines.map((line, idx) => (
+                <tr key={line.sheetRow} className="border-t">
+                  <td className="px-3 py-2 text-slate-500">
+                    {idx + 1}
+                    <span className="block text-[10px]">baris {line.sheetRow}</span>
+                  </td>
+                  <td className="px-3 py-2">
+                    <input
+                      className="w-full min-w-[140px] rounded border px-1.5 py-1"
+                      value={line.namaBarang}
+                      onChange={(e) => patchLine(line.sheetRow, { namaBarang: e.target.value })}
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    <input
+                      className="w-24 rounded border px-1.5 py-1"
+                      value={line.banyaknya}
+                      onChange={(e) => patchLine(line.sheetRow, { banyaknya: e.target.value })}
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    <input
+                      className="w-24 rounded border px-1.5 py-1"
+                      value={line.isi}
+                      onChange={(e) => patchLine(line.sheetRow, { isi: e.target.value })}
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    <input
+                      className="w-28 rounded border px-1.5 py-1"
+                      value={line.jumlah}
+                      onChange={(e) => patchLine(line.sheetRow, { jumlah: e.target.value })}
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    <input
+                      className="w-full min-w-[120px] rounded border px-1.5 py-1"
+                      value={line.keterangan}
+                      onChange={(e) => patchLine(line.sheetRow, { keterangan: e.target.value })}
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    <select
+                      className="rounded border px-1.5 py-1"
+                      value={line.status}
+                      onChange={(e) => patchLine(line.sheetRow, { status: e.target.value })}
+                    >
+                      <option value="OK">OK</option>
+                      <option value="CEK">CEK</option>
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <div className="flex flex-wrap gap-3">
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => void save()}
+          className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+        >
+          {saving ? "Menyimpan…" : "Simpan ke spreadsheet"}
+        </button>
+      </div>
+    </div>
+  );
+}

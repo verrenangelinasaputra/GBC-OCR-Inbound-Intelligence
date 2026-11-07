@@ -171,6 +171,32 @@ export function isMeaningfulOcrDataRow(row: string[] | undefined): boolean {
   return fileName.length > 0;
 }
 
+export function parseQtySatuanCell(value: string): number | null {
+  const m = String(value ?? "")
+    .trim()
+    .match(/^([\d.,]+)/);
+  if (!m) return null;
+  const n = Number(m[1].replace(",", "."));
+  return Number.isFinite(n) ? n : null;
+}
+
+export function recomputeOcrSheetLineStatus(cells: {
+  banyaknya: string;
+  isi: string;
+  jumlah: string;
+  namaBarang: string;
+}): "OK" | "CEK" {
+  if (!cells.namaBarang.trim()) return "CEK";
+  const banyaknya = parseQtySatuanCell(cells.banyaknya);
+  const isi = parseQtySatuanCell(cells.isi);
+  const jumlah = parseQtySatuanCell(cells.jumlah);
+  const calc = banyaknya != null && isi != null ? banyaknya * isi : null;
+  const mismatch = calc !== null && jumlah != null && calc !== jumlah;
+  const missing = banyaknya == null || jumlah == null;
+  if (mismatch || missing) return "CEK";
+  return "OK";
+}
+
 /** Baris 1-based untuk tulis data OCR berikutnya (setelah header + baris data terakhir). */
 export function nextOcrDataRowNumber(rows: string[][]): number {
   let lastData = 1;
