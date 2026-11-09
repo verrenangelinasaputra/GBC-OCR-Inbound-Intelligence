@@ -3,6 +3,8 @@ import { DATA_COMPILATION_TAB_NAME } from "@/lib/config/ocr-export-target";
 import { SUPPLIER_GUDANG_OPTIONS } from "@/lib/config/supplier-gudang";
 import type { GoogleExportConfig } from "./config";
 import { OCR_SHEET_HEADERS } from "./google-sj-export-rows";
+import { applyOcrSheetFormatting } from "./ocr-sheet-format";
+import { applySummaryDashboardFormatting } from "./summary-sheet-format";
 
 export const SUMMARY_TAB_NAME = "Summary";
 export const DATA_CALC_TAB_NAME = "_DataCalc";
@@ -72,10 +74,11 @@ export function dataCalcColumnFormulasForLocale(dcTab: string, locale?: string):
 function summaryFilterAndKpiRows(sep: string, dcLabel: string): string[][] {
   const calc = quoteTab(DATA_CALC_TAB_NAME);
   const sum = quoteTab(SUMMARY_TAB_NAME);
+  const calcRange = `${calc}!A2:J`;
   const filt = (extra: string) =>
-    `(${calc}!C:C>=${sum}!$B$5)*(${calc}!C:C<=${sum}!$B$6)*(IF(${sum}!$B$7="ALL"${sep}1${sep}${calc}!A:A=${sum}!$B$7))*(IF(${sum}!$B$8="ALL"${sep}1${sep}${calc}!B:B=${sum}!$B$8))*(IF(LEN(${sum}!$B$9)=0${sep}1${sep}REGEXMATCH(${calc}!E:E${sep}"(?i)"&${sum}!$B$9)))${extra}`;
+    `(${calc}!C2:C>=${sum}!$B$5)*(${calc}!C2:C<=${sum}!$B$6)*(IF(${sum}!$B$7="ALL"${sep}1${sep}${calc}!A2:A=${sum}!$B$7))*(IF(${sum}!$B$8="ALL"${sep}1${sep}${calc}!B2:B=${sum}!$B$8))*(IF(LEN(${sum}!$B$9)=0${sep}1${sep}REGEXMATCH(${calc}!E2:E${sep}"(?i)"&${sum}!$B$9)))${extra}`;
 
-  const q = (query: string) => `=QUERY(${calc}!A:J${sep} "${query}"${sep} 1)`;
+  const q = (query: string) => `=QUERY(${calcRange}${sep} "${query}"${sep} 0)`;
 
   return [
     ["GBC Inbound Goods Monitoring — Management Dashboard", "", "", "", "", ""],
@@ -84,7 +87,7 @@ function summaryFilterAndKpiRows(sep: string, dcLabel: string): string[][] {
     ["Filter", "Nilai", "", "", "", ""],
     [
       "Date From (Tanggal SJ)",
-      `=DATE(YEAR(TODAY())${sep}MONTH(TODAY())${sep}1)`,
+      `=DATE(YEAR(TODAY())${sep}1${sep}1)`,
       "",
       "",
       "",
@@ -98,7 +101,7 @@ function summaryFilterAndKpiRows(sep: string, dcLabel: string): string[][] {
     ["KPI Overview", "Nilai", "", "", "", ""],
     [
       "Total Units Received",
-      `=IFERROR(SUM(FILTER(${calc}!G:G${sep}${filt("")}))${sep}0)`,
+      `=IFERROR(SUM(FILTER(${calc}!G2:G${sep}${filt("")}))${sep}0)`,
       "",
       "",
       "",
@@ -106,7 +109,7 @@ function summaryFilterAndKpiRows(sep: string, dcLabel: string): string[][] {
     ],
     [
       "Total Unique Items",
-      `=IFERROR(ROWS(UNIQUE(FILTER(${calc}!E:E${sep}${filt(`*(${calc}!E:E<>"")`)})))${sep}0)`,
+      `=IFERROR(ROWS(UNIQUE(FILTER(${calc}!E2:E${sep}${filt(`*(${calc}!E2:E<>"")`)})))${sep}0)`,
       "",
       "",
       "",
@@ -114,7 +117,7 @@ function summaryFilterAndKpiRows(sep: string, dcLabel: string): string[][] {
     ],
     [
       "Total Deliveries (unique SJ)",
-      `=IFERROR(ROWS(UNIQUE(FILTER(${calc}!D:D${sep}${filt(`*(${calc}!D:D<>"")`)})))${sep}0)`,
+      `=IFERROR(ROWS(UNIQUE(FILTER(${calc}!D2:D${sep}${filt(`*(${calc}!D2:D<>"")`)})))${sep}0)`,
       "",
       "",
       "",
@@ -122,7 +125,7 @@ function summaryFilterAndKpiRows(sep: string, dcLabel: string): string[][] {
     ],
     [
       "Total Suppliers",
-      `=IFERROR(ROWS(UNIQUE(FILTER(${calc}!B:B${sep}${filt(`*(${calc}!B:B<>"")`)})))${sep}0)`,
+      `=IFERROR(ROWS(UNIQUE(FILTER(${calc}!B2:B${sep}${filt(`*(${calc}!B2:B<>"")`)})))${sep}0)`,
       "",
       "",
       "",
@@ -130,7 +133,7 @@ function summaryFilterAndKpiRows(sep: string, dcLabel: string): string[][] {
     ],
     [
       "Active Warehouses",
-      `=IFERROR(ROWS(UNIQUE(FILTER(${calc}!A:A${sep}${filt(`*(${calc}!A:A<>"")`)})))${sep}0)`,
+      `=IFERROR(ROWS(UNIQUE(FILTER(${calc}!A2:A${sep}${filt(`*(${calc}!A2:A<>"")`)})))${sep}0)`,
       "",
       "",
       "",
@@ -138,7 +141,7 @@ function summaryFilterAndKpiRows(sep: string, dcLabel: string): string[][] {
     ],
     [
       "Total Delivery Days",
-      `=IFERROR(ROWS(UNIQUE(FILTER(${calc}!C:C${sep}${filt(`*(${calc}!C:C<>"")`)})))${sep}0)`,
+      `=IFERROR(ROWS(UNIQUE(FILTER(${calc}!C2:C${sep}${filt(`*(${calc}!C2:C<>"")`)})))${sep}0)`,
       "",
       "",
       "",
@@ -147,33 +150,27 @@ function summaryFilterAndKpiRows(sep: string, dcLabel: string): string[][] {
     ["", "", "", "", "", ""],
     ["Weekly Inbound Overview", "", "", "", "", ""],
     [
-      q(
-        "select J, count(E), sum(G) where G > 0 group by J label count(E) 'Line Items' sum(G) 'Units'"
-      ),
+      q("select J, count(E), sum(G) where G > 0 and J is not null group by J"),
     ],
     ["", "", "", "", "", ""],
     ["Weekly Item Summary (by product & warehouse)", "", "", "", "", ""],
     [
-      q(
-        "select J, F, E, A, sum(G), H where E is not null group by J, F, E, A, H label sum(G) 'Total Qty'"
-      ),
+      q("select J, F, E, A, sum(G), H where E is not null and G > 0 group by J, F, E, A, H"),
     ],
     ["", "", "", "", "", ""],
     ["Delivery Breakdown (detail)", "", "", "", "", ""],
-    [q("select C, J, A, B, D, F, E, G, H where C is not null order by C desc")],
+    [q("select C, J, A, B, D, F, E, G, H where C is not null and G > 0 order by C desc")],
     ["", "", "", "", "", ""],
     ["Supplier Summary", "", "", "", "", ""],
     [
       q(
-        "select B, count(D), count(E), sum(G), min(C), max(C) where B is not null group by B label count(D) 'Deliveries' count(E) 'Items' sum(G) 'Units' min(C) 'First' max(C) 'Latest'"
+        "select B, sum(G), count(D), count(E), min(C), max(C) where B is not null and G > 0 and C is not null group by B"
       ),
     ],
     ["", "", "", "", "", ""],
     ["Warehouse Performance", "", "", "", "", ""],
     [
-      q(
-        "select A, sum(G), count(E), count(D), count(B) where A is not null group by A label sum(G) 'Units' count(E) 'Items' count(D) 'Deliveries' count(B) 'Suppliers'"
-      ),
+      q("select A, sum(G), count(E), count(D), count(B) where A is not null and G > 0 group by A"),
     ],
   ];
 }
@@ -232,9 +229,6 @@ export async function ensureInboundMonitoringWorkbook(
   });
   const locale = meta.data.properties?.locale ?? undefined;
   const sep = formulaArgSeparator(locale);
-  if (process.env.DEBUG_SHEET_FORMULAS === "1") {
-    console.log("[monitoring] locale=", locale, "sep=", JSON.stringify(sep));
-  }
   const sheetList = meta.data.sheets ?? [];
   await renameSheet1IfNeeded(sheets, spreadsheetId, sheetList);
 
@@ -274,6 +268,10 @@ export async function ensureInboundMonitoringWorkbook(
       valueInputOption: "USER_ENTERED",
       requestBody: { values: [[gudangFilterFormula(dcTab, g, sep)]] },
     });
+    const gudangSheetId = byTitle.get(g);
+    if (gudangSheetId != null) {
+      await applyOcrSheetFormatting(sheets, spreadsheetId, gudangSheetId);
+    }
   }
 
   const calcHeaders = [
@@ -316,23 +314,12 @@ export async function ensureInboundMonitoringWorkbook(
 
   const summaryId = byTitle.get(SUMMARY_TAB_NAME);
   if (summaryId != null) {
-    await sheets.spreadsheets.batchUpdate({
-      spreadsheetId,
-      requestBody: {
-        requests: [
-          {
-            updateSheetProperties: {
-              properties: { sheetId: summaryId, gridProperties: { frozenRowCount: 1 } },
-              fields: "gridProperties.frozenRowCount",
-            },
-          },
-        ],
-      },
-    });
+    await applySummaryDashboardFormatting(sheets, spreadsheetId, summaryId);
   }
 
   const dcId = byTitle.get(dcTab) ?? byTitle.get(DATA_COMPILATION_TAB_NAME) ?? byTitle.get("Sheet1");
   if (dcId != null) {
+    await applyOcrSheetFormatting(sheets, spreadsheetId, dcId);
     await sheets.spreadsheets.batchUpdate({
       spreadsheetId,
       requestBody: {

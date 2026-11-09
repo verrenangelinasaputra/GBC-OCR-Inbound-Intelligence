@@ -63,7 +63,7 @@ async function main() {
     console.log(`_DataCalc ${col} formula:`, String(f).slice(0, 200));
   }
 
-  for (const addr of ["B12", "B20", "A22"]) {
+  for (const addr of ["B5", "B12", "A20", "A29", "A32", "A27"]) {
     const v = await readCell(sheets, id, `'Summary'!${addr}`);
     console.log(`Summary ${addr}:`, String(v).slice(0, 100));
   }
