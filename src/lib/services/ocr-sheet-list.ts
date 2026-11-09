@@ -1,6 +1,7 @@
 import { google } from "googleapis";
 import { createGoogleAuthClient, resolveSheetTabName } from "@/lib/providers/google-workspace/client";
 import { getGoogleExportConfigOptional } from "@/lib/providers/google-workspace";
+import { mapOcrSheetRow, ocrSheetFullColumnsRange } from "@/lib/providers/google-workspace/ocr-sheet-columns";
 import { encodeOcrSheetDocKey, isMeaningfulOcrDataRow } from "@/lib/services/ocr-sheet-keys";
 
 export type OcrSheetDocument = {
@@ -22,11 +23,9 @@ export async function listOcrDocumentsFromSheet(limit = 80): Promise<OcrSheetDoc
   const auth = createGoogleAuthClient(config);
   const sheets = google.sheets({ version: "v4", auth });
   const sheetTab = await resolveSheetTabName(config);
-  const range = `${sheetTab}!A:O`;
-
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: config.sheetId,
-    range,
+    range: ocrSheetFullColumnsRange(sheetTab),
   });
 
   const rows = res.data.values ?? [];
@@ -35,11 +34,10 @@ export async function listOcrDocumentsFromSheet(limit = 80): Promise<OcrSheetDoc
   for (let i = 1; i < rows.length; i += 1) {
     const row = rows[i] ?? [];
     if (!isMeaningfulOcrDataRow(row)) continue;
-    const fileName = String(row[12] ?? "").trim();
-    const fileUrl = String(row[13] ?? "").trim();
-    const key = fileName || `${row[2] ?? ""}|${row[1] ?? ""}|${i}`;
+    const fields = mapOcrSheetRow(row);
+    const key = fields.fileName || `${fields.noSuratJalan}|${fields.tanggal}|${i}`;
     const existing = map.get(key);
-    const status = String(row[14] ?? "").trim() || "OK";
+    const status = fields.status || "OK";
     if (existing) {
       existing.lineCount += 1;
       if (status) existing.statuses.add(status);
@@ -47,12 +45,12 @@ export async function listOcrDocumentsFromSheet(limit = 80): Promise<OcrSheetDoc
     }
     map.set(key, {
       docKey: encodeOcrSheetDocKey(key),
-      exportTimestamp: String(row[0] ?? ""),
-      tanggal: String(row[1] ?? ""),
-      noSuratJalan: String(row[2] ?? ""),
-      noKendaraan: String(row[3] ?? ""),
-      fileName,
-      fileUrl: fileUrl.startsWith("http") ? fileUrl : "",
+      exportTimestamp: fields.exportTimestamp,
+      tanggal: fields.tanggal,
+      noSuratJalan: fields.noSuratJalan,
+      noKendaraan: fields.noKendaraan,
+      fileName: fields.fileName,
+      fileUrl: fields.fileUrl.startsWith("http") ? fields.fileUrl : "",
       lineCount: 1,
       lineStatus: status,
       statuses: new Set(status ? [status] : []),

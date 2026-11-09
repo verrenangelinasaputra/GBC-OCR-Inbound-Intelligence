@@ -1,7 +1,8 @@
 import type { GeminiSJItem, GeminiSJPayload } from "@/lib/providers/ocr/gemini-surat-jalan";
 
-/** Kolom A–O — harus selaras dengan `buildGoogleSheetRows` dan pembacaan `ocr-sheet-list`. */
+/** Kolom A–R — selaras `buildGoogleSheetRows`, `ocr-sheet-columns`, dan review. */
 export const OCR_SHEET_HEADERS = [
+  "Gudang tujuan",
   "Tanggal Ekspor",
   "Tanggal SJ",
   "No. Surat Jalan",
@@ -16,8 +17,12 @@ export const OCR_SHEET_HEADERS = [
   "Keterangan",
   "Nama File",
   "Link Drive",
+  "Kendaraan / Driver",
+  "Catatan",
   "Status",
 ] as const;
+
+export const OCR_SHEET_LEGACY_HEADER = "Tanggal Ekspor";
 
 function formatQtySatuan(qty: number | null | undefined, satuan: string | undefined): string {
   if (qty === null || qty === undefined) return "";
@@ -133,6 +138,9 @@ export function buildGoogleSheetRows(params: {
   fileName: string;
   fileUrl: string;
   exportedAt?: Date;
+  gudang?: string;
+  kendaraanDriver?: string;
+  catatan?: string;
   fallback?: {
     suratJalanNumber?: string | null;
     documentDate?: Date | null;
@@ -149,6 +157,9 @@ export function buildGoogleSheetRows(params: {
   const noSj = (payload.no_surat_jalan || fallback?.suratJalanNumber || "").toUpperCase();
   const noKendaraan = (payload.no_kendaraan || fallback?.vehicleInfo || "").toUpperCase();
   const noPo = payload.no_po || fallback?.poReference || "";
+  const gudang = (params.gudang || "").trim();
+  const kendaraanDriver = (params.kendaraanDriver || "").trim();
+  const catatan = (params.catatan || "").trim();
   let namaPenerima = payload.nama_penerima || "";
   let alamat = payload.alamat || "";
   if (!namaPenerima && !alamat && fallback?.destinationText) {
@@ -166,6 +177,7 @@ export function buildGoogleSheetRows(params: {
   if (items.length === 0) {
     return [
       [
+        gudang,
         timestamp,
         tanggal,
         noSj,
@@ -180,6 +192,8 @@ export function buildGoogleSheetRows(params: {
         "Tidak ada baris terdeteksi",
         fileName,
         fileUrl,
+        kendaraanDriver,
+        catatan,
         "CEK",
       ],
     ];
@@ -191,6 +205,7 @@ export function buildGoogleSheetRows(params: {
         ? formatQtySatuan(item.jumlah_qty, item.jumlah_satuan || "PCS")
         : "";
     return [
+      gudang,
       timestamp,
       tanggal,
       noSj,
@@ -205,6 +220,8 @@ export function buildGoogleSheetRows(params: {
       (item.keterangan || "").trim(),
       fileName,
       fileUrl,
+      kendaraanDriver,
+      catatan,
       lineStatus(item),
     ];
   });
@@ -222,11 +239,13 @@ export function parseGeminiPayloadFromStructured(structured: unknown): GeminiSJP
 /** Baris data OCR valid (abaikan baris sampah cuma kolom Status). */
 export function isMeaningfulOcrDataRow(row: string[] | undefined): boolean {
   if (!row?.length) return false;
-  const exported = String(row[0] ?? "").trim();
+  const exportedLegacy = String(row[0] ?? "").trim();
+  if (exportedLegacy && /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(exportedLegacy)) return true;
+  const exported = String(row[1] ?? "").trim();
   if (exported && /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(exported)) return true;
-  const noSj = String(row[2] ?? "").trim();
+  const noSj = String(row[3] ?? row[2] ?? "").trim();
   if (noSj) return true;
-  const fileName = String(row[12] ?? "").trim();
+  const fileName = String(row[13] ?? row[12] ?? "").trim();
   return fileName.length > 0;
 }
 

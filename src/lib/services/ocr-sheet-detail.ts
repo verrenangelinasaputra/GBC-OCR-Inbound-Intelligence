@@ -3,32 +3,23 @@ import { createGoogleAuthClient, resolveSheetTabName } from "@/lib/providers/goo
 import { getGoogleExportConfigOptional } from "@/lib/providers/google-workspace";
 import { recomputeOcrSheetLineStatus } from "@/lib/providers/google-workspace/google-sj-export-rows";
 import {
+  mapOcrSheetRow,
+  ocrSheetFullColumnsRange,
+  ocrSheetRowRange,
+  ocrSheetRowToValues,
+  type OcrSheetRowFields,
+} from "@/lib/providers/google-workspace/ocr-sheet-columns";
+import {
   decodeOcrSheetDocKey,
   firstRowIsOcrHeader,
   sheetRowMatchesDocKey,
 } from "@/lib/services/ocr-sheet-keys";
 
-export type OcrSheetLine = {
-  sheetRow: number;
-  exportTimestamp: string;
-  tanggal: string;
-  noSuratJalan: string;
-  noKendaraan: string;
-  noPo: string;
-  namaPenerima: string;
-  alamat: string;
-  banyaknya: string;
-  isi: string;
-  namaBarang: string;
-  jumlah: string;
-  keterangan: string;
-  fileName: string;
-  fileUrl: string;
-  status: string;
-};
+export type OcrSheetLine = OcrSheetRowFields & { sheetRow: number };
 
 export type OcrSheetDocumentDetail = {
   docKey: string;
+  gudang: string;
   exportTimestamp: string;
   tanggal: string;
   noSuratJalan: string;
@@ -38,29 +29,14 @@ export type OcrSheetDocumentDetail = {
   alamat: string;
   fileName: string;
   fileUrl: string;
+  kendaraanDriver: string;
+  catatan: string;
   lineStatus: string;
   lines: OcrSheetLine[];
 };
 
 function lineFromRow(sheetRow: number, row: string[]): OcrSheetLine {
-  return {
-    sheetRow,
-    exportTimestamp: String(row[0] ?? ""),
-    tanggal: String(row[1] ?? ""),
-    noSuratJalan: String(row[2] ?? ""),
-    noKendaraan: String(row[3] ?? ""),
-    noPo: String(row[4] ?? ""),
-    namaPenerima: String(row[5] ?? ""),
-    alamat: String(row[6] ?? ""),
-    banyaknya: String(row[7] ?? ""),
-    isi: String(row[8] ?? ""),
-    namaBarang: String(row[9] ?? ""),
-    jumlah: String(row[10] ?? ""),
-    keterangan: String(row[11] ?? ""),
-    fileName: String(row[12] ?? ""),
-    fileUrl: String(row[13] ?? ""),
-    status: String(row[14] ?? "").trim() || "OK",
-  };
+  return { sheetRow, ...mapOcrSheetRow(row) };
 }
 
 function rowFromLine(line: OcrSheetLine): string[] {
@@ -73,23 +49,7 @@ function rowFromLine(line: OcrSheetLine): string[] {
           jumlah: line.jumlah,
           namaBarang: line.namaBarang,
         });
-  return [
-    line.exportTimestamp,
-    line.tanggal,
-    line.noSuratJalan,
-    line.noKendaraan,
-    line.noPo,
-    line.namaPenerima,
-    line.alamat,
-    line.banyaknya,
-    line.isi,
-    line.namaBarang,
-    line.jumlah,
-    line.keterangan,
-    line.fileName,
-    line.fileUrl,
-    status,
-  ];
+  return ocrSheetRowToValues({ ...line, status });
 }
 
 async function readSheetMatrix() {
@@ -101,7 +61,7 @@ async function readSheetMatrix() {
   const sheetTab = await resolveSheetTabName(config);
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: config.sheetId,
-    range: `${sheetTab}!A:O`,
+    range: ocrSheetFullColumnsRange(sheetTab),
   });
   return { config, sheets, sheetTab, rows: res.data.values ?? [] };
 }
@@ -126,6 +86,7 @@ export async function getOcrSheetDocumentDetail(docKey: string): Promise<OcrShee
   const statuses = new Set(lines.map((l) => l.status));
   return {
     docKey,
+    gudang: head.gudang,
     exportTimestamp: head.exportTimestamp,
     tanggal: head.tanggal,
     noSuratJalan: head.noSuratJalan,
@@ -135,18 +96,23 @@ export async function getOcrSheetDocumentDetail(docKey: string): Promise<OcrShee
     alamat: head.alamat,
     fileName: head.fileName,
     fileUrl: head.fileUrl.startsWith("http") ? head.fileUrl : "",
+    kendaraanDriver: head.kendaraanDriver,
+    catatan: head.catatan,
     lineStatus: statuses.has("CEK") ? "CEK" : head.status || "OK",
     lines,
   };
 }
 
 export type OcrSheetHeaderPatch = {
+  gudang?: string;
   tanggal?: string;
   noSuratJalan?: string;
   noKendaraan?: string;
   noPo?: string;
   namaPenerima?: string;
   alamat?: string;
+  kendaraanDriver?: string;
+  catatan?: string;
 };
 
 export type OcrSheetLinePatch = {
@@ -170,6 +136,19 @@ export async function saveOcrSheetDocumentEdits(params: {
   const current = await getOcrSheetDocumentDetail(params.docKey);
   const lineByRow = new Map(current.lines.map((l) => [l.sheetRow, { ...l }]));
 
+  const applyHeader = (line: OcrSheetLine) => {
+    if (!params.header) return;
+    if (params.header.gudang !== undefined) line.gudang = params.header.gudang;
+    if (params.header.tanggal !== undefined) line.tanggal = params.header.tanggal;
+    if (params.header.noSuratJalan !== undefined) line.noSuratJalan = params.header.noSuratJalan;
+    if (params.header.noKendaraan !== undefined) line.noKendaraan = params.header.noKendaraan;
+    if (params.header.noPo !== undefined) line.noPo = params.header.noPo;
+    if (params.header.namaPenerima !== undefined) line.namaPenerima = params.header.namaPenerima;
+    if (params.header.alamat !== undefined) line.alamat = params.header.alamat;
+    if (params.header.kendaraanDriver !== undefined) line.kendaraanDriver = params.header.kendaraanDriver;
+    if (params.header.catatan !== undefined) line.catatan = params.header.catatan;
+  };
+
   for (const patch of params.lines ?? []) {
     const line = lineByRow.get(patch.sheetRow);
     if (!line) continue;
@@ -186,25 +165,13 @@ export async function saveOcrSheetDocumentEdits(params: {
         jumlah: line.jumlah,
         namaBarang: line.namaBarang,
       });
-    if (params.header) {
-      if (params.header.tanggal !== undefined) line.tanggal = params.header.tanggal;
-      if (params.header.noSuratJalan !== undefined) line.noSuratJalan = params.header.noSuratJalan;
-      if (params.header.noKendaraan !== undefined) line.noKendaraan = params.header.noKendaraan;
-      if (params.header.noPo !== undefined) line.noPo = params.header.noPo;
-      if (params.header.namaPenerima !== undefined) line.namaPenerima = params.header.namaPenerima;
-      if (params.header.alamat !== undefined) line.alamat = params.header.alamat;
-    }
+    applyHeader(line);
     lineByRow.set(patch.sheetRow, line);
   }
 
   if (params.header && (!params.lines || params.lines.length === 0)) {
     for (const [sheetRow, line] of lineByRow) {
-      if (params.header.tanggal !== undefined) line.tanggal = params.header.tanggal;
-      if (params.header.noSuratJalan !== undefined) line.noSuratJalan = params.header.noSuratJalan;
-      if (params.header.noKendaraan !== undefined) line.noKendaraan = params.header.noKendaraan;
-      if (params.header.noPo !== undefined) line.noPo = params.header.noPo;
-      if (params.header.namaPenerima !== undefined) line.namaPenerima = params.header.namaPenerima;
-      if (params.header.alamat !== undefined) line.alamat = params.header.alamat;
+      applyHeader(line);
       lineByRow.set(sheetRow, line);
     }
   }
@@ -218,7 +185,7 @@ export async function saveOcrSheetDocumentEdits(params: {
     const merged = lineByRow.get(sheetRow);
     if (!merged) continue;
     data.push({
-      range: `${sheetTab}!A${sheetRow}:O${sheetRow}`,
+      range: ocrSheetRowRange(sheetTab, sheetRow),
       values: [rowFromLine(merged)],
     });
   }

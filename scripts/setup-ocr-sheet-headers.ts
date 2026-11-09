@@ -15,7 +15,7 @@ async function main() {
   console.log("Menulis header OCR ke tab:", cfg.sheetTab);
   console.log("Sheet:", GBC_OCR_RESULTS_SHEET_URL);
   await ensureOcrSheetHeaders(cfg);
-  console.log("Selesai — baris 1 sekarang header, data OCR mulai baris 2.");
+  console.log("Selesai — header v2 (18 kolom) + format warna. Baris data lama tidak otomatis dipindah kolom.");
 }
 
 main().catch((e) => {

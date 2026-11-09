@@ -1,4 +1,9 @@
-import { isMeaningfulOcrDataRow, OCR_SHEET_HEADERS } from "@/lib/providers/google-workspace/google-sj-export-rows";
+import {
+  isMeaningfulOcrDataRow,
+  OCR_SHEET_HEADERS,
+  OCR_SHEET_LEGACY_HEADER,
+} from "@/lib/providers/google-workspace/google-sj-export-rows";
+import { mapOcrSheetRow } from "@/lib/providers/google-workspace/ocr-sheet-columns";
 
 export { isMeaningfulOcrDataRow };
 
@@ -13,17 +18,16 @@ export function decodeOcrSheetDocKey(docKey: string): string {
 /** Cocokkan baris sheet dengan kunci dokumen (nama file atau noSj|tanggal|…). */
 export function sheetRowMatchesDocKey(row: string[], rawKey: string): boolean {
   if (!isMeaningfulOcrDataRow(row)) return false;
-  const fileName = String(row[12] ?? "").trim();
-  if (fileName && fileName === rawKey) return true;
+  const fields = mapOcrSheetRow(row);
+  if (fields.fileName && fields.fileName === rawKey) return true;
   const parts = rawKey.split("|");
   if (parts.length >= 2) {
-    const noSj = String(row[2] ?? "").trim();
-    const tanggal = String(row[1] ?? "").trim();
-    if (parts[0] === noSj && parts[1] === tanggal) return true;
+    if (parts[0] === fields.noSuratJalan && parts[1] === fields.tanggal) return true;
   }
   return false;
 }
 
 export function firstRowIsOcrHeader(row: string[] | undefined): boolean {
-  return String(row?.[0] ?? "").trim() === OCR_SHEET_HEADERS[0];
+  const first = String(row?.[0] ?? "").trim();
+  return first === OCR_SHEET_HEADERS[0] || first === OCR_SHEET_LEGACY_HEADER;
 }

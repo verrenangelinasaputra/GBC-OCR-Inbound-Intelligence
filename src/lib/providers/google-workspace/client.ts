@@ -2,7 +2,17 @@ import { Readable } from "node:stream";
 import { google } from "googleapis";
 import type { GoogleExportConfig } from "./config";
 import { createDriveOAuthClient, isDriveOAuthConfigured } from "./drive-oauth";
-import { nextOcrDataRowNumber, OCR_SHEET_HEADERS } from "./google-sj-export-rows";
+import {
+  nextOcrDataRowNumber,
+  OCR_SHEET_HEADERS,
+  OCR_SHEET_LEGACY_HEADER,
+} from "./google-sj-export-rows";
+import {
+  OCR_SHEET_RANGE_COL,
+  ocrSheetFullColumnsRange,
+  ocrSheetRowRange,
+} from "./ocr-sheet-columns";
+import { applyOcrSheetFormatting } from "./ocr-sheet-format";
 
 function driveScopes(config: GoogleExportConfig): string[] {
   return [
@@ -95,16 +105,16 @@ export async function uploadFileToDrive(params: {
   }
 }
 
-function firstRowIsOcrHeader(row: string[] | undefined): boolean {
+function firstRowIsCurrentOcrHeader(row: string[] | undefined): boolean {
   if (!row?.length) return false;
   return String(row[0] ?? "").trim() === OCR_SHEET_HEADERS[0];
 }
 
 function firstRowLooksLikeOcrData(row: string[] | undefined): boolean {
   if (!row?.length) return false;
-  const exported = String(row[0] ?? "").trim();
+  const exported = String(row[1] ?? row[0] ?? "").trim();
   if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(exported)) return true;
-  const status = String(row[14] ?? "").trim().toUpperCase();
+  const status = String(row[17] ?? row[14] ?? "").trim().toUpperCase();
   return status === "OK" || status === "CEK";
 }
 
@@ -132,13 +142,17 @@ export async function ensureOcrSheetHeaders(config: GoogleExportConfig): Promise
 
   const head = await sheets.spreadsheets.values.get({
     spreadsheetId: config.sheetId,
-    range: `${sheetTab}!A1:O1`,
+    range: `${sheetTab}!A1:${OCR_SHEET_RANGE_COL}1`,
   });
   const first = head.data.values?.[0];
-  if (firstRowIsOcrHeader(first)) return;
+  const headerOk = firstRowIsCurrentOcrHeader(first);
 
   const hasContent = (first ?? []).some((c) => String(c ?? "").trim() !== "");
-  if (hasContent && (firstRowLooksLikeOcrData(first) || first)) {
+  if (
+    !headerOk &&
+    hasContent &&
+    (firstRowLooksLikeOcrData(first) || String(first?.[0] ?? "").trim() === OCR_SHEET_LEGACY_HEADER)
+  ) {
     await sheets.spreadsheets.batchUpdate({
       spreadsheetId: config.sheetId,
       requestBody: {
@@ -154,26 +168,16 @@ export async function ensureOcrSheetHeaders(config: GoogleExportConfig): Promise
     });
   }
 
-  await sheets.spreadsheets.batchUpdate({
-    spreadsheetId: config.sheetId,
-    requestBody: {
-      requests: [
-        {
-          updateSheetProperties: {
-            properties: { sheetId, gridProperties: { frozenRowCount: 1 } },
-            fields: "gridProperties.frozenRowCount",
-          },
-        },
-      ],
-    },
-  });
+  if (!headerOk) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: config.sheetId,
+      range: `${sheetTab}!A1:${OCR_SHEET_RANGE_COL}1`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [Array.from(OCR_SHEET_HEADERS)] },
+    });
+  }
 
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: config.sheetId,
-    range: `${sheetTab}!A1:O1`,
-    valueInputOption: "USER_ENTERED",
-    requestBody: { values: [Array.from(OCR_SHEET_HEADERS)] },
-  });
+  await applyOcrSheetFormatting(sheets, config.sheetId, sheetId);
 }
 
 export async function resolveSheetTabName(config: GoogleExportConfig): Promise<string> {
@@ -203,11 +207,11 @@ export async function appendRowsToSheet(params: {
 
   const existing = await sheets.spreadsheets.values.get({
     spreadsheetId: params.config.sheetId,
-    range: `${sheetTab}!A:O`,
+    range: ocrSheetFullColumnsRange(sheetTab),
   });
   const startRow = nextOcrDataRowNumber(existing.data.values ?? []);
   const endRow = startRow + params.rows.length - 1;
-  const range = `${sheetTab}!A${startRow}:O${endRow}`;
+  const range = ocrSheetRowRange(sheetTab, startRow, endRow);
 
   const res = await sheets.spreadsheets.values.update({
     spreadsheetId: params.config.sheetId,
