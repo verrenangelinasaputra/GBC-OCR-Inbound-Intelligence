@@ -26,7 +26,8 @@ type UploadResult = {
   message?: string;
 };
 
-const ACCEPT = ".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf";
+const ACCEPT = ".jpg,.jpeg,.png,image/jpeg,image/png";
+const ALLOWED_TYPES = new Set(["image/jpeg", "image/jpg", "image/png"]);
 
 function fileId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -67,10 +68,21 @@ export function SupplierUploadForm() {
     }
     const next: StagedFile[] = [];
     for (const file of Array.from(incoming).slice(0, room)) {
+      const type = file.type || "";
+      const ext = file.name.toLowerCase();
+      const ok =
+        ALLOWED_TYPES.has(type) ||
+        ext.endsWith(".jpg") ||
+        ext.endsWith(".jpeg") ||
+        ext.endsWith(".png");
+      if (!ok) {
+        setError("Hanya foto JPG atau PNG — PDF tidak didukung (OCR butuh gambar).");
+        continue;
+      }
       next.push({
         id: fileId(),
         file,
-        previewUrl: file.type === "application/pdf" ? "" : URL.createObjectURL(file),
+        previewUrl: URL.createObjectURL(file),
       });
     }
     setError("");
@@ -136,7 +148,7 @@ export function SupplierUploadForm() {
             <div>
               <h2 className="text-base font-semibold text-slate-900">Foto Surat Jalan</h2>
               <p className="mt-1 text-sm text-slate-500">
-                JPG, PNG, atau PDF — {SUPPLIER_MAX_SJ_FILES} file per pengiriman (1 file = 1 SJ).
+                Foto JPG atau PNG saja — {SUPPLIER_MAX_SJ_FILES} file per pengiriman (1 file = 1 SJ).
               </p>
             </div>
             <button
@@ -179,18 +191,12 @@ export function SupplierUploadForm() {
                       Hapus
                     </button>
                   </div>
-                  {item.previewUrl ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img
-                      src={item.previewUrl}
-                      alt={item.file.name}
-                      className="h-40 w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-40 items-center justify-center bg-slate-100 text-sm text-slate-600">
-                      PDF — {item.file.name}
-                    </div>
-                  )}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={item.previewUrl}
+                    alt={item.file.name}
+                    className="h-40 w-full object-cover"
+                  />
                   <p className="truncate px-3 py-2 text-xs text-slate-500" title={item.file.name}>
                     {item.file.name}
                   </p>

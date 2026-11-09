@@ -10,7 +10,7 @@ import { writeAuditLog } from "@/lib/services/audit";
 import { SuratJalanStatus } from "@prisma/client";
 import { SUPPLIER_GUDANG_OPTIONS, SUPPLIER_MAX_SJ_FILES } from "@/lib/config/supplier-gudang";
 
-const ALLOWED = new Set(["image/jpeg", "image/jpg", "image/png", "application/pdf"]);
+const ALLOWED = new Set(["image/jpeg", "image/jpg", "image/png"]);
 const MAX_BYTES = 15 * 1024 * 1024;
 const GUDANG_SET = new Set<string>(SUPPLIER_GUDANG_OPTIONS);
 
@@ -71,7 +71,7 @@ export async function POST(request: Request) {
     let page = 1;
     for (const file of files) {
       if (!ALLOWED.has(file.type)) {
-        return jsonError(new Error(`Format tidak diizinkan: ${file.type}`), 400);
+        return jsonError(new Error(`Format tidak diizinkan — hanya foto JPG/PNG, bukan PDF.`), 400);
       }
       const buffer = Buffer.from(await file.arrayBuffer());
       if (buffer.length > MAX_BYTES) {

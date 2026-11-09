@@ -4,7 +4,7 @@ import { isSheetOnlyMode } from "@/lib/config/app-mode";
 import { SUPPLIER_GUDANG_OPTIONS, SUPPLIER_MAX_SJ_FILES } from "@/lib/config/supplier-gudang";
 import { processSheetOnlyUpload } from "@/lib/services/sheet-only-upload";
 
-const ALLOWED = new Set(["image/jpeg", "image/jpg", "image/png", "application/pdf"]);
+const ALLOWED = new Set(["image/jpeg", "image/jpg", "image/png"]);
 const MAX_BYTES = 15 * 1024 * 1024;
 const GUDANG_SET = new Set<string>(SUPPLIER_GUDANG_OPTIONS);
 
@@ -40,7 +40,10 @@ export async function POST(request: Request) {
     for (let i = 0; i < files.length; i += 1) {
       const file = files[i];
       if (!ALLOWED.has(file.type)) {
-        return jsonError(new Error(`Format tidak diizinkan (file ${i + 1}): ${file.type}`), 400);
+        return jsonError(
+          new Error(`Format tidak diizinkan (file ${i + 1}) — hanya foto JPG/PNG, bukan PDF.`),
+          400
+        );
       }
       const buffer = Buffer.from(await file.arrayBuffer());
       if (buffer.length > MAX_BYTES) {
