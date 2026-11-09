@@ -147,94 +147,151 @@ export function SupplierUploadForm() {
     const decoder = new TextDecoder();
     let buffer = "";
     let finalPayload: UploadResult | null = null;
+    let streamError: string | null = null;
+    let knownFileTotal = fileTotal;
+    const completedUploads: NonNullable<UploadResult["uploads"]> = [];
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
+    type StreamEvent = {
+      type: string;
+      fileIndex?: number;
+      fileTotal?: number;
+      fileName?: string;
+      phase?: string;
+      message?: string;
+      payload?: UploadResult;
+      submissionRef?: string;
+      suratJalanNumber?: string;
+      sheetRowCount?: number;
+    };
+
+    const handleEvent = (event: StreamEvent) => {
+      if (event.type === "file_start" && event.fileIndex && event.fileTotal && event.fileName) {
+        knownFileTotal = event.fileTotal;
+        setUploadProgress((prev) => ({
+          ...prev,
+          active: true,
+          fileIndex: event.fileIndex!,
+          fileTotal: event.fileTotal!,
+          fileName: event.fileName!,
+          message: "Memulai pemrosesan gambar…",
+          phase: "prepare",
+          percent: uploadProgressPercent(event.fileIndex!, event.fileTotal!, "prepare"),
+          startedAt: prev.startedAt ?? Date.now(),
+        }));
+      }
+
+      if (
+        event.type === "step" &&
+        event.fileIndex &&
+        event.fileTotal &&
+        event.fileName &&
+        event.message &&
+        event.phase
+      ) {
+        const phase = event.phase as SheetUploadProgressPhase;
+        setUploadProgress((prev) => ({
+          ...prev,
+          active: true,
+          fileIndex: event.fileIndex!,
+          fileTotal: event.fileTotal!,
+          fileName: event.fileName!,
+          message: event.message!,
+          phase,
+          percent: uploadProgressPercent(event.fileIndex!, event.fileTotal!, phase),
+          startedAt: prev.startedAt ?? Date.now(),
+        }));
+      }
+
+      if (event.type === "file_done" && event.fileIndex && event.fileTotal && event.submissionRef) {
+        completedUploads.push({
+          submissionRef: event.submissionRef,
+          suratJalanNumber: event.suratJalanNumber,
+          sheetRowCount: event.sheetRowCount ?? 0,
+        });
+        setUploadProgress((prev) => ({
+          ...prev,
+          active: true,
+          fileIndex: event.fileIndex!,
+          fileTotal: event.fileTotal!,
+          percent: uploadProgressPercent(event.fileIndex!, event.fileTotal!, "done"),
+          message: "SJ ini selesai — lanjut ke berikutnya jika ada…",
+          phase: "done",
+        }));
+      }
+
+      if (event.type === "complete" && event.payload) {
+        finalPayload = event.payload;
+        setUploadProgress((prev) => ({
+          ...prev,
+          active: true,
+          percent: 100,
+          message: "Semua Surat Jalan selesai diproses.",
+          phase: "done",
+        }));
+      }
+
+      if (event.type === "error" && event.message) {
+        streamError = event.message;
+      }
+    };
+
+    const parseLines = (chunk: string, flushTail: boolean) => {
+      buffer += chunk;
       const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-
+      if (flushTail) {
+        buffer = "";
+        const tail = lines.pop();
+        if (tail?.trim()) lines.push(tail);
+      } else {
+        buffer = lines.pop() ?? "";
+      }
       for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed) continue;
-        const event = JSON.parse(trimmed) as {
-          type: string;
-          fileIndex?: number;
-          fileTotal?: number;
-          fileName?: string;
-          phase?: string;
-          message?: string;
-          payload?: UploadResult;
-        };
-
-        if (event.type === "file_start" && event.fileIndex && event.fileTotal && event.fileName) {
-          setUploadProgress((prev) => ({
-            ...prev,
-            active: true,
-            fileIndex: event.fileIndex!,
-            fileTotal: event.fileTotal!,
-            fileName: event.fileName!,
-            message: "Memulai pemrosesan gambar…",
-            phase: "prepare",
-            percent: uploadProgressPercent(event.fileIndex!, event.fileTotal!, "prepare"),
-            startedAt: prev.startedAt ?? Date.now(),
-          }));
-        }
-
-        if (
-          event.type === "step" &&
-          event.fileIndex &&
-          event.fileTotal &&
-          event.fileName &&
-          event.message &&
-          event.phase
-        ) {
-          const phase = event.phase as SheetUploadProgressPhase;
-          setUploadProgress((prev) => ({
-            ...prev,
-            active: true,
-            fileIndex: event.fileIndex!,
-            fileTotal: event.fileTotal!,
-            fileName: event.fileName!,
-            message: event.message!,
-            phase,
-            percent: uploadProgressPercent(event.fileIndex!, event.fileTotal!, phase),
-            startedAt: prev.startedAt ?? Date.now(),
-          }));
-        }
-
-        if (event.type === "file_done" && event.fileIndex && event.fileTotal) {
-          setUploadProgress((prev) => ({
-            ...prev,
-            active: true,
-            fileIndex: event.fileIndex!,
-            fileTotal: event.fileTotal!,
-            percent: uploadProgressPercent(event.fileIndex!, event.fileTotal!, "done"),
-            message: "SJ ini selesai — lanjut ke berikutnya jika ada…",
-            phase: "done",
-          }));
-        }
-
-        if (event.type === "complete" && event.payload) {
-          finalPayload = event.payload;
-          setUploadProgress((prev) => ({
-            ...prev,
-            active: true,
-            percent: 100,
-            message: "Semua Surat Jalan selesai diproses.",
-            phase: "done",
-          }));
-        }
-
-        if (event.type === "error") {
-          throw new Error(event.message ?? "Upload gagal");
+        try {
+          handleEvent(JSON.parse(trimmed) as StreamEvent);
+        } catch {
+          // abaikan baris rusak
         }
       }
+    };
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        parseLines(decoder.decode(), true);
+        break;
+      }
+      parseLines(decoder.decode(value, { stream: true }), false);
+    }
+
+    if (streamError) {
+      throw new Error(streamError);
+    }
+
+    if (!finalPayload && completedUploads.length === knownFileTotal && knownFileTotal > 0) {
+      const sheetRowCount = completedUploads.reduce((n, u) => n + u.sheetRowCount, 0);
+      finalPayload = {
+        fileCount: knownFileTotal,
+        submissionRef: completedUploads[0]?.submissionRef,
+        uploads: completedUploads,
+        sheetRowCount,
+        message: `${knownFileTotal} Surat Jalan diproses (total ${sheetRowCount} baris di spreadsheet).`,
+      };
     }
 
     if (!finalPayload) {
-      throw new Error("Proses selesai tanpa hasil — coba lagi.");
+      if (completedUploads.length > 0) {
+        throw new Error(
+          `Proses terputus setelah ${completedUploads.length} dari ${knownFileTotal} SJ. ` +
+            "Kemungkinan timeout server (OCR lama). Cek spreadsheet — data yang sempat diproses mungkin sudah masuk. " +
+            "Kurangi jumlah file per submit atau naikkan maxDuration di Vercel."
+        );
+      }
+      throw new Error(
+        "Koneksi stream berakhir tanpa konfirmasi selesai. " +
+          "Jika OCR masih berjalan di server, cek spreadsheet. Coba refresh dan upload ulang sisa file jika perlu."
+      );
     }
     return finalPayload;
   }

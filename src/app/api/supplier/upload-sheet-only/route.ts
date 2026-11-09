@@ -8,6 +8,9 @@ const ALLOWED = new Set(["image/jpeg", "image/jpg", "image/png"]);
 const MAX_BYTES = 15 * 1024 * 1024;
 const GUDANG_SET = new Set<string>(SUPPLIER_GUDANG_OPTIONS);
 
+export const maxDuration = 300;
+export const runtime = "nodejs";
+
 export async function POST(request: Request) {
   if (!isSheetOnlyMode()) {
     return jsonError(new Error("SHEET_ONLY_MODE bukan true — endpoint nonaktif"), 404);

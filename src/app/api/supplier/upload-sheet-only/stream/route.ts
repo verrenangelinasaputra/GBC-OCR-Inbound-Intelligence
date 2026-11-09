@@ -8,6 +8,10 @@ const ALLOWED = new Set(["image/jpeg", "image/jpg", "image/png"]);
 const MAX_BYTES = 15 * 1024 * 1024;
 const GUDANG_SET = new Set<string>(SUPPLIER_GUDANG_OPTIONS);
 
+/** OCR multi-file bisa >60s — naikkan limit di Vercel (Pro: hingga 300s). */
+export const maxDuration = 300;
+export const runtime = "nodejs";
+
 type NdjsonEvent =
   | {
       type: "file_start";
