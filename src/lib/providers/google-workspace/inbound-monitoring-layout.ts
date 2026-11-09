@@ -182,19 +182,15 @@ function summaryFilterAndKpiRows(sep: string, dcLabel: string): string[][] {
   rows.push(headerRow);
 
   const queryRow = wideSummaryRow();
-  queryRow[band.weekly] = q("select J, count(E), sum(G) where G > 0 and J is not null group by J");
+  queryRow[band.weekly] = q("select J, sum(G) where G > 0 and J is not null group by J");
   queryRow[band.item] = q(
     "select J, F, E, A, sum(G), H where E is not null and G > 0 group by J, F, E, A, H"
   );
   queryRow[band.delivery] = q(
     "select C, J, A, B, D, F, E, G, H where C is not null and G > 0 order by C desc"
   );
-  queryRow[band.supplier] = q(
-    "select B, sum(G), count(D), count(E), min(C), max(C) where B is not null and G > 0 and C is not null group by B"
-  );
-  queryRow[band.warehouse] = q(
-    "select A, sum(G), count(E), count(D), count(B) where A is not null and G > 0 group by A"
-  );
+  queryRow[band.supplier] = q("select B, sum(G) where B is not null and G > 0 group by B");
+  queryRow[band.warehouse] = q("select A, sum(G) where A is not null and G > 0 group by A");
   rows.push(queryRow);
 
   return rows;

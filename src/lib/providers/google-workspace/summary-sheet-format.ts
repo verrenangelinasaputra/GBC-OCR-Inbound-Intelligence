@@ -145,8 +145,8 @@ export async function applySummaryDashboardFormatting(
     bandHeader(sheetId, h, bandColIndex.weekly, bandColIndex.weekly + 3),
     bandHeader(sheetId, h, bandColIndex.item, bandColIndex.item + 6),
     bandHeader(sheetId, h, bandColIndex.delivery, bandColIndex.delivery + 9),
-    bandHeader(sheetId, h, bandColIndex.supplier, bandColIndex.supplier + 6),
-    bandHeader(sheetId, h, bandColIndex.warehouse, bandColIndex.warehouse + 5),
+    bandHeader(sheetId, h, bandColIndex.supplier, bandColIndex.supplier + 2),
+    bandHeader(sheetId, h, bandColIndex.warehouse, bandColIndex.warehouse + 2),
     {
       updateSheetProperties: {
         properties: {
@@ -186,13 +186,52 @@ export async function applySummaryDashboardFormatting(
           sheetId,
           startRowIndex: q0,
           endRowIndex: 3000,
-          startColumnIndex: bandColIndex.supplier + 4,
-          endColumnIndex: bandColIndex.supplier + 6,
+          startColumnIndex: bandColIndex.supplier + 1,
+          endColumnIndex: bandColIndex.supplier + 2,
         },
         cell: {
-          userEnteredFormat: { numberFormat: { type: "DATE", pattern: "dd/MM/yyyy" } },
+          userEnteredFormat: {
+            numberFormat: { type: "NUMBER", pattern: "#,##0" },
+            horizontalAlignment: "RIGHT",
+          },
         },
-        fields: "userEnteredFormat.numberFormat",
+        fields: "userEnteredFormat(numberFormat,horizontalAlignment)",
+      },
+    },
+    {
+      repeatCell: {
+        range: {
+          sheetId,
+          startRowIndex: q0,
+          endRowIndex: 3000,
+          startColumnIndex: bandColIndex.warehouse + 1,
+          endColumnIndex: bandColIndex.warehouse + 2,
+        },
+        cell: {
+          userEnteredFormat: {
+            numberFormat: { type: "NUMBER", pattern: "#,##0" },
+            horizontalAlignment: "RIGHT",
+          },
+        },
+        fields: "userEnteredFormat(numberFormat,horizontalAlignment)",
+      },
+    },
+    {
+      repeatCell: {
+        range: {
+          sheetId,
+          startRowIndex: q0,
+          endRowIndex: 3000,
+          startColumnIndex: bandColIndex.weekly + 1,
+          endColumnIndex: bandColIndex.weekly + 2,
+        },
+        cell: {
+          userEnteredFormat: {
+            numberFormat: { type: "NUMBER", pattern: "#,##0" },
+            horizontalAlignment: "RIGHT",
+          },
+        },
+        fields: "userEnteredFormat(numberFormat,horizontalAlignment)",
       },
     },
   ];
