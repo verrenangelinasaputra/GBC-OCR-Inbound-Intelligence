@@ -2,6 +2,8 @@ import { GeminiOCRProvider } from "@/lib/providers/ocr/gemini-ocr";
 import type { GeminiSJPayload } from "@/lib/providers/ocr/gemini-surat-jalan";
 import { ocrExportSheetUrl } from "@/lib/config/ocr-export-target";
 import { isDriveOAuthConfigured } from "@/lib/providers/google-workspace/drive-oauth";
+import { getSupplierDriveSettings } from "@/lib/supplier-auth/supplier-drive-settings";
+import { isSupplierMasterUsername } from "@/lib/supplier-auth/master-admin";
 import {
   appendRowsToSheet,
   buildGoogleSheetRows,
@@ -56,6 +58,7 @@ export async function processSheetOnlyUpload(params: {
   vehicleInfo?: string;
   gudang?: string;
   supplierName?: string;
+  supplierUsername?: string;
   batchIndex?: number;
   batchTotal?: number;
   onProgress?: (event: SheetUploadProgressEvent) => void | Promise<void>;
@@ -136,6 +139,34 @@ export async function processSheetOnlyUpload(params: {
             mimeType: params.file.mimeType || "image/jpeg",
           });
     fileUrl = uploaded.fileUrl;
+
+    const mirrorUser = params.supplierUsername?.trim().toLowerCase();
+    if (
+      mirrorUser &&
+      !isSupplierMasterUsername(mirrorUser) &&
+      gudangLabel &&
+      driveSubfolder
+    ) {
+      try {
+        const driveSettings = await getSupplierDriveSettings(mirrorUser);
+        if (driveSettings?.mirrorEnabled && driveSettings.driveRootFolderId) {
+          await uploadSuratJalanToGudangDrive({
+            config,
+            rootFolderId: driveSettings.driveRootFolderId,
+            buffer: params.file.buffer,
+            fileName,
+            mimeType: params.file.mimeType || "image/jpeg",
+            gudang: gudangLabel,
+            subfolderName: driveSubfolder,
+          });
+        }
+      } catch (mirrorErr) {
+        const mirrorMsg = mirrorErr instanceof Error ? mirrorErr.message : "Mirror Drive supplier gagal";
+        driveWarning = driveWarning
+          ? `${driveWarning} | Mirror supplier: ${mirrorMsg}`
+          : `Upload GBC OK; mirror ke Drive supplier gagal: ${mirrorMsg}`;
+      }
+    }
   } catch (err) {
     const raw = err instanceof Error ? err.message : "Upload Drive gagal";
     const vercelHint =

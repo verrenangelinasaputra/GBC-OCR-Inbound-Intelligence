@@ -119,6 +119,7 @@ export async function POST(request: Request) {
           vehicleInfo: vehicleInfo || undefined,
           gudang,
           supplierName,
+          supplierUsername: session.username,
           batchIndex: fileIndex,
           batchTotal: fileTotal,
           onProgress: async (p) => {

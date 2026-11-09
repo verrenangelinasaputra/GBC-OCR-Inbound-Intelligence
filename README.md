@@ -59,6 +59,11 @@ Buka:
 
 - **Internal:** http://localhost:3000/login  
 - **Supplier portal:** http://localhost:3000/supplier/login  
+- **Master supplier** (kelola daftar + folder Drive mirror): login `admin_supplier` → `/supplier/master` (`npm run supplier:master-setup` untuk hash password)
+
+### Mirror upload ke Drive supplier
+
+Setelah tiap submit, foto masuk folder GBC (Nomar) seperti biasa. Jika di **Master Supplier** mirror aktif untuk username tersebut, salinan dengan struktur folder sama diunggah ke **folder root Drive supplier** (paste URL folder di master). Folder supplier harus dishare **Editor** ke akun OAuth upload (`nomarcengkareng@gmail.com`). Pengaturan disimpan di tab `SupplierDrive` pada spreadsheet kredensial supplier.
 
 ### Akun demo (dari seed — ganti di production)
 
@@ -67,6 +72,8 @@ Buka:
 | Admin / DBM | `admin` | `AdminGBC!2026` |
 | Supplier SSC | `fauzi_ssc` | `SupplierSSC!2026` |
 | Warehouse | `warehouse_demo` | `Warehouse!2026` |
+| Admin Supplier | `admin_supplier` | `$2b$12$R.0uTYrj2N4TocI6VVrDKOaOUI/s2ikEO6Olt9DPpblC/QwMCYGp2` |
+
 
 ## Alur uji end-to-end (demo)
 

@@ -53,6 +53,9 @@ export async function middleware(request: NextRequest) {
       if (isInternalStaff(session.roles)) {
         return NextResponse.redirect(new URL("/dashboard", request.url));
       }
+      if (session.roles.includes("SUPPLIER_MASTER_ADMIN")) {
+        return NextResponse.redirect(new URL("/supplier/master", request.url));
+      }
       return NextResponse.redirect(new URL("/supplier", request.url));
     }
 
@@ -66,7 +69,14 @@ export async function middleware(request: NextRequest) {
       if (isInternalStaff(session.roles)) {
         return nextWithPath(request);
       }
-      if (session.roles.includes("SUPPLIER_USER")) {
+      const isSupplierMaster = session.roles.includes("SUPPLIER_MASTER_ADMIN");
+      if (session.roles.includes("SUPPLIER_USER") || isSupplierMaster) {
+        if (pathname.startsWith("/supplier/master") && !isSupplierMaster) {
+          return NextResponse.redirect(new URL("/supplier", request.url));
+        }
+        if (pathname.startsWith("/api/supplier/master") && !isSupplierMaster) {
+          return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+        }
         const supplierArea =
           pathname === "/supplier" ||
           pathname.startsWith("/supplier/") ||

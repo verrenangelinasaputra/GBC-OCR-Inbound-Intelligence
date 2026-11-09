@@ -3,15 +3,22 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import clsx from "clsx";
-import { ChevronLeft, ChevronRight, ImagePlus, ListChecks, LogOut } from "lucide-react";
+import { ChevronLeft, ChevronRight, ImagePlus, ListChecks, LogOut, Shield } from "lucide-react";
 import { useState } from "react";
 
-const NAV = [
+const NAV_BASE = [
   { href: "/supplier", label: "Upload", icon: ImagePlus, exact: true },
   { href: "/supplier/submissions", label: "Status Pengiriman", icon: ListChecks, exact: false },
 ] as const;
 
-export function SupplierSidebar() {
+const NAV_MASTER = {
+  href: "/supplier/master",
+  label: "Master Supplier",
+  icon: Shield,
+  exact: false,
+} as const;
+
+export function SupplierSidebar({ isMasterAdmin = false }: { isMasterAdmin?: boolean }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
 
@@ -40,7 +47,7 @@ export function SupplierSidebar() {
       </div>
 
       <nav className="flex-1 overflow-y-auto p-2">
-        {NAV.map((item) => {
+        {[...(isMasterAdmin ? [NAV_MASTER, ...NAV_BASE] : NAV_BASE)].map((item) => {
           const active = item.exact
             ? pathname === item.href
             : pathname === item.href || pathname.startsWith(`${item.href}/`);

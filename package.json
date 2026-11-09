@@ -17,7 +17,8 @@
     "sheet:headers": "tsx scripts/setup-ocr-sheet-headers.ts",
     "drive:oauth-setup": "tsx scripts/setup-drive-oauth.ts",
     "drive:upload-test": "tsx scripts/test-drive-upload.ts",
-    "internal:setup": "tsx scripts/setup-internal-admin.ts"
+    "internal:setup": "tsx scripts/setup-internal-admin.ts",
+    "supplier:master-setup": "tsx scripts/setup-supplier-master.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

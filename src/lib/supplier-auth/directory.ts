@@ -168,6 +168,20 @@ function accountFromRow(row: string[], rowNumber: number): SupplierAccount {
   };
 }
 
+export async function listAllSupplierAccounts(): Promise<SupplierAccount[]> {
+  try {
+    await ensureTab(USERS_TAB(), USER_HEADERS);
+    const rows = await readTab(USERS_TAB());
+    const out: SupplierAccount[] = [];
+    for (let index = 1; index < rows.length; index += 1) {
+      out.push(accountFromRow(rows[index] ?? [], index + 1));
+    }
+    return out;
+  } catch (error) {
+    wrapSheetError(error);
+  }
+}
+
 export async function findSupplierByUsername(username: string): Promise<SupplierAccount | null> {
   try {
     await ensureTab(USERS_TAB(), USER_HEADERS);

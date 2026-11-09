@@ -1,5 +1,6 @@
 import { createSessionToken, setSessionCookie } from "@/lib/auth/session";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
+import { isSupplierMasterUsername, loginSupplierMaster } from "./master-admin";
 import { generateVerificationCode } from "./code";
 import {
   assertCodeResendAllowed,
@@ -105,6 +106,9 @@ export async function verifyRegisterCode(usernameRaw: string, codeRaw: string): 
 
 export async function loginSupplier(usernameRaw: string, password: string): Promise<{ redirect: string }> {
   const username = validateUsername(usernameRaw);
+  if (isSupplierMasterUsername(username)) {
+    return loginSupplierMaster(password);
+  }
   const account = await findSupplierByUsername(username);
   const ok = account?.emailVerified && (await verifyPassword(password, account.passwordHash));
   if (!account || !ok) throw new SupplierAuthError("Username atau password salah.", 401);
