@@ -5,6 +5,7 @@ import { isSheetOnlyMode } from "@/lib/config/app-mode";
 
 const PUBLIC_PATHS = [
   "/login",
+  "/register",
   "/supplier/login",
   "/supplier/register",
   "/supplier/forgot-password",
@@ -33,10 +34,12 @@ export async function middleware(request: NextRequest) {
 
     const open =
       pathname === "/login" ||
+      pathname === "/register" ||
       pathname === "/supplier/login" ||
       pathname === "/supplier/register" ||
       pathname === "/supplier/forgot-password" ||
       pathname.startsWith("/api/supplier/auth/") ||
+      pathname.startsWith("/api/auth/register") ||
       pathname === "/api/auth/login" ||
       pathname === "/api/auth/logout" ||
       pathname === "/api/app-mode" ||
@@ -59,7 +62,11 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL("/supplier", request.url));
     }
 
-    if (pathname === "/login" && session && isInternalStaff(session.roles)) {
+    if (
+      (pathname === "/login" || pathname === "/register") &&
+      session &&
+      isInternalStaff(session.roles)
+    ) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
 

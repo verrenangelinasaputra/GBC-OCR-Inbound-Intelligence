@@ -68,7 +68,7 @@ export default function LoginPage() {
         </form>
         <div className="mt-4 grid grid-cols-2 gap-3">
           <Link
-            href="/supplier/register"
+            href="/register"
             className="rounded-lg border border-slate-300 py-2.5 text-center text-sm font-medium text-slate-800 hover:bg-slate-50"
           >
             Register

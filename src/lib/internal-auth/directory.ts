@@ -8,6 +8,8 @@ export const INTERNAL_USER_HEADERS = [
   "full_name",
   "username",
   "email",
+  "phone",
+  "gudang_tujuan",
   "password_hash",
   "roles",
   "status",
@@ -21,6 +23,8 @@ export type InternalAccount = {
   fullName: string;
   username: string;
   email: string;
+  phone: string;
+  gudang: string;
   passwordHash: string;
   roles: string[];
   status: string;
@@ -89,7 +93,7 @@ async function ensureHeaders(): Promise<void> {
   try {
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: a1(tab, "A1:I1"),
+      range: a1(tab, "A1:K1"),
     });
     const first = String(res.data.values?.[0]?.[0] ?? "").trim().toLowerCase();
     if (first === "user_id") return;
@@ -101,7 +105,7 @@ async function ensureHeaders(): Promise<void> {
     }
     await sheets.spreadsheets.values.update({
       spreadsheetId: sheetId,
-      range: a1(tab, "A1:I1"),
+      range: a1(tab, "A1:K1"),
       valueInputOption: "RAW",
       requestBody: { values: [Array.from(INTERNAL_USER_HEADERS)] },
     });
@@ -111,15 +115,20 @@ async function ensureHeaders(): Promise<void> {
 }
 
 function accountFromRow(row: string[], rowNumber: number): InternalAccount {
+  const legacy = String(row[4] ?? "").startsWith("$") || String(row[4] ?? "").length > 40;
   return {
     rowNumber,
     userId: row[0] ?? "",
     fullName: row[1] ?? "",
     username: String(row[2] ?? "").trim().toLowerCase(),
     email: String(row[3] ?? "").trim().toLowerCase(),
-    passwordHash: row[4] ?? "",
-    roles: parseRoles(row[5] ?? "SUPER_ADMIN"),
-    status: String(row[6] ?? "ACTIVE").trim().toUpperCase() || "ACTIVE",
+    phone: legacy ? "" : String(row[4] ?? ""),
+    gudang: legacy ? "" : String(row[5] ?? ""),
+    passwordHash: legacy ? (row[4] ?? "") : (row[6] ?? ""),
+    roles: parseRoles(legacy ? (row[5] ?? "WAREHOUSE_OPERATOR") : (row[7] ?? "WAREHOUSE_OPERATOR")),
+    status: String(legacy ? row[6] : row[8] ?? "ACTIVE")
+      .trim()
+      .toUpperCase() || "ACTIVE",
   };
 }
 
@@ -130,7 +139,7 @@ export async function findInternalUserByUsername(username: string): Promise<Inte
     await ensureHeaders();
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: a1(tab, "A:I"),
+      range: a1(tab, "A:K"),
     });
     const rows = res.data.values ?? [];
     for (let index = 1; index < rows.length; index += 1) {
@@ -148,7 +157,7 @@ export async function markInternalLogin(rowNumber: number): Promise<void> {
   try {
     await sheets.spreadsheets.values.update({
       spreadsheetId: sheetId,
-      range: a1(tab, `I${rowNumber}`),
+      range: a1(tab, `K${rowNumber}`),
       valueInputOption: "RAW",
       requestBody: { values: [[timestampJakarta()]] },
     });
@@ -162,6 +171,8 @@ export async function appendInternalUser(row: {
   fullName: string;
   username: string;
   email: string;
+  phone?: string;
+  gudang?: string;
   passwordHash: string;
   roles: string[];
 }): Promise<void> {
@@ -171,21 +182,25 @@ export async function appendInternalUser(row: {
     await ensureHeaders();
     await sheets.spreadsheets.values.append({
       spreadsheetId: sheetId,
-      range: a1(tab, "A:I"),
+      range: a1(tab, "A:K"),
       valueInputOption: "RAW",
       insertDataOption: "INSERT_ROWS",
       requestBody: {
-        values: [[
-          row.userId,
-          row.fullName,
-          row.username,
-          row.email,
-          row.passwordHash,
-          row.roles.join(","),
-          "ACTIVE",
-          now,
-          "",
-        ]],
+        values: [
+          [
+            row.userId,
+            row.fullName,
+            row.username,
+            row.email,
+            row.phone ?? "",
+            row.gudang ?? "",
+            row.passwordHash,
+            row.roles.join(","),
+            "ACTIVE",
+            now,
+            "",
+          ],
+        ],
       },
     });
   } catch (error) {
