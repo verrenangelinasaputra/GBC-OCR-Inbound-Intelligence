@@ -1,10 +1,12 @@
 import { jsonError } from "@/lib/api/auth-context";
 import { getSession } from "@/lib/auth/session";
 import { isSheetOnlyMode } from "@/lib/config/app-mode";
+import { SUPPLIER_GUDANG_OPTIONS, SUPPLIER_MAX_SJ_FILES } from "@/lib/config/supplier-gudang";
 import { processSheetOnlyUpload } from "@/lib/services/sheet-only-upload";
 
 const ALLOWED = new Set(["image/jpeg", "image/jpg", "image/png", "application/pdf"]);
 const MAX_BYTES = 15 * 1024 * 1024;
+const GUDANG_SET = new Set<string>(SUPPLIER_GUDANG_OPTIONS);
 
 export async function POST(request: Request) {
   if (!isSheetOnlyMode()) {
@@ -20,48 +22,68 @@ export async function POST(request: Request) {
     const form = await request.formData();
     const notes = String(form.get("notes") ?? "");
     const vehicleInfo = String(form.get("vehicleInfo") ?? "");
+    const gudang = String(form.get("gudang") ?? "").trim();
     const files = form.getAll("files").filter((f): f is File => f instanceof File);
     if (files.length === 0) {
       return jsonError(new Error("Minimal 1 file Surat Jalan"), 400);
     }
-    if (files.length > 1) {
-      return jsonError(
-        new Error("Mode Sheet-only: upload 1 file per submit (multi-page: gabung PDF dulu)."),
-        400
-      );
+    if (files.length > SUPPLIER_MAX_SJ_FILES) {
+      return jsonError(new Error(`Maksimal ${SUPPLIER_MAX_SJ_FILES} Surat Jalan per submit`), 400);
+    }
+    if (!gudang || !GUDANG_SET.has(gudang)) {
+      return jsonError(new Error("Pilih gudang tujuan yang valid"), 400);
     }
 
-    const file = files[0];
-    if (!ALLOWED.has(file.type)) {
-      return jsonError(new Error(`Format tidak diizinkan: ${file.type}`), 400);
-    }
-    const buffer = Buffer.from(await file.arrayBuffer());
-    if (buffer.length > MAX_BYTES) {
-      return jsonError(new Error("File terlalu besar (max 15MB)"), 400);
+    const uploads: Awaited<ReturnType<typeof processSheetOnlyUpload>>[] = [];
+    const driveWarnings: string[] = [];
+
+    for (let i = 0; i < files.length; i += 1) {
+      const file = files[i];
+      if (!ALLOWED.has(file.type)) {
+        return jsonError(new Error(`Format tidak diizinkan (file ${i + 1}): ${file.type}`), 400);
+      }
+      const buffer = Buffer.from(await file.arrayBuffer());
+      if (buffer.length > MAX_BYTES) {
+        return jsonError(new Error(`File ${i + 1} terlalu besar (max 15MB)`), 400);
+      }
+
+      const result = await processSheetOnlyUpload({
+        file: { buffer, mimeType: file.type, name: file.name },
+        notes: notes || undefined,
+        vehicleInfo: vehicleInfo || undefined,
+        gudang,
+      });
+      uploads.push(result);
+      if (result.driveWarning) driveWarnings.push(result.driveWarning);
     }
 
-    const result = await processSheetOnlyUpload({
-      file: { buffer, mimeType: file.type, name: file.name },
-      notes: notes || undefined,
-      vehicleInfo: vehicleInfo || undefined,
-    });
+    const totalRows = uploads.reduce((n, u) => n + u.sheetRowCount, 0);
+    const last = uploads[uploads.length - 1];
 
     return Response.json({
       ok: true,
       mode: "sheet-only",
-      submissionRef: result.submissionRef,
-      suratJalanNumber: result.suratJalanNumber,
-      sheetRowCount: result.sheetRowCount,
-      sheetId: result.sheetId,
-      sheetTab: result.sheetTab,
-      sheetUrl: result.sheetUrl,
-      sheetUpdatedRange: result.sheetUpdatedRange,
-      driveFileUrl: result.driveFileUrl,
-      driveWarning: result.driveWarning,
-      ocrWarnings: result.ocrWarnings,
+      fileCount: uploads.length,
+      gudang,
+      submissionRef: uploads[0]?.submissionRef,
+      uploads: uploads.map((u) => ({
+        submissionRef: u.submissionRef,
+        suratJalanNumber: u.suratJalanNumber,
+        sheetRowCount: u.sheetRowCount,
+        driveFileUrl: u.driveFileUrl,
+      })),
+      suratJalanNumber: uploads[0]?.suratJalanNumber,
+      sheetRowCount: totalRows,
+      sheetId: last?.sheetId,
+      sheetTab: last?.sheetTab,
+      sheetUrl: last?.sheetUrl,
+      sheetUpdatedRange: last?.sheetUpdatedRange,
+      driveFileUrl: uploads.find((u) => u.driveFileUrl)?.driveFileUrl,
+      driveWarning: driveWarnings[0],
+      ocrWarnings: uploads.flatMap((u) => u.ocrWarnings),
       message:
-        `Data ditulis ke spreadsheet (tab ${result.sheetTab}, ${result.sheetRowCount} baris)` +
-        (result.driveFileUrl ? " + foto di Drive" : ""),
+        `${uploads.length} Surat Jalan → spreadsheet (total ${totalRows} baris, gudang: ${gudang})` +
+        (uploads.some((u) => u.driveFileUrl) ? " + foto di Drive" : ""),
     });
   } catch (e) {
     return jsonError(e instanceof Error ? e : new Error("Upload gagal"));

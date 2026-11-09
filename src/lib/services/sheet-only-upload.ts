@@ -30,10 +30,22 @@ function makeSubmissionRef(): string {
   return `SJ-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
 }
 
+function tagRowsWithGudang(rows: string[][], gudang: string | undefined): string[][] {
+  if (!gudang?.trim()) return rows;
+  const label = `Gudang tujuan: ${gudang.trim()}`;
+  return rows.map((row) => {
+    const copy = [...row];
+    const ket = String(copy[11] ?? "").trim();
+    copy[11] = ket ? `${label} — ${ket}` : label;
+    return copy;
+  });
+}
+
 export async function processSheetOnlyUpload(params: {
   file: { buffer: Buffer; mimeType: string; name: string };
   notes?: string;
   vehicleInfo?: string;
+  gudang?: string;
 }): Promise<SheetOnlyUploadResult> {
   if (!isGoogleExportConfigured()) {
     throw new Error(
@@ -86,7 +98,7 @@ export async function processSheetOnlyUpload(params: {
     fileUrl = "";
   }
 
-  const rows = buildGoogleSheetRows({
+  let rows = buildGoogleSheetRows({
     payload,
     fileName,
     fileUrl,
@@ -95,9 +107,10 @@ export async function processSheetOnlyUpload(params: {
       documentDate: result.documentDate ? new Date(result.documentDate) : null,
       vehicleInfo: params.vehicleInfo || result.vehicleInfo || null,
       poReference: result.poReference ?? null,
-      destinationText: result.destination ?? null,
+      destinationText: result.destination ?? params.gudang?.trim() ?? null,
     },
   });
+  rows = tagRowsWithGudang(rows, params.gudang);
 
   const sheetAppend = await appendRowsToSheet({ config, rows });
 

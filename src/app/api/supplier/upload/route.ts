@@ -8,9 +8,11 @@ import { findDuplicateDocuments } from "@/lib/services/duplicate-detection";
 import { notifyDbmUsers } from "@/lib/providers/notifications";
 import { writeAuditLog } from "@/lib/services/audit";
 import { SuratJalanStatus } from "@prisma/client";
+import { SUPPLIER_GUDANG_OPTIONS, SUPPLIER_MAX_SJ_FILES } from "@/lib/config/supplier-gudang";
 
 const ALLOWED = new Set(["image/jpeg", "image/jpg", "image/png", "application/pdf"]);
 const MAX_BYTES = 15 * 1024 * 1024;
+const GUDANG_SET = new Set<string>(SUPPLIER_GUDANG_OPTIONS);
 
 export async function POST(request: Request) {
   try {
@@ -22,10 +24,18 @@ export async function POST(request: Request) {
     const form = await request.formData();
     const notes = String(form.get("notes") ?? "");
     const vehicleInfo = String(form.get("vehicleInfo") ?? "");
+    const gudang = String(form.get("gudang") ?? "").trim();
     const files = form.getAll("files").filter((f): f is File => f instanceof File);
     if (files.length === 0) {
       return jsonError(new Error("Minimal 1 file Surat Jalan"), 400);
     }
+    if (files.length > SUPPLIER_MAX_SJ_FILES) {
+      return jsonError(new Error(`Maksimal ${SUPPLIER_MAX_SJ_FILES} file per submit`), 400);
+    }
+    if (!gudang || !GUDANG_SET.has(gudang)) {
+      return jsonError(new Error("Pilih gudang tujuan yang valid"), 400);
+    }
+    const combinedNotes = notes ? `${notes} | Gudang: ${gudang}` : `Gudang: ${gudang}`;
 
     const supplier = await prisma.supplier.findUniqueOrThrow({
       where: { id: session.supplierId },
@@ -36,7 +46,7 @@ export async function POST(request: Request) {
       data: {
         referenceNumber: shipmentRef,
         supplierId: supplier.id,
-        notes: notes || undefined,
+        notes: combinedNotes,
         vehicleInfo: vehicleInfo || undefined,
       },
     });
@@ -52,8 +62,9 @@ export async function POST(request: Request) {
         uploadedById: session.userId,
         status: SuratJalanStatus.UPLOADED,
         submissionRef,
-        supplierNotes: notes || undefined,
+        supplierNotes: combinedNotes,
         vehicleInfo: vehicleInfo || undefined,
+        destinationText: gudang,
       },
     });
 

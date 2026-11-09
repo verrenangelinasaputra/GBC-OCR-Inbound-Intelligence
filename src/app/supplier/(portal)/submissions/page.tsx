@@ -10,7 +10,7 @@ export default async function SupplierSubmissionsPage() {
     return (
       <div>
         <h1 className="text-2xl font-semibold">Status Pengiriman</h1>
-        <p className="mt-2 text-sm text-slate-400">
+        <p className="mt-2 text-sm text-slate-500">
           Setelah upload, hasil OCR masuk ke spreadsheet operasional GBC dan foto masuk Drive. Portal ini
           tidak menyimpan status di database.
         </p>
