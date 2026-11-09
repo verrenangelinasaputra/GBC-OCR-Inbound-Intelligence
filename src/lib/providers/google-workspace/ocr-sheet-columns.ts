@@ -1,30 +1,31 @@
 import { OCR_SHEET_HEADERS } from "./google-sj-export-rows";
 
-/** Indeks kolom (0-based) — layout v2. */
+/** Indeks kolom (0-based) — layout v3 (Data Compilation). */
 export const OCR_COL = {
   GUDANG: 0,
-  TANGGAL_EKSPOR: 1,
-  TANGGAL_SJ: 2,
-  NO_SJ: 3,
-  NO_KENDARAAN: 4,
-  NO_PO: 5,
-  NAMA_PENERIMA: 6,
-  ALAMAT: 7,
-  BANYAKNYA: 8,
-  ISI: 9,
-  NAMA_BARANG: 10,
-  JUMLAH: 11,
-  KETERANGAN: 12,
-  NAMA_FILE: 13,
-  LINK_DRIVE: 14,
-  KENDARAAN_DRIVER: 15,
-  CATATAN: 16,
-  STATUS: 17,
+  SUPPLIER: 1,
+  TANGGAL_EKSPOR: 2,
+  TANGGAL_SJ: 3,
+  NO_SJ: 4,
+  NO_KENDARAAN: 5,
+  NO_PO: 6,
+  NAMA_PENERIMA: 7,
+  ALAMAT: 8,
+  BANYAKNYA: 9,
+  ISI: 10,
+  NAMA_BARANG: 11,
+  JUMLAH: 12,
+  KETERANGAN: 13,
+  NAMA_FILE: 14,
+  LINK_DRIVE: 15,
+  KENDARAAN_DRIVER: 16,
+  CATATAN: 17,
+  STATUS: 18,
 } as const;
 
 export const OCR_SHEET_COLUMN_COUNT = OCR_SHEET_HEADERS.length;
 
-export const OCR_SHEET_RANGE_COL = "R";
+export const OCR_SHEET_RANGE_COL = "S";
 
 export function ocrSheetRowRange(sheetTab: string, startRow: number, endRow?: number): string {
   const end = endRow ?? startRow;
@@ -37,14 +38,26 @@ export function ocrSheetFullColumnsRange(sheetTab: string): string {
 
 const DATE_CELL = /^\d{1,2}\/\d{1,2}\/\d{4}$/;
 
+function rowHasGudangPrefix(row: string[]): boolean {
+  return /^gudang\b/i.test(String(row[0] ?? "").trim());
+}
+
 /** Baris data lama (kolom A = Tanggal Ekspor). */
 export function isLegacyOcrDataRow(row: string[] | undefined): boolean {
   if (!row?.length) return false;
   return DATE_CELL.test(String(row[0] ?? "").trim());
 }
 
+/** v2 tanpa kolom Supplier (Gudang + Tanggal Ekspor di B). */
+export function isLegacyOcrGudangOnlyRow(row: string[] | undefined): boolean {
+  if (!row?.length) return false;
+  if (isLegacyOcrDataRow(row)) return false;
+  return rowHasGudangPrefix(row) && DATE_CELL.test(String(row[1] ?? "").trim());
+}
+
 export type OcrSheetRowFields = {
   gudang: string;
+  supplier: string;
   exportTimestamp: string;
   tanggal: string;
   noSuratJalan: string;
@@ -69,6 +82,7 @@ export function mapOcrSheetRow(row: string[] | undefined): OcrSheetRowFields {
   if (isLegacyOcrDataRow(r)) {
     return {
       gudang: "",
+      supplier: "Unverified",
       exportTimestamp: String(r[0] ?? ""),
       tanggal: String(r[1] ?? ""),
       noSuratJalan: String(r[2] ?? ""),
@@ -88,8 +102,32 @@ export function mapOcrSheetRow(row: string[] | undefined): OcrSheetRowFields {
       status: String(r[14] ?? "").trim() || "OK",
     };
   }
+  if (isLegacyOcrGudangOnlyRow(r)) {
+    return {
+      gudang: String(r[0] ?? ""),
+      supplier: "Unverified",
+      exportTimestamp: String(r[1] ?? ""),
+      tanggal: String(r[2] ?? ""),
+      noSuratJalan: String(r[3] ?? ""),
+      noKendaraan: String(r[4] ?? ""),
+      noPo: String(r[5] ?? ""),
+      namaPenerima: String(r[6] ?? ""),
+      alamat: String(r[7] ?? ""),
+      banyaknya: String(r[8] ?? ""),
+      isi: String(r[9] ?? ""),
+      namaBarang: String(r[10] ?? ""),
+      jumlah: String(r[11] ?? ""),
+      keterangan: String(r[12] ?? ""),
+      fileName: String(r[13] ?? ""),
+      fileUrl: String(r[14] ?? ""),
+      kendaraanDriver: String(r[15] ?? ""),
+      catatan: String(r[16] ?? ""),
+      status: String(r[17] ?? "").trim() || "OK",
+    };
+  }
   return {
     gudang: String(r[OCR_COL.GUDANG] ?? ""),
+    supplier: String(r[OCR_COL.SUPPLIER] ?? "").trim() || "Unverified",
     exportTimestamp: String(r[OCR_COL.TANGGAL_EKSPOR] ?? ""),
     tanggal: String(r[OCR_COL.TANGGAL_SJ] ?? ""),
     noSuratJalan: String(r[OCR_COL.NO_SJ] ?? ""),
@@ -113,6 +151,7 @@ export function mapOcrSheetRow(row: string[] | undefined): OcrSheetRowFields {
 export function ocrSheetRowToValues(fields: OcrSheetRowFields): string[] {
   return [
     fields.gudang,
+    fields.supplier,
     fields.exportTimestamp,
     fields.tanggal,
     fields.noSuratJalan,

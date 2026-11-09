@@ -3,6 +3,7 @@ import type { GeminiSJItem, GeminiSJPayload } from "@/lib/providers/ocr/gemini-s
 /** Kolom A–R — selaras `buildGoogleSheetRows`, `ocr-sheet-columns`, dan review. */
 export const OCR_SHEET_HEADERS = [
   "Gudang tujuan",
+  "Supplier",
   "Tanggal Ekspor",
   "Tanggal SJ",
   "No. Surat Jalan",
@@ -139,6 +140,7 @@ export function buildGoogleSheetRows(params: {
   fileUrl: string;
   exportedAt?: Date;
   gudang?: string;
+  supplierName?: string;
   kendaraanDriver?: string;
   catatan?: string;
   fallback?: {
@@ -158,6 +160,8 @@ export function buildGoogleSheetRows(params: {
   const noKendaraan = (payload.no_kendaraan || fallback?.vehicleInfo || "").toUpperCase();
   const noPo = payload.no_po || fallback?.poReference || "";
   const gudang = (params.gudang || "").trim();
+  const supplier =
+    (params.supplierName || "").trim() || "Unverified";
   const kendaraanDriver = (params.kendaraanDriver || "").trim();
   const catatan = (params.catatan || "").trim();
   let namaPenerima = payload.nama_penerima || "";
@@ -178,6 +182,7 @@ export function buildGoogleSheetRows(params: {
     return [
       [
         gudang,
+        supplier,
         timestamp,
         tanggal,
         noSj,
@@ -206,6 +211,7 @@ export function buildGoogleSheetRows(params: {
         : "";
     return [
       gudang,
+      supplier,
       timestamp,
       tanggal,
       noSj,
@@ -241,11 +247,13 @@ export function isMeaningfulOcrDataRow(row: string[] | undefined): boolean {
   if (!row?.length) return false;
   const exportedLegacy = String(row[0] ?? "").trim();
   if (exportedLegacy && /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(exportedLegacy)) return true;
-  const exported = String(row[1] ?? "").trim();
-  if (exported && /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(exported)) return true;
-  const noSj = String(row[3] ?? row[2] ?? "").trim();
+  const exportedV3 = String(row[2] ?? "").trim();
+  if (exportedV3 && /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(exportedV3)) return true;
+  const exportedV2 = String(row[1] ?? "").trim();
+  if (exportedV2 && /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(exportedV2)) return true;
+  const noSj = String(row[4] ?? row[3] ?? row[2] ?? "").trim();
   if (noSj) return true;
-  const fileName = String(row[13] ?? row[12] ?? "").trim();
+  const fileName = String(row[14] ?? row[13] ?? row[12] ?? "").trim();
   return fileName.length > 0;
 }
 

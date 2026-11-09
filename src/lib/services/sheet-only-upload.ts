@@ -173,6 +173,7 @@ export async function processSheetOnlyUpload(params: {
     fileName,
     fileUrl,
     gudang: params.gudang,
+    supplierName: supplierName || "Unverified",
     kendaraanDriver: params.vehicleInfo,
     catatan: params.notes,
     fallback: {

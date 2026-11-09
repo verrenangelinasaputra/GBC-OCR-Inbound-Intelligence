@@ -32,6 +32,8 @@ export function ocrExportSheetUrl(sheetId = getOcrExportSheetId()): string {
   return `https://docs.google.com/spreadsheets/d/${sheetId}/edit`;
 }
 
+export const DATA_COMPILATION_TAB_NAME = "Data Compilation";
+
 export function getOcrExportSheetTab(): string {
-  return process.env.GOOGLE_SHEET_TAB?.trim() || "Sheet1";
+  return process.env.GOOGLE_SHEET_TAB?.trim() || DATA_COMPILATION_TAB_NAME;
 }

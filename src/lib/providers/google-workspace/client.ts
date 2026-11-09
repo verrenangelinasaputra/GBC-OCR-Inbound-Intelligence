@@ -13,6 +13,8 @@ import {
   ocrSheetRowRange,
 } from "./ocr-sheet-columns";
 import { applyOcrSheetFormatting } from "./ocr-sheet-format";
+import { ensureInboundMonitoringWorkbook } from "./inbound-monitoring-layout";
+import { DATA_COMPILATION_TAB_NAME } from "@/lib/config/ocr-export-target";
 
 function driveScopes(config: GoogleExportConfig): string[] {
   return [
@@ -114,7 +116,7 @@ function firstRowLooksLikeOcrData(row: string[] | undefined): boolean {
   if (!row?.length) return false;
   const exported = String(row[1] ?? row[0] ?? "").trim();
   if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(exported)) return true;
-  const status = String(row[17] ?? row[14] ?? "").trim().toUpperCase();
+  const status = String(row[18] ?? row[17] ?? row[14] ?? "").trim().toUpperCase();
   return status === "OK" || status === "CEK";
 }
 
@@ -178,6 +180,11 @@ export async function ensureOcrSheetHeaders(config: GoogleExportConfig): Promise
   }
 
   await applyOcrSheetFormatting(sheets, config.sheetId, sheetId);
+  try {
+    await ensureInboundMonitoringWorkbook(config, sheets);
+  } catch {
+    /* monitoring tabs opsional — tidak blokir append OCR */
+  }
 }
 
 export async function resolveSheetTabName(config: GoogleExportConfig): Promise<string> {
@@ -189,6 +196,8 @@ export async function resolveSheetTabName(config: GoogleExportConfig): Promise<s
   });
   const titles = meta.data.sheets?.map((s) => s.properties?.title).filter(Boolean) as string[];
   if (titles.includes(config.sheetTab)) return config.sheetTab;
+  if (titles.includes(DATA_COMPILATION_TAB_NAME)) return DATA_COMPILATION_TAB_NAME;
+  if (titles.includes("Sheet1")) return "Sheet1";
   if (titles[0]) return titles[0];
   return config.sheetTab;
 }

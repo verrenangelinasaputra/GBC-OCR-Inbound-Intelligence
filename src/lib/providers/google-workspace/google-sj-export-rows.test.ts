@@ -59,7 +59,7 @@ describe("buildSuratJalanDriveSubfolderName", () => {
 });
 
 describe("buildGoogleSheetRows", () => {
-  it("emits one row per item with 18 columns", () => {
+  it("emits one row per item with 19 columns", () => {
     const rows = buildGoogleSheetRows({
       payload: {
         tanggal: "21/09/2026",
@@ -84,20 +84,22 @@ describe("buildGoogleSheetRows", () => {
       fileName: "Surat Jalan_21-09-2026_SG071351.jpeg",
       fileUrl: "https://drive.google.com/file/d/abc/view",
       gudang: "Gudang Karanggan",
+      supplierName: "PT Maju Jaya",
       kendaraanDriver: "Pak Budi",
       catatan: "Urgent",
       exportedAt: new Date("2026-10-03T12:00:00+07:00"),
     });
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toHaveLength(18);
+    expect(rows[0]).toHaveLength(19);
     expect(rows[0][0]).toBe("Gudang Karanggan");
-    expect(rows[0][3]).toBe("SG071351");
-    expect(rows[0][8]).toBe("116 DUS");
-    expect(rows[0][9]).toBe("144 PCS");
-    expect(rows[0][11]).toBe("16704 PCS");
-    expect(rows[0][15]).toBe("Pak Budi");
-    expect(rows[0][16]).toBe("Urgent");
-    expect(rows[0][17]).toBe("OK");
+    expect(rows[0][1]).toBe("PT Maju Jaya");
+    expect(rows[0][4]).toBe("SG071351");
+    expect(rows[0][9]).toBe("116 DUS");
+    expect(rows[0][10]).toBe("144 PCS");
+    expect(rows[0][12]).toBe("16704 PCS");
+    expect(rows[0][16]).toBe("Pak Budi");
+    expect(rows[0][17]).toBe("Urgent");
+    expect(rows[0][18]).toBe("OK");
   });
 });
 
@@ -114,7 +116,7 @@ describe("nextOcrDataRowNumber", () => {
         fileName: "f.jpeg",
         fileUrl: "",
       })[0],
-      ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "07/11/2026"],
+      ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "07/11/2026"],
     ];
     expect(nextOcrDataRowNumber(rows)).toBe(3);
   });
