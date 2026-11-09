@@ -113,7 +113,7 @@ Lihat [.env.example](./.env.example).
 3. **Share** folder Drive dan spreadsheet di atas ke **`gbc-inbound-export@gbc-inbound-intelligence.iam.gserviceaccount.com`** (atau email SA Anda) sebagai **Editor**.
 4. `GOOGLE_EXPORT_ENABLED=true` **atau** `SHEET_ONLY_MODE=true` (export otomatis aktif di mode pilot).
 5. Cek: `npm run google:test` → menu **Integrations** menampilkan status Google.
-6. Tab utama **`Data Compilation`** (rename dari Sheet1): kolom **Supplier** di samping Gudang. Setup monitoring lengkap (6 tab gudang + Summary + `_DataCalc`): `npm run sheet:monitoring` (juga header biru + filter).
+6. Tab utama **`Data Compilation`** (rename dari Sheet1): kolom **Supplier** di samping Gudang. Setup monitoring: `npm run sheet:monitoring` — formula memakai **`;`** (locale Indonesia), referensi tab aktif (`Data Compilation` atau `Sheet1`).
 7. Setelah upload supplier + OCR Gemini: **baris per item** di sheet + **foto** di Drive dengan struktur:
    - `[GOOGLE_DRIVE_FOLDER_ID]/Gudang <nama>/YYYY-MM-DD - <No SJ> - <Nama Supplier>/`
    - File: `SJ_YYYYMMDD_<Nama Supplier>_<No SJ>_<Nama Gudang>.jpg` — upload banyak file: sufiks ` (2)`, ` (3)`, … sebelum ekstensi.
