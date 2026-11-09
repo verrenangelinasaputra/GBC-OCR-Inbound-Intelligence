@@ -58,6 +58,7 @@ export function SupplierUploadForm() {
     message: "",
     phase: "prepare",
     percent: 0,
+    startedAt: null,
   });
 
   useEffect(() => {
@@ -168,15 +169,17 @@ export function SupplierUploadForm() {
         };
 
         if (event.type === "file_start" && event.fileIndex && event.fileTotal && event.fileName) {
-          setUploadProgress({
+          setUploadProgress((prev) => ({
+            ...prev,
             active: true,
-            fileIndex: event.fileIndex,
-            fileTotal: event.fileTotal,
-            fileName: event.fileName,
+            fileIndex: event.fileIndex!,
+            fileTotal: event.fileTotal!,
+            fileName: event.fileName!,
             message: "Memulai pemrosesan gambar…",
             phase: "prepare",
-            percent: uploadProgressPercent(event.fileIndex, event.fileTotal, "prepare"),
-          });
+            percent: uploadProgressPercent(event.fileIndex!, event.fileTotal!, "prepare"),
+            startedAt: prev.startedAt ?? Date.now(),
+          }));
         }
 
         if (
@@ -188,15 +191,17 @@ export function SupplierUploadForm() {
           event.phase
         ) {
           const phase = event.phase as SheetUploadProgressPhase;
-          setUploadProgress({
+          setUploadProgress((prev) => ({
+            ...prev,
             active: true,
-            fileIndex: event.fileIndex,
-            fileTotal: event.fileTotal,
-            fileName: event.fileName,
-            message: event.message,
+            fileIndex: event.fileIndex!,
+            fileTotal: event.fileTotal!,
+            fileName: event.fileName!,
+            message: event.message!,
             phase,
-            percent: uploadProgressPercent(event.fileIndex, event.fileTotal, phase),
-          });
+            percent: uploadProgressPercent(event.fileIndex!, event.fileTotal!, phase),
+            startedAt: prev.startedAt ?? Date.now(),
+          }));
         }
 
         if (event.type === "file_done" && event.fileIndex && event.fileTotal) {
@@ -250,6 +255,8 @@ export function SupplierUploadForm() {
     try {
       let data: UploadResult | null = null;
 
+      const startedAt = Date.now();
+
       if (sheetOnly) {
         setUploadProgress({
           active: true,
@@ -259,6 +266,7 @@ export function SupplierUploadForm() {
           message: "Mengirim data ke server…",
           phase: "prepare",
           percent: 0,
+          startedAt,
         });
         data = await consumeSheetOnlyStream(form, fileTotal);
       } else {
@@ -270,6 +278,7 @@ export function SupplierUploadForm() {
           message: `Mengunggah ${fileTotal} file ke sistem GBC…`,
           phase: "prepare",
           percent: 10,
+          startedAt,
         });
         const res = await fetch("/api/supplier/upload", { method: "POST", body: form });
         const json = await res.json();
@@ -294,7 +303,7 @@ export function SupplierUploadForm() {
     } finally {
       setLoading(false);
       setTimeout(() => {
-        setUploadProgress((prev) => ({ ...prev, active: false }));
+        setUploadProgress((prev) => ({ ...prev, active: false, startedAt: null }));
       }, 600);
     }
   }
