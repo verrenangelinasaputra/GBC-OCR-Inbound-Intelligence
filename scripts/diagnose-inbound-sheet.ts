@@ -3,17 +3,7 @@ import { loadEnvFile } from "./load-env";
 import { createGoogleAuthClient } from "../src/lib/providers/google-workspace/client";
 import { getGoogleExportConfigOptional } from "../src/lib/providers/google-workspace";
 import { DATA_COMPILATION_TAB_NAME } from "../src/lib/config/ocr-export-target";
-import { SUMMARY_BAND_LAYOUT } from "../src/lib/providers/google-workspace/inbound-monitoring-layout";
-
-function colLetter(index0: number): string {
-  let n = index0;
-  let s = "";
-  while (n >= 0) {
-    s = String.fromCharCode(65 + (n % 26)) + s;
-    n = Math.floor(n / 26) - 1;
-  }
-  return s;
-}
+import { SUMMARY_REPORT_TABS } from "../src/lib/providers/google-workspace/inbound-monitoring-layout";
 import { SUPPLIER_GUDANG_OPTIONS } from "../src/lib/config/supplier-gudang";
 
 loadEnvFile();
@@ -74,20 +64,14 @@ async function main() {
     console.log(`_DataCalc ${col} formula:`, String(f).slice(0, 200));
   }
 
-  const B = SUMMARY_BAND_LAYOUT;
-  const q = B.queryRow;
-  for (const addr of [
-    "B5",
-    "B12",
-    `${colLetter(B.bandColIndex.weekly)}${q}`,
-    `${colLetter(B.bandColIndex.item)}${q}`,
-    `${colLetter(B.bandColIndex.delivery)}${q}`,
-    `${colLetter(B.bandColIndex.supplier)}${q}`,
-    `${colLetter(B.bandColIndex.warehouse)}${q}`,
-  ]) {
+  for (const addr of ["B5", "B12", "D12"]) {
     const v = await readCell(sheets, id, `'Summary'!${addr}`);
+    console.log(`Summary ${addr}:`, String(v).slice(0, 80));
+  }
+  for (const tab of Object.values(SUMMARY_REPORT_TABS)) {
+    const v = await readCell(sheets, id, `'${tab}'!A2`);
     const err = String(v).includes("#");
-    console.log(`Summary ${addr}:`, String(v).slice(0, 100), err ? "⚠" : "ok");
+    console.log(`Report [${tab}] A2:`, String(v).slice(0, 60), err ? "⚠" : "ok");
   }
 }
 

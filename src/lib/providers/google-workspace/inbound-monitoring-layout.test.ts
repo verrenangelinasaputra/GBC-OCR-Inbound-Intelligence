@@ -3,7 +3,7 @@ import {
   dataCalcColumnFormulasForLocale,
   formulaArgSeparator,
   resolveDataCompilationTabTitle,
-  SUMMARY_BAND_LAYOUT,
+  SUMMARY_REPORT_TABS,
 } from "./inbound-monitoring-layout";
 
 function parenBalance(s: string): number {
@@ -26,13 +26,9 @@ describe("inbound monitoring formulas", () => {
     expect(resolveDataCompilationTabTitle(["Data Compilation", "Sheet1"])).toBe("Data Compilation");
   });
 
-  it("places Summary QUERY bands on separate columns at the same row", () => {
-    const { bandColIndex, queryRow } = SUMMARY_BAND_LAYOUT;
-    expect(queryRow).toBe(20);
-    expect(bandColIndex.item).toBeGreaterThan(bandColIndex.weekly + 2);
-    expect(bandColIndex.delivery).toBeGreaterThan(bandColIndex.item + 5);
-    expect(bandColIndex.supplier).toBeGreaterThan(bandColIndex.delivery + 8);
-    expect(bandColIndex.warehouse).toBeGreaterThan(bandColIndex.supplier + 5);
+  it("defines Indonesian report tab names", () => {
+    expect(SUMMARY_REPORT_TABS.weekly).toBe("Ringkasan Mingguan");
+    expect(SUMMARY_REPORT_TABS.delivery).toBe("Detail Pengiriman");
   });
 
   it("generates balanced ARRAYFORMULA with empty IF branch for id_ID", () => {

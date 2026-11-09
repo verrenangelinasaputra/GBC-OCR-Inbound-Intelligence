@@ -5,31 +5,16 @@ import type { GoogleExportConfig } from "./config";
 import { OCR_SHEET_HEADERS } from "./google-sj-export-rows";
 import { applyOcrSheetFormatting } from "./ocr-sheet-format";
 import { applySummaryDashboardFormatting } from "./summary-sheet-format";
+import {
+  applySummaryReportTab,
+  SUMMARY_REPORTS,
+  SUMMARY_REPORT_TABS,
+} from "./summary-report-tabs";
 
 export const SUMMARY_TAB_NAME = "Summary";
 export const DATA_CALC_TAB_NAME = "_DataCalc";
 
-/**
- * Tabel QUERY di baris sama, kolom berbeda — spill vertikal tanpa tabrakan (#REF!),
- * tanpa jarak baris kosong besar (Google Sheets tidak bisa "insert row" otomatis).
- */
-export const SUMMARY_BAND_LAYOUT = {
-  headerRow: 19,
-  queryRow: 20,
-  wideColumns: 32,
-  /** Indeks kolom 0-based pada baris QUERY (A=0, F=5, M=12, V=21, AB=27). */
-  bandColIndex: {
-    weekly: 0,
-    item: 5,
-    delivery: 12,
-    supplier: 21,
-    warehouse: 27,
-  },
-} as const;
-
-function wideSummaryRow(fill = ""): string[] {
-  return Array(SUMMARY_BAND_LAYOUT.wideColumns).fill(fill);
-}
+export { SUMMARY_REPORT_TABS };
 
 /**
  * Pembuluh argument formula saat diketik di UI (locale Indonesia → `;`).
@@ -93,107 +78,66 @@ export function dataCalcColumnFormulasForLocale(dcTab: string, locale?: string):
   return dataCalcColumnFormulas(dcTab, formulaArgSeparator(locale));
 }
 
-function summaryFilterAndKpiRows(sep: string, dcLabel: string): string[][] {
+function summarySheetDataFilter(sep: string, extra = ""): string {
   const calc = quoteTab(DATA_CALC_TAB_NAME);
   const sum = quoteTab(SUMMARY_TAB_NAME);
-  const calcRange = `${calc}!A2:J`;
-  const filt = (extra: string) =>
-    `(${calc}!C2:C>=${sum}!$B$5)*(${calc}!C2:C<=${sum}!$B$6)*(IF(${sum}!$B$7="ALL"${sep}1${sep}${calc}!A2:A=${sum}!$B$7))*(IF(${sum}!$B$8="ALL"${sep}1${sep}${calc}!B2:B=${sum}!$B$8))*(IF(LEN(${sum}!$B$9)=0${sep}1${sep}REGEXMATCH(${calc}!E2:E${sep}"(?i)"&${sum}!$B$9)))${extra}`;
+  return `(${calc}!C2:C>=${sum}!$B$5)*(${calc}!C2:C<=${sum}!$B$6)*(${calc}!G2:G>0)*(IF(${sum}!$B$7="ALL"${sep}1${sep}${calc}!A2:A=${sum}!$B$7))*(IF(${sum}!$B$8="ALL"${sep}1${sep}${calc}!B2:B=${sum}!$B$8))*(IF(LEN(${sum}!$B$9)=0${sep}1${sep}REGEXMATCH(${calc}!E2:E${sep}"(?i)"&${sum}!$B$9)))${extra}`;
+}
 
-  const q = (query: string) => `=QUERY(${calcRange}${sep} "${query}"${sep} 0)`;
-  const band = SUMMARY_BAND_LAYOUT.bandColIndex;
+function summaryFilteredQuery(sep: string, select: string): string {
+  const calc = quoteTab(DATA_CALC_TAB_NAME);
+  const filt = summarySheetDataFilter(sep);
+  return `=IFERROR(QUERY(FILTER(${calc}!A2:J${sep}${filt})${sep} "${select}"${sep} 0)${sep}"—")`;
+}
 
-  const rows: string[][] = [
-    ["GBC Inbound Goods Monitoring — Management Dashboard", "", "", "", "", ""],
-    [`Sumber data: tab ${dcLabel} (tanpa input manual di Summary)`, "", "", "", "", ""],
-    ["", "", "", "", "", ""],
-    ["Filter", "Nilai", "", "", "", ""],
-    [
-      "Date From (Tanggal SJ)",
-      `=DATE(YEAR(TODAY())${sep}1${sep}1)`,
-      "",
-      "",
-      "",
-      "",
-    ],
-    ["Date To", "=TODAY()", "", "", "", ""],
-    ["Warehouse", "ALL", "", "", "", ""],
-    ["Supplier", "ALL", "", "", "", ""],
-    ["Product contains", "", "", "", "", ""],
-    ["", "", "", "", "", ""],
-    ["KPI Overview", "Nilai", "", "", "", ""],
-    [
-      "Total Units Received",
+function summaryFilterAndKpiRows(sep: string, dcLabel: string): string[][] {
+  const calc = quoteTab(DATA_CALC_TAB_NAME);
+  const filt = (extra: string) => summarySheetDataFilter(sep, extra);
+
+  const dashRow = (a: string, b: string, c = "", d = ""): string[] => [a, b, c, d, "", "", "", "", ""];
+
+  return [
+    dashRow("GBC Inbound Goods Monitoring — Management Dashboard", "", "", ""),
+    dashRow(`Sumber: ${dcLabel} + tab Ringkasan * (filter di bawah)`, "", "", ""),
+    dashRow("", "", "", ""),
+    dashRow("Filter periode & gudang", "Nilai", "", ""),
+    dashRow("Date From (Tanggal SJ)", `=DATE(YEAR(TODAY())${sep}1${sep}1)`, "", ""),
+    dashRow("Date To", "=TODAY()", "", ""),
+    dashRow("Warehouse", "ALL", "", ""),
+    dashRow("Supplier", "ALL", "", ""),
+    dashRow("Product contains", "", "", ""),
+    dashRow("", "", "", ""),
+    dashRow("KPI (sesuai filter)", "", "KPI", ""),
+    dashRow(
+      "Total unit diterima",
       `=IFERROR(SUM(FILTER(${calc}!G2:G${sep}${filt("")}))${sep}0)`,
-      "",
-      "",
-      "",
-      "",
-    ],
-    [
-      "Total Unique Items",
-      `=IFERROR(ROWS(UNIQUE(FILTER(${calc}!E2:E${sep}${filt(`*(${calc}!E2:E<>"")`)})))${sep}0)`,
-      "",
-      "",
-      "",
-      "",
-    ],
-    [
-      "Total Deliveries (unique SJ)",
+      "Item unik",
+      `=IFERROR(ROWS(UNIQUE(FILTER(${calc}!E2:E${sep}${filt(`*(${calc}!E2:E<>"")`)})))${sep}0)`
+    ),
+    dashRow(
+      "Pengiriman (SJ unik)",
       `=IFERROR(ROWS(UNIQUE(FILTER(${calc}!D2:D${sep}${filt(`*(${calc}!D2:D<>"")`)})))${sep}0)`,
-      "",
-      "",
-      "",
-      "",
-    ],
-    [
-      "Total Suppliers",
-      `=IFERROR(ROWS(UNIQUE(FILTER(${calc}!B2:B${sep}${filt(`*(${calc}!B2:B<>"")`)})))${sep}0)`,
-      "",
-      "",
-      "",
-      "",
-    ],
-    [
-      "Active Warehouses",
+      "Supplier aktif",
+      `=IFERROR(ROWS(UNIQUE(FILTER(${calc}!B2:B${sep}${filt(`*(${calc}!B2:B<>"")`)})))${sep}0)`
+    ),
+    dashRow(
+      "Gudang aktif",
       `=IFERROR(ROWS(UNIQUE(FILTER(${calc}!A2:A${sep}${filt(`*(${calc}!A2:A<>"")`)})))${sep}0)`,
-      "",
-      "",
-      "",
-      "",
-    ],
-    [
-      "Total Delivery Days",
-      `=IFERROR(ROWS(UNIQUE(FILTER(${calc}!C2:C${sep}${filt(`*(${calc}!C2:C<>"")`)})))${sep}0)`,
-      "",
-      "",
-      "",
-      "",
-    ],
-    ["", "", "", "", "", ""],
+      "Hari kirim unik",
+      `=IFERROR(ROWS(UNIQUE(FILTER(${calc}!C2:C${sep}${filt(`*(${calc}!C2:C<>"")`)})))${sep}0)`
+    ),
+    dashRow("", "", "", ""),
+    dashRow("Laporan detail", "Buka tab di workbook:", "", ""),
+    dashRow("→", SUMMARY_REPORT_TABS.weekly, "", ""),
+    dashRow("→", SUMMARY_REPORT_TABS.items, "", ""),
+    dashRow("→", SUMMARY_REPORT_TABS.delivery, "", ""),
+    dashRow("→", SUMMARY_REPORT_TABS.supplier, "", ""),
+    dashRow("→", SUMMARY_REPORT_TABS.warehouse, "", ""),
   ];
+}
 
-  const headerRow = wideSummaryRow();
-  headerRow[band.weekly] = "Weekly Inbound Overview";
-  headerRow[band.item] = "Weekly Item Summary (by product & warehouse)";
-  headerRow[band.delivery] = "Delivery Breakdown (detail)";
-  headerRow[band.supplier] = "Supplier Summary";
-  headerRow[band.warehouse] = "Warehouse Performance";
-  rows.push(headerRow);
-
-  const queryRow = wideSummaryRow();
-  queryRow[band.weekly] = q("select J, sum(G) where G > 0 and J is not null group by J");
-  queryRow[band.item] = q(
-    "select J, F, E, A, sum(G), H where E is not null and G > 0 group by J, F, E, A, H"
-  );
-  queryRow[band.delivery] = q(
-    "select C, J, A, B, D, F, E, G, H where C is not null and G > 0 order by C desc"
-  );
-  queryRow[band.supplier] = q("select B, sum(G) where B is not null and G > 0 group by B");
-  queryRow[band.warehouse] = q("select A, sum(G) where A is not null and G > 0 group by A");
-  rows.push(queryRow);
-
-  return rows;
+export function buildSummaryReportQuery(sep: string, select: string): string {
+  return summaryFilteredQuery(sep, select);
 }
 
 async function ensureSheet(
@@ -324,7 +268,7 @@ export async function ensureInboundMonitoringWorkbook(
   const summaryValues = summaryFilterAndKpiRows(sep, dcTab);
   await sheets.spreadsheets.values.clear({
     spreadsheetId,
-    range: `'${SUMMARY_TAB_NAME}'!A1:AF30`,
+    range: `'${SUMMARY_TAB_NAME}'!A1:I500`,
   });
   await sheets.spreadsheets.values.update({
     spreadsheetId,
@@ -336,6 +280,37 @@ export async function ensureInboundMonitoringWorkbook(
   const summaryId = byTitle.get(SUMMARY_TAB_NAME);
   if (summaryId != null) {
     await applySummaryDashboardFormatting(sheets, spreadsheetId, summaryId);
+  }
+
+  for (const report of SUMMARY_REPORTS) {
+    const reportId = await ensureSheet(sheets, spreadsheetId, report.tab, byTitle);
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId,
+      range: `'${report.tab}'!A1:Z3000`,
+    });
+    const queryA2 = buildSummaryReportQuery(sep, report.querySelect);
+    await applySummaryReportTab(sheets, spreadsheetId, reportId, report, queryA2);
+  }
+
+  const dataCalcId = byTitle.get(DATA_CALC_TAB_NAME);
+  if (dataCalcId != null) {
+    try {
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        requestBody: {
+          requests: [
+            {
+              updateSheetProperties: {
+                properties: { sheetId: dataCalcId, hidden: true },
+                fields: "hidden",
+              },
+            },
+          ],
+        },
+      });
+    } catch {
+      /* opsional */
+    }
   }
 
   const dcId = byTitle.get(dcTab) ?? byTitle.get(DATA_COMPILATION_TAB_NAME) ?? byTitle.get("Sheet1");
