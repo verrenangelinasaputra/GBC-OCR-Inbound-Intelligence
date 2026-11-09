@@ -1,13 +1,14 @@
 let cachedModels: string[] | null = null;
 let cacheKey: string | null = null;
 
+/** Lite dulu untuk latency OCR (target ~1 menit per gambar pada foto standar). */
 const PREFERRED_ORDER = [
-  "gemini-3.5-flash",
-  "gemini-2.5-flash",
-  "gemini-3-flash-preview",
-  "gemini-flash-latest",
   "gemini-2.5-flash-lite",
   "gemini-3.5-flash-lite",
+  "gemini-2.5-flash",
+  "gemini-3.5-flash",
+  "gemini-3-flash-preview",
+  "gemini-flash-latest",
 ];
 
 export function getModelsFromEnv(): string[] {

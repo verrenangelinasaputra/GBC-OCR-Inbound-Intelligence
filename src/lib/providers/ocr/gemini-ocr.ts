@@ -78,10 +78,13 @@ export class GeminiOCRProvider implements OCRProvider {
       ],
       generationConfig: {
         temperature: 0,
+        maxOutputTokens: 8192,
         responseMimeType: "application/json",
         responseSchema: SJ_GEMINI_SCHEMA,
       },
     };
+
+    const ocrTimeoutMs = Number(process.env.GEMINI_OCR_TIMEOUT_MS) || 90_000;
 
     let lastError = "";
     const errors: string[] = [];
@@ -96,14 +99,27 @@ export class GeminiOCRProvider implements OCRProvider {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
       for (let attempt = 0; attempt < 3; attempt++) {
-        const res = await fetch(url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-goog-api-key": key,
-          },
-          body: JSON.stringify(body),
-        });
+        let res: Response;
+        try {
+          res = await fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": key,
+            },
+            body: JSON.stringify(body),
+            signal: AbortSignal.timeout(ocrTimeoutMs),
+          });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          lastError = `${model} timeout/network: ${msg}`;
+          errors.push(lastError);
+          if (attempt < 2) {
+            await sleep(1500 * (attempt + 1));
+            continue;
+          }
+          break;
+        }
 
         if (res.status === 200) {
           const json = (await res.json()) as {

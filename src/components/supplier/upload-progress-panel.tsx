@@ -13,8 +13,8 @@ const PHASE_WEIGHT: Record<SheetUploadProgressPhase, number> = {
 
 const STEPS_PER_FILE = 5;
 
-/** Estimasi kasar per SJ (detik) — mayoritas waktu di OCR Gemini. */
-const DEFAULT_SECONDS_PER_FILE = 55;
+/** Estimasi kasar per SJ (detik) — setelah optimasi resize + flash-lite. */
+const DEFAULT_SECONDS_PER_FILE = 50;
 
 export type UploadProgressState = {
   active: boolean;
@@ -45,12 +45,15 @@ function formatClockTime(date: Date): string {
 
 function estimateRemainingMs(progress: UploadProgressState, elapsedMs: number): number {
   if (progress.percent >= 100) return 0;
-  if (progress.percent >= 4) {
-    const remaining = (elapsedMs * (100 - progress.percent)) / progress.percent;
-    return Math.max(0, remaining);
+  const perFileMs = DEFAULT_SECONDS_PER_FILE * 1000;
+  const totalGuessMs = progress.fileTotal * perFileMs;
+  const fileBased = Math.max(0, totalGuessMs - elapsedMs);
+
+  if (progress.percent < 18) {
+    return fileBased;
   }
-  const totalGuessMs = progress.fileTotal * DEFAULT_SECONDS_PER_FILE * 1000;
-  return Math.max(0, totalGuessMs - elapsedMs);
+  const linear = (elapsedMs * (100 - progress.percent)) / progress.percent;
+  return Math.max(0, Math.min(linear, fileBased * 1.25));
 }
 
 export function uploadProgressPercent(
