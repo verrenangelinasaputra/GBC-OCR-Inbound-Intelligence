@@ -7,13 +7,22 @@ import { OCR_SHEET_HEADERS } from "./google-sj-export-rows";
 export const SUMMARY_TAB_NAME = "Summary";
 export const DATA_CALC_TAB_NAME = "_DataCalc";
 
-/** Locale Indonesia memakai `;` sebagai pemisah argumen formula. */
+/**
+ * Pembuluh argument formula saat diketik di UI (locale Indonesia → `;`).
+ * Untuk `values.update` + USER_ENTERED, gunakan locale spreadsheet (mis. in_ID → `;`).
+ */
 export function formulaArgSeparator(spreadsheetLocale?: string): string {
   const forced = process.env.GOOGLE_SHEET_FORMULA_LOCALE?.trim().toLowerCase();
   if (forced === "us" || forced === "en") return ",";
   if (forced === "id" || forced === "id_id") return ";";
-  const loc = (spreadsheetLocale ?? "id_ID").toLowerCase();
-  if (loc.startsWith("id") || loc.startsWith("de") || loc.startsWith("fr") || loc.startsWith("es")) {
+  const loc = (spreadsheetLocale ?? "in_ID").toLowerCase();
+  if (
+    loc.startsWith("id_") ||
+    loc.startsWith("in_id") ||
+    loc.startsWith("de") ||
+    loc.startsWith("fr") ||
+    loc.startsWith("es")
+  ) {
     return ";";
   }
   return ",";
@@ -29,27 +38,35 @@ export function resolveDataCompilationTabTitle(titles: string[]): string {
   return DATA_COMPILATION_TAB_NAME;
 }
 
-function gudangQueryFormula(dcTab: string, gudang: string, sep: string): string {
+/** FILTER lebih andal daripada QUERY untuk locale Indonesia (pemisah `;`). */
+function gudangFilterFormula(dcTab: string, gudang: string, sep: string): string {
   const safe = gudang.replace(/'/g, "''");
-  const range = `${quoteTab(dcTab)}!A1:S`;
-  return `=QUERY(${range}${sep} "select * where Col1 = '${safe}'"${sep} 1)`;
+  const dc = quoteTab(dcTab);
+  return `=FILTER(${dc}!$A$2:$S${sep} ${dc}!$A$2:$A="${safe}")`;
 }
 
 function dataCalcColumnFormulas(dcTab: string, sep: string): string[] {
   const dc = quoteTab(dcTab);
-  const skip = `${sep}${sep}`;
+  const skip = `${sep}""${sep}`;
+  const gate = `LEN(${dc}!$D$2:$D)=0`;
+  const sjDate = `IFERROR(DATEVALUE(${dc}!$D$2:$D)${sep}"")`;
   return [
-    `=ARRAYFORMULA(IF(LEN(${dc}!$D$2:$D)=0${skip}${dc}!$A$2:$A)`,
-    `=ARRAYFORMULA(IF(LEN(${dc}!$D$2:$D)=0${skip}IF(LEN(${dc}!$B$2:$B)=0${sep}"Unverified"${sep}${dc}!$B$2:$B))`,
-    `=ARRAYFORMULA(IF(LEN(${dc}!$D$2:$D)=0${skip}${dc}!$D$2:$D)`,
-    `=ARRAYFORMULA(IF(LEN(${dc}!$D$2:$D)=0${skip}${dc}!$E$2:$E)`,
-    `=ARRAYFORMULA(IF(LEN(${dc}!$D$2:$D)=0${skip}${dc}!$L$2:$L)`,
-    `=ARRAYFORMULA(IF(LEN(${dc}!$D$2:$D)=0${skip}"Unverified")`,
-    `=ARRAYFORMULA(IF(LEN(${dc}!$D$2:$D)=0${skip}IFERROR(VALUE(REGEXEXTRACT(${dc}!$M$2:$M${sep}"^([\\d.,]+)"))${sep}0))`,
-    `=ARRAYFORMULA(IF(LEN(${dc}!$D$2:$D)=0${skip}IFERROR(REGEXEXTRACT(${dc}!$M$2:$M${sep}"\\s(\\S+)$")${sep}"Pending"))`,
-    `=ARRAYFORMULA(IF(LEN(${dc}!$D$2:$D)=0${skip}WEEKNUM(IFERROR(DATEVALUE(${dc}!$D$2:$D)${sep}TODAY())${sep}2))`,
-    `=ARRAYFORMULA(IF(LEN(${dc}!$D$2:$D)=0${skip}TEXT(IFERROR(DATEVALUE(${dc}!$D$2:$D)${sep}TODAY())${sep}"yyyy")&"-W"&TEXT(WEEKNUM(IFERROR(DATEVALUE(${dc}!$D$2:$D)${sep}TODAY())${sep}2)${sep}"00")))`,
+    `=ARRAYFORMULA(IF(${gate}${skip}${dc}!$A$2:$A))`,
+    `=ARRAYFORMULA(IF(${gate}${skip}IF(LEN(${dc}!$B$2:$B)=0${sep}"Unverified"${sep}${dc}!$B$2:$B)))`,
+    `=ARRAYFORMULA(IF(${gate}${skip}${sjDate}))`,
+    `=ARRAYFORMULA(IF(${gate}${skip}${dc}!$E$2:$E))`,
+    `=ARRAYFORMULA(IF(${gate}${skip}${dc}!$L$2:$L))`,
+    `=ARRAYFORMULA(IF(${gate}${skip}"Unverified"))`,
+    `=ARRAYFORMULA(IF(${gate}${skip}IFERROR(VALUE(REGEXEXTRACT(${dc}!$M$2:$M${sep}"^([\\d.,]+)"))${sep}0)))`,
+    `=ARRAYFORMULA(IF(${gate}${skip}IFERROR(REGEXEXTRACT(${dc}!$M$2:$M${sep}"\\s(\\S+)$")${sep}"Pending")))`,
+    `=ARRAYFORMULA(IF(${gate}${skip}WEEKNUM(IFERROR(DATEVALUE(${dc}!$D$2:$D)${sep}TODAY())${sep}2)))`,
+    `=ARRAYFORMULA(IF(${gate}${skip}TEXT(IFERROR(DATEVALUE(${dc}!$D$2:$D)${sep}TODAY())${sep}"yyyy")&"-W"&TEXT(WEEKNUM(IFERROR(DATEVALUE(${dc}!$D$2:$D)${sep}TODAY())${sep}2)${sep}"00")))`,
   ];
+}
+
+/** Untuk unit test: pastikan formula tertutup dan memakai pemisah locale. */
+export function dataCalcColumnFormulasForLocale(dcTab: string, locale?: string): string[] {
+  return dataCalcColumnFormulas(dcTab, formulaArgSeparator(locale));
 }
 
 function summaryFilterAndKpiRows(sep: string, dcLabel: string): string[][] {
@@ -79,10 +96,17 @@ function summaryFilterAndKpiRows(sep: string, dcLabel: string): string[][] {
     ["Product contains", "", "", "", "", ""],
     ["", "", "", "", "", ""],
     ["KPI Overview", "Nilai", "", "", "", ""],
-    ["Total Units Received", `=SUM(FILTER(${calc}!G:G${sep}${filt("")}))`, "", "", "", ""],
+    [
+      "Total Units Received",
+      `=IFERROR(SUM(FILTER(${calc}!G:G${sep}${filt("")}))${sep}0)`,
+      "",
+      "",
+      "",
+      "",
+    ],
     [
       "Total Unique Items",
-      `=ROWS(UNIQUE(FILTER(${calc}!E:E${sep}${filt(`*(${calc}!E:E<>"")`)})))`,
+      `=IFERROR(ROWS(UNIQUE(FILTER(${calc}!E:E${sep}${filt(`*(${calc}!E:E<>"")`)})))${sep}0)`,
       "",
       "",
       "",
@@ -90,7 +114,7 @@ function summaryFilterAndKpiRows(sep: string, dcLabel: string): string[][] {
     ],
     [
       "Total Deliveries (unique SJ)",
-      `=ROWS(UNIQUE(FILTER(${calc}!D:D${sep}${filt(`*(${calc}!D:D<>"")`)})))`,
+      `=IFERROR(ROWS(UNIQUE(FILTER(${calc}!D:D${sep}${filt(`*(${calc}!D:D<>"")`)})))${sep}0)`,
       "",
       "",
       "",
@@ -98,7 +122,7 @@ function summaryFilterAndKpiRows(sep: string, dcLabel: string): string[][] {
     ],
     [
       "Total Suppliers",
-      `=ROWS(UNIQUE(FILTER(${calc}!B:B${sep}${filt(`*(${calc}!B:B<>"")`)})))`,
+      `=IFERROR(ROWS(UNIQUE(FILTER(${calc}!B:B${sep}${filt(`*(${calc}!B:B<>"")`)})))${sep}0)`,
       "",
       "",
       "",
@@ -106,7 +130,7 @@ function summaryFilterAndKpiRows(sep: string, dcLabel: string): string[][] {
     ],
     [
       "Active Warehouses",
-      `=ROWS(UNIQUE(FILTER(${calc}!A:A${sep}${filt(`*(${calc}!A:A<>"")`)})))`,
+      `=IFERROR(ROWS(UNIQUE(FILTER(${calc}!A:A${sep}${filt(`*(${calc}!A:A<>"")`)})))${sep}0)`,
       "",
       "",
       "",
@@ -114,7 +138,7 @@ function summaryFilterAndKpiRows(sep: string, dcLabel: string): string[][] {
     ],
     [
       "Total Delivery Days",
-      `=ROWS(UNIQUE(FILTER(${calc}!C:C${sep}${filt(`*(${calc}!C:C<>"")`)})))`,
+      `=IFERROR(ROWS(UNIQUE(FILTER(${calc}!C:C${sep}${filt(`*(${calc}!C:C<>"")`)})))${sep}0)`,
       "",
       "",
       "",
@@ -124,14 +148,14 @@ function summaryFilterAndKpiRows(sep: string, dcLabel: string): string[][] {
     ["Weekly Inbound Overview", "", "", "", "", ""],
     [
       q(
-        "select J, count(E), sum(G), count(distinct D), count(distinct B) where G > 0 group by J label count(E) 'Unique Items' sum(G) 'Units' count(distinct D) 'Deliveries' count(distinct B) 'Suppliers'"
+        "select J, count(E), sum(G) where G > 0 group by J label count(E) 'Line Items' sum(G) 'Units'"
       ),
     ],
     ["", "", "", "", "", ""],
     ["Weekly Item Summary (by product & warehouse)", "", "", "", "", ""],
     [
       q(
-        "select J, F, E, A, sum(G), H, count(distinct D) where E is not null group by J, F, E, A, H label sum(G) 'Total Qty' count(distinct D) 'Deliveries'"
+        "select J, F, E, A, sum(G), H where E is not null group by J, F, E, A, H label sum(G) 'Total Qty'"
       ),
     ],
     ["", "", "", "", "", ""],
@@ -141,14 +165,14 @@ function summaryFilterAndKpiRows(sep: string, dcLabel: string): string[][] {
     ["Supplier Summary", "", "", "", "", ""],
     [
       q(
-        "select B, count(distinct D), count(distinct E), sum(G), count(distinct A), min(C), max(C) where B is not null group by B label count(distinct D) 'Deliveries' count(distinct E) 'Items' sum(G) 'Units' count(distinct A) 'Warehouses' min(C) 'First' max(C) 'Latest'"
+        "select B, count(D), count(E), sum(G), min(C), max(C) where B is not null group by B label count(D) 'Deliveries' count(E) 'Items' sum(G) 'Units' min(C) 'First' max(C) 'Latest'"
       ),
     ],
     ["", "", "", "", "", ""],
     ["Warehouse Performance", "", "", "", "", ""],
     [
       q(
-        "select A, sum(G), count(distinct E), count(distinct D), count(distinct B) where A is not null group by A label sum(G) 'Units' count(distinct E) 'Items' count(distinct D) 'Deliveries' count(distinct B) 'Suppliers'"
+        "select A, sum(G), count(E), count(D), count(B) where A is not null group by A label sum(G) 'Units' count(E) 'Items' count(D) 'Deliveries' count(B) 'Suppliers'"
       ),
     ],
   ];
@@ -208,6 +232,9 @@ export async function ensureInboundMonitoringWorkbook(
   });
   const locale = meta.data.properties?.locale ?? undefined;
   const sep = formulaArgSeparator(locale);
+  if (process.env.DEBUG_SHEET_FORMULAS === "1") {
+    console.log("[monitoring] locale=", locale, "sep=", JSON.stringify(sep));
+  }
   const sheetList = meta.data.sheets ?? [];
   await renameSheet1IfNeeded(sheets, spreadsheetId, sheetList);
 
@@ -234,11 +261,18 @@ export async function ensureInboundMonitoringWorkbook(
   }
 
   for (const g of SUPPLIER_GUDANG_OPTIONS) {
+    const tabName = `'${g.replace(/'/g, "''")}'`;
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `'${g.replace(/'/g, "''")}'!A1`,
+      range: `${tabName}!A1:S1`,
+      valueInputOption: "RAW",
+      requestBody: { values: [Array.from(OCR_SHEET_HEADERS)] },
+    });
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${tabName}!A2`,
       valueInputOption: "USER_ENTERED",
-      requestBody: { values: [[gudangQueryFormula(dcTab, g, sep)]] },
+      requestBody: { values: [[gudangFilterFormula(dcTab, g, sep)]] },
     });
   }
 
@@ -261,15 +295,12 @@ export async function ensureInboundMonitoringWorkbook(
     valueInputOption: "RAW",
     requestBody: { values: [calcHeaders] },
   });
-  for (let c = 0; c < colFormulas.length; c += 1) {
-    const col = String.fromCharCode(65 + c);
-    await sheets.spreadsheets.values.update({
-      spreadsheetId,
-      range: `'${DATA_CALC_TAB_NAME}'!${col}2`,
-      valueInputOption: "USER_ENTERED",
-      requestBody: { values: [[colFormulas[c]]] },
-    });
-  }
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `'${DATA_CALC_TAB_NAME}'!A2:J2`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [colFormulas] },
+  });
 
   const summaryValues = summaryFilterAndKpiRows(sep, dcTab);
   await sheets.spreadsheets.values.clear({

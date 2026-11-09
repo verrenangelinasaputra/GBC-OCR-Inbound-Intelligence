@@ -109,7 +109,11 @@ export async function uploadFileToDrive(params: {
 
 function firstRowIsCurrentOcrHeader(row: string[] | undefined): boolean {
   if (!row?.length) return false;
-  return String(row[0] ?? "").trim() === OCR_SHEET_HEADERS[0];
+  if (row.length < OCR_SHEET_HEADERS.length) return false;
+  for (let i = 0; i < OCR_SHEET_HEADERS.length; i += 1) {
+    if (String(row[i] ?? "").trim() !== OCR_SHEET_HEADERS[i]) return false;
+  }
+  return true;
 }
 
 function firstRowLooksLikeOcrData(row: string[] | undefined): boolean {
@@ -182,8 +186,8 @@ export async function ensureOcrSheetHeaders(config: GoogleExportConfig): Promise
   await applyOcrSheetFormatting(sheets, config.sheetId, sheetId);
   try {
     await ensureInboundMonitoringWorkbook(config, sheets);
-  } catch {
-    /* monitoring tabs opsional — tidak blokir append OCR */
+  } catch (err) {
+    console.warn("ensureInboundMonitoringWorkbook gagal (tab monitoring mungkin belum diperbarui):", err);
   }
 }
 
