@@ -9,6 +9,33 @@ import { applySummaryDashboardFormatting } from "./summary-sheet-format";
 export const SUMMARY_TAB_NAME = "Summary";
 export const DATA_CALC_TAB_NAME = "_DataCalc";
 
+/** Baris 1-based — ruang kosong agar hasil QUERY (spill) tidak menimpa judul section berikutnya. */
+export const SUMMARY_QUERY_LAYOUT = {
+  weeklyHeader: 19,
+  weeklyQuery: 20,
+  weeklyBlockEnd: 44,
+  itemHeader: 45,
+  itemQuery: 46,
+  itemBlockEnd: 95,
+  deliveryHeader: 96,
+  deliveryQuery: 97,
+  deliveryBlockEnd: 196,
+  supplierHeader: 197,
+  supplierQuery: 198,
+  supplierBlockEnd: 247,
+  warehouseHeader: 248,
+  warehouseQuery: 249,
+  warehouseBlockEnd: 298,
+} as const;
+
+const BLANK_ROW = ["", "", "", "", "", ""];
+
+function padSummaryRows(rows: string[][], target1BasedRow: number): void {
+  while (rows.length < target1BasedRow - 1) {
+    rows.push([...BLANK_ROW]);
+  }
+}
+
 /**
  * Pembuluh argument formula saat diketik di UI (locale Indonesia → `;`).
  * Untuk `values.update` + USER_ENTERED, gunakan locale spreadsheet (mis. in_ID → `;`).
@@ -79,8 +106,9 @@ function summaryFilterAndKpiRows(sep: string, dcLabel: string): string[][] {
     `(${calc}!C2:C>=${sum}!$B$5)*(${calc}!C2:C<=${sum}!$B$6)*(IF(${sum}!$B$7="ALL"${sep}1${sep}${calc}!A2:A=${sum}!$B$7))*(IF(${sum}!$B$8="ALL"${sep}1${sep}${calc}!B2:B=${sum}!$B$8))*(IF(LEN(${sum}!$B$9)=0${sep}1${sep}REGEXMATCH(${calc}!E2:E${sep}"(?i)"&${sum}!$B$9)))${extra}`;
 
   const q = (query: string) => `=QUERY(${calcRange}${sep} "${query}"${sep} 0)`;
+  const L = SUMMARY_QUERY_LAYOUT;
 
-  return [
+  const rows: string[][] = [
     ["GBC Inbound Goods Monitoring — Management Dashboard", "", "", "", "", ""],
     [`Sumber data: tab ${dcLabel} (tanpa input manual di Summary)`, "", "", "", "", ""],
     ["", "", "", "", "", ""],
@@ -148,31 +176,68 @@ function summaryFilterAndKpiRows(sep: string, dcLabel: string): string[][] {
       "",
     ],
     ["", "", "", "", "", ""],
-    ["Weekly Inbound Overview", "", "", "", "", ""],
-    [
-      q("select J, count(E), sum(G) where G > 0 and J is not null group by J"),
-    ],
-    ["", "", "", "", "", ""],
-    ["Weekly Item Summary (by product & warehouse)", "", "", "", "", ""],
-    [
-      q("select J, F, E, A, sum(G), H where E is not null and G > 0 group by J, F, E, A, H"),
-    ],
-    ["", "", "", "", "", ""],
-    ["Delivery Breakdown (detail)", "", "", "", "", ""],
-    [q("select C, J, A, B, D, F, E, G, H where C is not null and G > 0 order by C desc")],
-    ["", "", "", "", "", ""],
-    ["Supplier Summary", "", "", "", "", ""],
-    [
-      q(
-        "select B, sum(G), count(D), count(E), min(C), max(C) where B is not null and G > 0 and C is not null group by B"
-      ),
-    ],
-    ["", "", "", "", "", ""],
-    ["Warehouse Performance", "", "", "", "", ""],
-    [
-      q("select A, sum(G), count(E), count(D), count(B) where A is not null and G > 0 group by A"),
-    ],
   ];
+
+  padSummaryRows(rows, L.weeklyHeader);
+  rows.push(["Weekly Inbound Overview", "", "", "", "", ""]);
+  padSummaryRows(rows, L.weeklyQuery);
+  rows.push([
+    q("select J, count(E), sum(G) where G > 0 and J is not null group by J"),
+    "",
+    "",
+    "",
+    "",
+    "",
+  ]);
+  padSummaryRows(rows, L.itemHeader);
+  rows.push(["Weekly Item Summary (by product & warehouse)", "", "", "", "", ""]);
+  padSummaryRows(rows, L.itemQuery);
+  rows.push([
+    q("select J, F, E, A, sum(G), H where E is not null and G > 0 group by J, F, E, A, H"),
+    "",
+    "",
+    "",
+    "",
+    "",
+  ]);
+  padSummaryRows(rows, L.deliveryHeader);
+  rows.push(["Delivery Breakdown (detail)", "", "", "", "", ""]);
+  padSummaryRows(rows, L.deliveryQuery);
+  rows.push([
+    q("select C, J, A, B, D, F, E, G, H where C is not null and G > 0 order by C desc"),
+    "",
+    "",
+    "",
+    "",
+    "",
+  ]);
+  padSummaryRows(rows, L.supplierHeader);
+  rows.push(["Supplier Summary", "", "", "", "", ""]);
+  padSummaryRows(rows, L.supplierQuery);
+  rows.push([
+    q(
+      "select B, sum(G), count(D), count(E), min(C), max(C) where B is not null and G > 0 and C is not null group by B"
+    ),
+    "",
+    "",
+    "",
+    "",
+    "",
+  ]);
+  padSummaryRows(rows, L.warehouseHeader);
+  rows.push(["Warehouse Performance", "", "", "", "", ""]);
+  padSummaryRows(rows, L.warehouseQuery);
+  rows.push([
+    q("select A, sum(G), count(E), count(D), count(B) where A is not null and G > 0 group by A"),
+    "",
+    "",
+    "",
+    "",
+    "",
+  ]);
+  padSummaryRows(rows, L.warehouseBlockEnd);
+
+  return rows;
 }
 
 async function ensureSheet(
@@ -303,7 +368,7 @@ export async function ensureInboundMonitoringWorkbook(
   const summaryValues = summaryFilterAndKpiRows(sep, dcTab);
   await sheets.spreadsheets.values.clear({
     spreadsheetId,
-    range: `'${SUMMARY_TAB_NAME}'!A:Z`,
+    range: `'${SUMMARY_TAB_NAME}'!A1:J400`,
   });
   await sheets.spreadsheets.values.update({
     spreadsheetId,

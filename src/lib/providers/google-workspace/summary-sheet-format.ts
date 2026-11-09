@@ -1,9 +1,25 @@
 import type { sheets_v4 } from "googleapis";
+import { SUMMARY_QUERY_LAYOUT } from "./inbound-monitoring-layout";
 
 const NAVY = { red: 0.12, green: 0.23, blue: 0.54 };
 const WHITE = { red: 1, green: 1, blue: 1 };
 const SLATE_HEADER = { red: 0.85, green: 0.89, blue: 0.94 };
 const INPUT_FILL = { red: 1, green: 0.98, blue: 0.85 };
+
+function sectionHeaderRow(sheetId: number, row0: number) {
+  return {
+    repeatCell: {
+      range: { sheetId, startRowIndex: row0, endRowIndex: row0 + 1, startColumnIndex: 0, endColumnIndex: 8 },
+      cell: {
+        userEnteredFormat: {
+          backgroundColor: SLATE_HEADER,
+          textFormat: { bold: true, fontSize: 11 },
+        },
+      },
+      fields: "userEnteredFormat(backgroundColor,textFormat)",
+    },
+  };
+}
 
 /** Dashboard Summary: judul, filter, KPI, dan lebar kolom. */
 export async function applySummaryDashboardFormatting(
@@ -11,6 +27,15 @@ export async function applySummaryDashboardFormatting(
   spreadsheetId: string,
   sheetId: number
 ): Promise<void> {
+  const L = SUMMARY_QUERY_LAYOUT;
+  const sectionRows0 = [
+    L.weeklyHeader - 1,
+    L.itemHeader - 1,
+    L.deliveryHeader - 1,
+    L.supplierHeader - 1,
+    L.warehouseHeader - 1,
+  ];
+
   const requests: object[] = [
     {
       mergeCells: {
@@ -121,18 +146,7 @@ export async function applySummaryDashboardFormatting(
         fields: "userEnteredFormat(textFormat,horizontalAlignment,numberFormat)",
       },
     },
-    ...[18, 21, 24, 27, 30].map((row) => ({
-      repeatCell: {
-        range: { sheetId, startRowIndex: row, endRowIndex: row + 1, startColumnIndex: 0, endColumnIndex: 6 },
-        cell: {
-          userEnteredFormat: {
-            backgroundColor: SLATE_HEADER,
-            textFormat: { bold: true, fontSize: 11 },
-          },
-        },
-        fields: "userEnteredFormat(backgroundColor,textFormat)",
-      },
-    })),
+    ...sectionRows0.map((row0) => sectionHeaderRow(sheetId, row0)),
     {
       updateSheetProperties: {
         properties: {
@@ -142,7 +156,7 @@ export async function applySummaryDashboardFormatting(
         fields: "gridProperties.frozenRowCount",
       },
     },
-    ...[280, 120, 100, 100, 100, 100].map((pixelSize, startIndex) => ({
+    ...[280, 120, 100, 100, 100, 100, 100, 100, 90].map((pixelSize, startIndex) => ({
       updateDimensionProperties: {
         range: { sheetId, dimension: "COLUMNS", startIndex, endIndex: startIndex + 1 },
         properties: { pixelSize },
@@ -151,7 +165,13 @@ export async function applySummaryDashboardFormatting(
     })),
     {
       repeatCell: {
-        range: { sheetId, startRowIndex: 19, endRowIndex: 500, startColumnIndex: 0, endColumnIndex: 1 },
+        range: {
+          sheetId,
+          startRowIndex: L.deliveryQuery - 1,
+          endRowIndex: L.deliveryBlockEnd,
+          startColumnIndex: 0,
+          endColumnIndex: 1,
+        },
         cell: {
           userEnteredFormat: { numberFormat: { type: "DATE", pattern: "dd/MM/yyyy" } },
         },
@@ -160,16 +180,13 @@ export async function applySummaryDashboardFormatting(
     },
     {
       repeatCell: {
-        range: { sheetId, startRowIndex: 26, endRowIndex: 500, startColumnIndex: 0, endColumnIndex: 1 },
-        cell: {
-          userEnteredFormat: { numberFormat: { type: "DATE", pattern: "dd/MM/yyyy" } },
+        range: {
+          sheetId,
+          startRowIndex: L.supplierQuery - 1,
+          endRowIndex: L.supplierBlockEnd,
+          startColumnIndex: 4,
+          endColumnIndex: 6,
         },
-        fields: "userEnteredFormat.numberFormat",
-      },
-    },
-    {
-      repeatCell: {
-        range: { sheetId, startRowIndex: 28, endRowIndex: 500, startColumnIndex: 4, endColumnIndex: 6 },
         cell: {
           userEnteredFormat: { numberFormat: { type: "DATE", pattern: "dd/MM/yyyy" } },
         },

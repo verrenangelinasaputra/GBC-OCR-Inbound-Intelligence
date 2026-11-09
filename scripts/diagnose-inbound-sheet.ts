@@ -3,6 +3,7 @@ import { loadEnvFile } from "./load-env";
 import { createGoogleAuthClient } from "../src/lib/providers/google-workspace/client";
 import { getGoogleExportConfigOptional } from "../src/lib/providers/google-workspace";
 import { DATA_COMPILATION_TAB_NAME } from "../src/lib/config/ocr-export-target";
+import { SUMMARY_QUERY_LAYOUT } from "../src/lib/providers/google-workspace/inbound-monitoring-layout";
 import { SUPPLIER_GUDANG_OPTIONS } from "../src/lib/config/supplier-gudang";
 
 loadEnvFile();
@@ -63,9 +64,20 @@ async function main() {
     console.log(`_DataCalc ${col} formula:`, String(f).slice(0, 200));
   }
 
-  for (const addr of ["B5", "B12", "A20", "A29", "A32", "A27"]) {
+  const Q = SUMMARY_QUERY_LAYOUT;
+  for (const addr of [
+    "B5",
+    "B12",
+    `A${Q.weeklyQuery}`,
+    `A${Q.itemHeader}`,
+    `A${Q.itemQuery}`,
+    `A${Q.deliveryQuery}`,
+    `A${Q.supplierQuery}`,
+    `A${Q.warehouseQuery}`,
+  ]) {
     const v = await readCell(sheets, id, `'Summary'!${addr}`);
-    console.log(`Summary ${addr}:`, String(v).slice(0, 100));
+    const err = String(v).includes("#");
+    console.log(`Summary ${addr}:`, String(v).slice(0, 100), err ? "⚠" : "ok");
   }
 }
 

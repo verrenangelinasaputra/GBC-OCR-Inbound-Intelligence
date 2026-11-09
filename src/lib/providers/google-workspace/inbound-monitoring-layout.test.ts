@@ -3,6 +3,7 @@ import {
   dataCalcColumnFormulasForLocale,
   formulaArgSeparator,
   resolveDataCompilationTabTitle,
+  SUMMARY_QUERY_LAYOUT,
 } from "./inbound-monitoring-layout";
 
 function parenBalance(s: string): number {
@@ -23,6 +24,12 @@ describe("inbound monitoring formulas", () => {
   it("resolves Sheet1 when Data Compilation missing", () => {
     expect(resolveDataCompilationTabTitle(["Sheet1", "Summary"])).toBe("Sheet1");
     expect(resolveDataCompilationTabTitle(["Data Compilation", "Sheet1"])).toBe("Data Compilation");
+  });
+
+  it("reserves row gaps between Summary QUERY anchors", () => {
+    expect(SUMMARY_QUERY_LAYOUT.weeklyBlockEnd).toBeGreaterThan(SUMMARY_QUERY_LAYOUT.weeklyQuery);
+    expect(SUMMARY_QUERY_LAYOUT.itemHeader).toBeGreaterThan(SUMMARY_QUERY_LAYOUT.weeklyBlockEnd);
+    expect(SUMMARY_QUERY_LAYOUT.deliveryHeader).toBeGreaterThan(SUMMARY_QUERY_LAYOUT.itemBlockEnd);
   });
 
   it("generates balanced ARRAYFORMULA with empty IF branch for id_ID", () => {
