@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import type { SubmissionHistoryRow } from "@/lib/services/ocr-sheet-submissions";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { downloadSubmissionsWord } from "@/lib/utils/export-submissions-table";
-import { ArrowDownUp, FileDown, Printer, RefreshCw, Search } from "lucide-react";
+import { ArrowDownUp, FileDown, Package, Printer, RefreshCw, Search, Truck } from "lucide-react";
 
 type SortKey = keyof SubmissionHistoryRow;
 type SortDir = "asc" | "desc";
@@ -34,6 +34,18 @@ function parseDdMmYyyy(s: string): number | null {
   const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s.trim());
   if (!m) return null;
   return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1])).getTime();
+}
+
+/** Angka dari kolom Jumlah, mis. `8736 PCS` → 8736 */
+function parseQtyFromJumlah(jumlah: string): number {
+  const m = /^([\d.,]+)/.exec(String(jumlah ?? "").trim());
+  if (!m) return 0;
+  const n = Number(m[1].replace(/\./g, "").replace(",", "."));
+  return Number.isFinite(n) ? n : 0;
+}
+
+function formatUnitCount(n: number): string {
+  return new Intl.NumberFormat("id-ID").format(n);
 }
 
 export function SupplierSubmissionsHistory({
@@ -98,6 +110,17 @@ export function SupplierSubmissionsHistory({
     list.sort((a, b) => compareValues(String(a[sortKey] ?? ""), String(b[sortKey] ?? ""), sortDir));
     return list;
   }, [rows, search, gudang, status, dateFrom, dateTo, sortKey, sortDir]);
+
+  const stats = useMemo(() => {
+    let totalUnits = 0;
+    const sj = new Set<string>();
+    for (const r of filtered) {
+      totalUnits += parseQtyFromJumlah(r.jumlah);
+      const no = r.noSuratJalan.trim();
+      if (no) sj.add(no);
+    }
+    return { totalUnits, totalSuratJalan: sj.size };
+  }, [filtered]);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -251,6 +274,39 @@ export function SupplierSubmissionsHistory({
             className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
           />
         </label>
+      </div>
+
+      <div className="grid gap-4 print:hidden sm:grid-cols-2">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Total unit</p>
+              <p className="mt-1 text-3xl font-semibold tabular-nums text-slate-900">
+                {formatUnitCount(stats.totalUnits)}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">Jumlah dari kolom Jumlah (sesuai filter)</p>
+            </div>
+            <span className="rounded-lg bg-blue-50 p-2 text-blue-700">
+              <Package className="h-5 w-5" />
+            </span>
+          </div>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                Total Surat Jalan
+              </p>
+              <p className="mt-1 text-3xl font-semibold tabular-nums text-slate-900">
+                {formatUnitCount(stats.totalSuratJalan)}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">No. SJ unik pada baris yang ditampilkan</p>
+            </div>
+            <span className="rounded-lg bg-emerald-50 p-2 text-emerald-700">
+              <Truck className="h-5 w-5" />
+            </span>
+          </div>
+        </div>
       </div>
 
       <p className="text-sm text-slate-500 print:hidden">
