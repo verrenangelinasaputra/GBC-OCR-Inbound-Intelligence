@@ -206,7 +206,7 @@ export async function ensureInboundMonitoringWorkbook(
     spreadsheetId,
     fields: "properties.locale,sheets.properties(sheetId,title)",
   });
-  const locale = meta.data.properties?.locale;
+  const locale = meta.data.properties?.locale ?? undefined;
   const sep = formulaArgSeparator(locale);
   const sheetList = meta.data.sheets ?? [];
   await renameSheet1IfNeeded(sheets, spreadsheetId, sheetList);
