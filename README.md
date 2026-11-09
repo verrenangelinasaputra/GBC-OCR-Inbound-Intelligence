@@ -198,7 +198,9 @@ Env **Vercel** (Production):
 | `SESSION_SECRET` | Min. 32 karakter random (wajib, untuk cookie login) |
 | `OCR_PROVIDER` | `gemini` |
 | `GEMINI_API_KEY` | Key AI Studio (`AIza...`) |
-| `GEMINI_MODEL` | Opsional — `gemini-2.5-flash-lite` (paling cepat untuk OCR SJ) |
+| `GEMINI_MODEL` | Opsional — hindari `gemini-3.5-flash` saja; pakai `gemini-2.5-flash-lite` atau kosongkan (kode auto-lite) |
+| `GEMINI_OCR_FAST` | Default `true` — flash-lite dicoba dulu meski env pakai model berat |
+| `GEMINI_OCR_STRIKETHROUGH_REFINE` | Default aktif — setelah OCR lite, pass kedua (`flash`) khusus baca coretan/koreksi kolom nama barang |
 | `OCR_MAX_IMAGE_PX` | Opsional — default `1920` (resize foto WA sebelum kirim ke Gemini) |
 | `GOOGLE_EXPORT_ENABLED` | `true` (opsional jika sudah `SHEET_ONLY_MODE=true`) |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | Isi penuh JSON service account |

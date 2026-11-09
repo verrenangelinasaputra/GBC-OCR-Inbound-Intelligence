@@ -39,6 +39,17 @@ function fileId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+function patchUploadProgress(
+  prev: UploadProgressState,
+  patch: Partial<UploadProgressState>
+): UploadProgressState {
+  const next = { ...prev, ...patch };
+  if (patch.phase != null && patch.phase !== prev.phase) {
+    next.phaseStartedAt = Date.now();
+  }
+  return next;
+}
+
 export function SupplierUploadForm() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [sheetOnly, setSheetOnly] = useState(false);
@@ -59,6 +70,7 @@ export function SupplierUploadForm() {
     phase: "prepare",
     percent: 0,
     startedAt: null,
+    phaseStartedAt: null,
   });
 
   useEffect(() => {
@@ -167,17 +179,18 @@ export function SupplierUploadForm() {
     const handleEvent = (event: StreamEvent) => {
       if (event.type === "file_start" && event.fileIndex && event.fileTotal && event.fileName) {
         knownFileTotal = event.fileTotal;
-        setUploadProgress((prev) => ({
-          ...prev,
-          active: true,
-          fileIndex: event.fileIndex!,
-          fileTotal: event.fileTotal!,
-          fileName: event.fileName!,
-          message: "Memulai pemrosesan gambar…",
-          phase: "prepare",
-          percent: uploadProgressPercent(event.fileIndex!, event.fileTotal!, "prepare"),
-          startedAt: prev.startedAt ?? Date.now(),
-        }));
+        setUploadProgress((prev) =>
+          patchUploadProgress(prev, {
+            active: true,
+            fileIndex: event.fileIndex!,
+            fileTotal: event.fileTotal!,
+            fileName: event.fileName!,
+            message: "Memulai pemrosesan gambar…",
+            phase: "prepare",
+            percent: uploadProgressPercent(event.fileIndex!, event.fileTotal!, "prepare"),
+            startedAt: prev.startedAt ?? Date.now(),
+          })
+        );
       }
 
       if (
@@ -189,18 +202,19 @@ export function SupplierUploadForm() {
         event.phase
       ) {
         const phase = event.phase as SheetUploadProgressPhase;
-        setUploadProgress((prev) => ({
-          ...prev,
-          active: true,
-          fileIndex: event.fileIndex!,
-          fileTotal: event.fileTotal!,
-          fileName: event.fileName!,
-          message: event.message!,
-          phase,
-          percent: uploadProgressPercent(event.fileIndex!, event.fileTotal!, phase),
-          startedAt: prev.startedAt ?? Date.now(),
-        }));
-      }
+          setUploadProgress((prev) =>
+            patchUploadProgress(prev, {
+              active: true,
+              fileIndex: event.fileIndex!,
+              fileTotal: event.fileTotal!,
+              fileName: event.fileName!,
+              message: event.message!,
+              phase,
+              percent: uploadProgressPercent(event.fileIndex!, event.fileTotal!, phase),
+              startedAt: prev.startedAt ?? Date.now(),
+            })
+          );
+        }
 
       if (event.type === "file_done" && event.fileIndex && event.fileTotal && event.submissionRef) {
         completedUploads.push({
@@ -324,6 +338,7 @@ export function SupplierUploadForm() {
           phase: "prepare",
           percent: 0,
           startedAt,
+          phaseStartedAt: startedAt,
         });
         data = await consumeSheetOnlyStream(form, fileTotal);
       } else {
@@ -336,6 +351,7 @@ export function SupplierUploadForm() {
           phase: "prepare",
           percent: 10,
           startedAt,
+          phaseStartedAt: startedAt,
         });
         const res = await fetch("/api/supplier/upload", { method: "POST", body: form });
         const json = await res.json();
@@ -360,7 +376,12 @@ export function SupplierUploadForm() {
     } finally {
       setLoading(false);
       setTimeout(() => {
-        setUploadProgress((prev) => ({ ...prev, active: false, startedAt: null }));
+        setUploadProgress((prev) => ({
+          ...prev,
+          active: false,
+          startedAt: null,
+          phaseStartedAt: null,
+        }));
       }, 600);
     }
   }

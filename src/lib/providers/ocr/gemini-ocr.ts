@@ -3,12 +3,26 @@ import type { OCRProvider } from "./demo-ocr";
 import {
   SJ_GEMINI_PROMPT,
   SJ_GEMINI_SCHEMA,
+  SJ_STRIKETHROUGH_PROMPT,
+  SJ_STRIKETHROUGH_SCHEMA,
   geminiPayloadToLineItems,
+  mergeStrikethroughRefinement,
   parseGeminiDateToIso,
   type GeminiSJPayload,
+  type StrikethroughRefineRow,
 } from "./gemini-surat-jalan";
 import { preprocessImageForOcr } from "./preprocess-image";
 import { resolveGeminiModels } from "./gemini-models";
+
+const STRIKETHROUGH_REFINE_MODELS = [
+  "gemini-2.5-flash",
+  "gemini-3.5-flash",
+  "gemini-2.5-flash-lite",
+] as const;
+
+function strikethroughRefineEnabled(): boolean {
+  return process.env.GEMINI_OCR_STRIKETHROUGH_REFINE !== "false";
+}
 
 function hintForAuthError(status: number, body: string): string | null {
   if (status === 401 || status === 403) {
@@ -84,7 +98,7 @@ export class GeminiOCRProvider implements OCRProvider {
       },
     };
 
-    const ocrTimeoutMs = Number(process.env.GEMINI_OCR_TIMEOUT_MS) || 90_000;
+    const ocrTimeoutMs = Number(process.env.GEMINI_OCR_TIMEOUT_MS) || 75_000;
 
     let lastError = "";
     const errors: string[] = [];
@@ -137,7 +151,18 @@ export class GeminiOCRProvider implements OCRProvider {
             );
           }
 
-          const data = JSON.parse(text) as GeminiSJPayload;
+          let data = JSON.parse(text) as GeminiSJPayload;
+          if (strikethroughRefineEnabled() && /lite/i.test(model)) {
+            const refined = await refineStrikethroughOnNames(
+              key,
+              processed,
+              sendMime,
+              ocrTimeoutMs
+            );
+            if (refined) {
+              data = mergeStrikethroughRefinement(data, refined);
+            }
+          }
           const lineItems = geminiPayloadToLineItems(data);
           const warnings: string[] = [];
           if (lineItems.length === 0) {
@@ -199,4 +224,59 @@ export class GeminiOCRProvider implements OCRProvider {
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+async function refineStrikethroughOnNames(
+  apiKey: string,
+  imageBuffer: Buffer,
+  mimeType: string,
+  timeoutMs: number
+): Promise<StrikethroughRefineRow[] | null> {
+  const body = {
+    contents: [
+      {
+        parts: [
+          {
+            inline_data: {
+              mime_type: mimeType,
+              data: imageBuffer.toString("base64"),
+            },
+          },
+          { text: SJ_STRIKETHROUGH_PROMPT },
+        ],
+      },
+    ],
+    generationConfig: {
+      temperature: 0,
+      maxOutputTokens: 2048,
+      responseMimeType: "application/json",
+      responseSchema: SJ_STRIKETHROUGH_SCHEMA,
+    },
+  };
+
+  for (const model of STRIKETHROUGH_REFINE_MODELS) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      if (res.status !== 200) continue;
+      const json = (await res.json()) as {
+        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      };
+      const text = json.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
+      if (!text) continue;
+      const parsed = JSON.parse(text) as { items?: StrikethroughRefineRow[] };
+      return parsed.items ?? null;
+    } catch {
+      continue;
+    }
+  }
+  return null;
 }

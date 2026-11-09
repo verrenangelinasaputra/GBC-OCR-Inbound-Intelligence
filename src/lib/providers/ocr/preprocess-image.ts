@@ -3,7 +3,7 @@ import sharp from "sharp";
 function maxEdgePx(): number {
   const raw = Number(process.env.OCR_MAX_IMAGE_PX);
   if (Number.isFinite(raw) && raw >= 800 && raw <= 4096) return raw;
-  return 1920;
+  return 1400;
 }
 
 /** Resize + JPEG — foto WA sering 3000px+; lebih kecil = Gemini lebih cepat, OCR SJ tetap terbaca. */
@@ -28,7 +28,9 @@ export async function preprocessImageForOcr(buffer: Buffer, mimeType: string): P
     }
 
     return await pipeline
-      .jpeg({ quality: 82, mozjpeg: true })
+      .normalize()
+      .sharpen({ sigma: 0.6, m1: 0.5, m2: 0.35 })
+      .jpeg({ quality: 80, mozjpeg: true })
       .toBuffer();
   } catch {
     return buffer;

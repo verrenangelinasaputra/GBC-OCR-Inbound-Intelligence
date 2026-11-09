@@ -11,12 +11,29 @@ const PREFERRED_ORDER = [
   "gemini-flash-latest",
 ];
 
+const FAST_LITE_MODELS = ["gemini-2.5-flash-lite", "gemini-3.5-flash-lite"] as const;
+
+function ocrFastModelsEnabled(): boolean {
+  return process.env.GEMINI_OCR_FAST !== "false";
+}
+
+/** Urutan model efektif — mode cepat selalu coba flash-lite dulu (abaikan urutan lambat di env). */
 export function getModelsFromEnv(): string[] {
   const fromEnv = process.env.GEMINI_MODEL?.trim();
-  if (fromEnv) {
-    return fromEnv.split(",").map((m) => m.trim()).filter(Boolean);
+  const envList = fromEnv
+    ? fromEnv.split(",").map((m) => m.trim()).filter(Boolean)
+    : [...PREFERRED_ORDER];
+
+  if (!ocrFastModelsEnabled()) return envList;
+
+  const merged: string[] = [];
+  for (const lite of FAST_LITE_MODELS) {
+    if (!merged.includes(lite)) merged.push(lite);
   }
-  return [...PREFERRED_ORDER];
+  for (const m of envList) {
+    if (!merged.includes(m)) merged.push(m);
+  }
+  return merged.slice(0, 2);
 }
 
 export async function resolveGeminiModels(apiKey: string): Promise<string[]> {
@@ -25,12 +42,22 @@ export async function resolveGeminiModels(apiKey: string): Promise<string[]> {
   }
 
   const envModels = getModelsFromEnv();
+
+  if (process.env.GEMINI_MODEL?.trim()) {
+    cachedModels = envModels;
+    cacheKey = apiKey;
+    return envModels;
+  }
+
   let available: string[] = [];
 
   try {
     const res = await fetch(
       "https://generativelanguage.googleapis.com/v1beta/models?pageSize=100",
-      { headers: { "x-goog-api-key": apiKey } }
+      {
+        headers: { "x-goog-api-key": apiKey },
+        signal: AbortSignal.timeout(8_000),
+      }
     );
     if (res.ok) {
       const json = (await res.json()) as {

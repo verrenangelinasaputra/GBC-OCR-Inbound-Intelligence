@@ -3,18 +3,18 @@
 import { useEffect, useState } from "react";
 import type { SheetUploadProgressPhase } from "@/lib/services/sheet-only-upload";
 
-const PHASE_WEIGHT: Record<SheetUploadProgressPhase, number> = {
-  prepare: 1,
-  ocr: 2,
-  drive: 3,
-  sheet: 4,
-  done: 5,
+/** Fraksi progres dalam satu file (OCR = mayoritas waktu). */
+const PHASE_FRACTION: Record<SheetUploadProgressPhase, number> = {
+  prepare: 0.06,
+  ocr: 0.2,
+  drive: 0.88,
+  sheet: 0.96,
+  done: 1,
 };
 
-const STEPS_PER_FILE = 5;
-
-/** Estimasi kasar per SJ (detik) — setelah optimasi resize + flash-lite. */
-const DEFAULT_SECONDS_PER_FILE = 50;
+/** Estimasi kasar per SJ (detik) — flash-lite + resize 1400px. */
+const DEFAULT_SECONDS_PER_FILE = 55;
+const OCR_PHASE_FILL_MS = 70_000;
 
 export type UploadProgressState = {
   active: boolean;
@@ -25,6 +25,7 @@ export type UploadProgressState = {
   phase: SheetUploadProgressPhase;
   percent: number;
   startedAt: number | null;
+  phaseStartedAt: number | null;
 };
 
 function formatDurationMs(ms: number): string {
@@ -62,9 +63,29 @@ export function uploadProgressPercent(
   phase: SheetUploadProgressPhase
 ): number {
   if (fileTotal <= 0) return 0;
-  const completedUnits = (fileIndex - 1) * STEPS_PER_FILE + PHASE_WEIGHT[phase];
-  const totalUnits = fileTotal * STEPS_PER_FILE;
-  return Math.min(100, Math.round((completedUnits / totalUnits) * 100));
+  const fileSpan = 100 / fileTotal;
+  const base = (fileIndex - 1) * fileSpan;
+  return Math.min(100, Math.round(base + PHASE_FRACTION[phase] * fileSpan));
+}
+
+function displayPercent(progress: UploadProgressState, now: number): number {
+  if (fileTotalInvalid(progress)) return progress.percent;
+  const fileSpan = 100 / progress.fileTotal;
+  const base = (progress.fileIndex - 1) * fileSpan;
+
+  if (progress.phase === "ocr" && progress.phaseStartedAt != null) {
+    const ocrElapsed = Math.max(0, now - progress.phaseStartedAt);
+    const t = Math.min(1, ocrElapsed / OCR_PHASE_FILL_MS);
+    const ocrLo = base + PHASE_FRACTION.prepare * fileSpan;
+    const ocrHi = base + 0.86 * fileSpan;
+    const interpolated = Math.round(ocrLo + t * (ocrHi - ocrLo));
+    return Math.max(progress.percent, Math.min(interpolated, ocrHi));
+  }
+  return progress.percent;
+}
+
+function fileTotalInvalid(p: UploadProgressState): boolean {
+  return p.fileTotal <= 0;
 }
 
 export function UploadProgressPanel({ progress }: { progress: UploadProgressState }) {
@@ -78,10 +99,11 @@ export function UploadProgressPanel({ progress }: { progress: UploadProgressStat
 
   if (!progress.active) return null;
 
-  const elapsedMs =
-    progress.startedAt != null ? Math.max(0, Date.now() - progress.startedAt) : 0;
+  const now = Date.now();
+  const elapsedMs = progress.startedAt != null ? Math.max(0, now - progress.startedAt) : 0;
   void tick;
-  const remainingMs = estimateRemainingMs(progress, elapsedMs);
+  const barPercent = displayPercent(progress, now);
+  const remainingMs = estimateRemainingMs({ ...progress, percent: barPercent }, elapsedMs);
   const finishAt = new Date(Date.now() + remainingMs);
 
   return (
@@ -110,14 +132,14 @@ export function UploadProgressPanel({ progress }: { progress: UploadProgressStat
           <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
             <div
               className="h-full rounded-full bg-blue-600 transition-all duration-300 ease-out"
-              style={{ width: `${progress.percent}%` }}
+              style={{ width: `${barPercent}%` }}
             />
           </div>
           <div className="mt-2 flex items-center justify-between gap-2 text-xs text-slate-600">
             <span>
               Berjalan: <span className="font-medium text-slate-800">{formatDurationMs(elapsedMs)}</span>
             </span>
-            <span className="font-medium">{progress.percent}%</span>
+            <span className="font-medium">{barPercent}%</span>
           </div>
         </div>
 
