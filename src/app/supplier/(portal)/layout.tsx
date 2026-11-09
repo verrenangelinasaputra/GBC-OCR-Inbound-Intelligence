@@ -12,7 +12,7 @@ export default async function SupplierPortalLayout({ children }: { children: Rea
     <div className="flex min-h-screen bg-slate-50 text-slate-900">
       <SupplierSidebar isMasterAdmin={isMasterAdmin} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="border-b border-slate-200 bg-white px-6 py-4">
+        <header className="border-b border-slate-200 bg-white px-6 py-4 print:hidden">
           <p className="text-sm text-slate-500">GBC Inbound Intelligence</p>
           <p className="text-lg font-semibold text-slate-900">
             {sheetOnly
