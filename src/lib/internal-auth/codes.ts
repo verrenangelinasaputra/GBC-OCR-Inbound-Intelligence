@@ -4,7 +4,7 @@ import { loadServiceAccountCredentials } from "@/lib/providers/google-workspace/
 import { hashVerificationCode, verificationCodeMatches } from "@/lib/supplier-auth/code";
 import { SupplierAuthError } from "@/lib/supplier-auth/errors";
 
-const CODES_TAB = () => process.env.INTERNAL_AUTH_CODES_TAB?.trim() || "AuthCodes";
+const CODES_TAB = () => process.env.INTERNAL_AUTH_CODES_TAB?.trim() || "WarehouseAuthCodes";
 
 const CODE_HEADERS = ["username", "purpose", "code_hash", "expires_at", "created_at", "payload_json"] as const;
 

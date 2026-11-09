@@ -1,7 +1,7 @@
-const DEFAULT_INTERNAL_SHEET_ID = "1PTxO6HbOccYn30g1l7SaGpGIcV0PBcuLmqzC3me5GYM";
+import { getCredentialsSpreadsheetId } from "./credentials-sheet";
 
 export function getInternalSheetId(): string {
-  return process.env.INTERNAL_SHEET_ID?.trim() || DEFAULT_INTERNAL_SHEET_ID;
+  return process.env.INTERNAL_SHEET_ID?.trim() || getCredentialsSpreadsheetId();
 }
 
 export function getInternalUsersTab(): string {

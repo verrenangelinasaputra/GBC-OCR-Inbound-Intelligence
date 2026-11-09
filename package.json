@@ -19,6 +19,7 @@
     "drive:oauth-setup": "tsx scripts/setup-drive-oauth.ts",
     "drive:upload-test": "tsx scripts/test-drive-upload.ts",
     "internal:setup": "tsx scripts/setup-internal-admin.ts",
+    "credentials:peek": "tsx scripts/peek-credentials-sheet.ts",
     "supplier:master-setup": "tsx scripts/setup-supplier-master.ts"
   },
   "prisma": {

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { hashPassword } from "@/lib/auth/password";
-import { SUPPLIER_GUDANG_OPTIONS } from "@/lib/config/supplier-gudang";
+import { normalizeGudangSelection } from "@/lib/config/supplier-gudang";
 import { generateVerificationCode } from "@/lib/supplier-auth/code";
 import { SupplierAuthError } from "@/lib/supplier-auth/errors";
 import {
@@ -24,12 +24,13 @@ function asError(error: unknown): SupplierAuthError {
   return new SupplierAuthError(message, /spreadsheet|SMTP|SESSION/i.test(message) ? 500 : 400);
 }
 
-function validateGudang(raw: string): string {
-  const g = String(raw ?? "").trim();
-  if (!SUPPLIER_GUDANG_OPTIONS.includes(g as (typeof SUPPLIER_GUDANG_OPTIONS)[number])) {
-    throw new SupplierAuthError("Pilih gudang tujuan yang valid.");
+function validateGudang(raw: unknown): string {
+  try {
+    return normalizeGudangSelection(raw);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Pilih gudang tujuan yang valid.";
+    throw new SupplierAuthError(message);
   }
-  return g;
 }
 
 export async function sendInternalRegisterCode(body: {
@@ -37,7 +38,7 @@ export async function sendInternalRegisterCode(body: {
   username?: string;
   email?: string;
   phone?: string;
-  gudang?: string;
+  gudang?: string | string[];
   password?: string;
   confirmPassword?: string;
 }): Promise<{ maskedEmail: string; devHint?: string }> {
@@ -46,7 +47,7 @@ export async function sendInternalRegisterCode(body: {
     const username = validateUsername(String(body.username ?? ""));
     const email = validateEmail(String(body.email ?? ""));
     const phone = String(body.phone ?? "").trim();
-    const gudang = validateGudang(String(body.gudang ?? ""));
+    const gudang = validateGudang(body.gudang);
     const password = String(body.password ?? "");
     if (fullName.length < 2 || fullName.length > 120) {
       throw new SupplierAuthError("Nama wajib diisi (2–120 karakter).");

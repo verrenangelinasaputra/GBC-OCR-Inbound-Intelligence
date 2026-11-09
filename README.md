@@ -195,8 +195,9 @@ Tanpa migrate + seed, login `admin` / password seed akan gagal (user belum ada d
 Cocok untuk **pilot upload Surat Jalan di Vercel** tanpa PostgreSQL:
 
 - **Bisa:** `/supplier/register` → kode email dari **nomarcengkareng@gmail.com** → login username + password → upload → OCR Gemini → spreadsheet operasional + Drive.
-- Akun supplier di [Supplier Credentials](https://docs.google.com/spreadsheets/d/156m4HFAUnqubtCJumBJZ9BCCel_kNVcU_ZV9kHi4HtY), tab **Users**. Kode disimpan sebagai hash di tab **AuthCodes** (pola yang sama dengan GBC Expense Hub).
-- **Supplier** → spreadsheet `SUPPLIER_SHEET_ID`; **admin internal** → `/login` + spreadsheet [Internal Users](https://docs.google.com/spreadsheets/d/1PTxO6HbOccYn30g1l7SaGpGIcV0PBcuLmqzC3me5GYM) (`INTERNAL_SHEET_ID`), tanpa Supabase.
+- Semua kredensial (supplier + warehouse) di satu spreadsheet: [GBC Credentials](https://docs.google.com/spreadsheets/d/1CNmLX2Qca-9GxDJTh77W8VaVaDAcMchqj7tzeeYEyZw/edit) (`CREDENTIALS_SHEET_ID`).
+- Tab **Users** + **AuthCodes** → register/login supplier. Tab **Sheet1** (`INTERNAL_SHEET_TAB`) + **WarehouseAuthCodes** → register/login Warehouse Intelligence (`/register`, `/login`).
+- Tab dibuat otomatis saat pertama kali dipakai; cek akses: `npm run credentials:peek`.
 - Buat user `admin` sekali: `npm run internal:setup` (butuh service account + share Editor ke sheet).
 - Menu PP / invoice / dll. tetap butuh Supabase jika ingin data live di app; dashboard mode spreadsheet menampilkan angka 0 + petunjuk.
 
@@ -217,9 +218,11 @@ Env **Vercel** (Production):
 | `GOOGLE_DRIVE_FOLDER_ID` | `1_eQPA9BXJj1RjLgfyCPnlgZEsJdpjHnA` (default di kode jika dikosongkan) |
 | `GOOGLE_SHEET_ID` | `1o2No4lV_r1Hrfi3qiyKI0ZX-VUaQaZdcxCbo4qJ1LDc` |
 | `GOOGLE_SHEET_TAB` | `Sheet1` |
-| `SUPPLIER_SHEET_ID` | `156m4HFAUnqubtCJumBJZ9BCCel_kNVcU_ZV9kHi4HtY` |
-| `INTERNAL_SHEET_ID` | `1PTxO6HbOccYn30g1l7SaGpGIcV0PBcuLmqzC3me5GYM` |
-| `INTERNAL_SHEET_TAB` | `Sheet1` (sesuaikan nama tab) |
+| `CREDENTIALS_SHEET_ID` | `1CNmLX2Qca-9GxDJTh77W8VaVaDAcMchqj7tzeeYEyZw` (default; bisa override per `SUPPLIER_SHEET_ID` / `INTERNAL_SHEET_ID`) |
+| `INTERNAL_SHEET_TAB` | `Sheet1` — akun warehouse internal |
+| `INTERNAL_AUTH_CODES_TAB` | `WarehouseAuthCodes` |
+| `SUPPLIER_USERS_TAB` | `Users` |
+| `SUPPLIER_AUTH_CODES_TAB` | `AuthCodes` |
 | `SMTP_HOST` | `smtp.gmail.com` |
 | `SMTP_PORT` | `587` |
 | `SMTP_USER` | `nomarcengkareng@gmail.com` |
@@ -231,8 +234,8 @@ Env **Vercel** (Production):
 
 Urutan setup (jangan dilewati):
 
-1. Spreadsheet Supplier Credentials → **Share** → ubah dari *Anyone with the link* menjadi **Restricted**.
-2. Share sheet itu sebagai **Editor** ke email `client_email` di JSON service account (bukan ke email pribadi saja).
+1. Spreadsheet [Credentials](https://docs.google.com/spreadsheets/d/1CNmLX2Qca-9GxDJTh77W8VaVaDAcMchqj7tzeeYEyZw/edit) → **Share** → **Restricted** (bukan publik).
+2. Share sebagai **Editor** ke email `client_email` di JSON service account (bukan ke email pribadi saja).
 3. Di Google Account **nomarcengkareng@gmail.com**: aktifkan 2-Step Verification → **App passwords** → buat password untuk Mail → tempel ke `SMTP_PASS` (bukan password login Gmail).
 4. Isi env di atas, **Redeploy**.
 5. Supplier buka `/supplier/register`, isi perusahaan, kontak, username, email, telepon, dan password. Kode 6 digit masuk ke email mereka, pengirimnya nomarcengkareng@gmail.com.

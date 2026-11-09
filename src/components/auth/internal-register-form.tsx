@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SUPPLIER_GUDANG_OPTIONS } from "@/lib/config/supplier-gudang";
 
 export function InternalRegisterForm() {
@@ -11,7 +11,7 @@ export function InternalRegisterForm() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [gudang, setGudang] = useState<string>(SUPPLIER_GUDANG_OPTIONS[0]);
+  const [gudang, setGudang] = useState<string[]>([]);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [code, setCode] = useState("");
@@ -22,6 +22,10 @@ export function InternalRegisterForm() {
 
   async function sendCode(e?: React.FormEvent) {
     e?.preventDefault();
+    if (!gudang.length) {
+      setError("Pilih minimal satu gudang tujuan.");
+      return;
+    }
     setLoading(true);
     setError("");
     const res = await fetch("/api/auth/register", {
@@ -90,7 +94,7 @@ export function InternalRegisterForm() {
             />
             <Field label="Email" value={email} onChange={setEmail} type="email" autoComplete="email" />
             <Field label="No. telepon" value={phone} onChange={setPhone} type="tel" autoComplete="tel" />
-            <SelectField label="Gudang tujuan" value={gudang} onChange={setGudang} options={SUPPLIER_GUDANG_OPTIONS} />
+            <GudangCheckboxDropdown selected={gudang} onChange={setGudang} options={SUPPLIER_GUDANG_OPTIONS} />
             <Field
               label="Password"
               value={password}
@@ -191,32 +195,76 @@ function Field({
   );
 }
 
-function SelectField({
-  label,
-  value,
+function GudangCheckboxDropdown({
+  selected,
   onChange,
   options,
 }: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
+  selected: string[];
+  onChange: (next: string[]) => void;
   options: readonly string[];
 }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDown(e: MouseEvent) {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [open]);
+
+  function toggle(option: string) {
+    onChange(
+      selected.includes(option) ? selected.filter((g) => g !== option) : [...selected, option]
+    );
+  }
+
+  const summary =
+    selected.length === 0
+      ? "Pilih gudang…"
+      : selected.length === 1
+        ? selected[0]
+        : `${selected.length} gudang dipilih`;
+
   return (
-    <div>
-      <label className="text-sm font-medium text-slate-700">{label}</label>
-      <select
-        className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        required
+    <div ref={rootRef} className="relative">
+      <span className="text-sm font-medium text-slate-700">Gudang tujuan</span>
+      <p className="mt-0.5 text-xs text-slate-500">Boleh lebih dari satu — centang di daftar</p>
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="mt-1 flex w-full items-center justify-between rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-sm text-slate-900"
       >
-        {options.map((o) => (
-          <option key={o} value={o}>
-            {o}
-          </option>
-        ))}
-      </select>
+        <span className={selected.length ? "text-slate-900" : "text-slate-400"}>{summary}</span>
+        <span className="text-slate-400" aria-hidden>
+          {open ? "▴" : "▾"}
+        </span>
+      </button>
+      {open && (
+        <div className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-md">
+          {options.map((o) => (
+            <label
+              key={o}
+              className="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50"
+            >
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-slate-300 text-blue-600"
+                checked={selected.includes(o)}
+                onChange={() => toggle(o)}
+              />
+              <span>{o}</span>
+            </label>
+          ))}
+        </div>
+      )}
+      {selected.length > 1 && (
+        <p className="mt-1 text-xs text-slate-500">{selected.join("; ")}</p>
+      )}
     </div>
   );
 }

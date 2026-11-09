@@ -2,9 +2,8 @@ import { randomUUID } from "node:crypto";
 import { google } from "googleapis";
 import { loadServiceAccountCredentials } from "@/lib/providers/google-workspace/config";
 import { hashVerificationCode, verificationCodeMatches } from "./code";
+import { getCredentialsSpreadsheetId } from "@/lib/config/credentials-sheet";
 import { SupplierAuthError } from "./errors";
-
-const DEFAULT_SHEET_ID = "156m4HFAUnqubtCJumBJZ9BCCel_kNVcU_ZV9kHi4HtY";
 const USERS_TAB = () => process.env.SUPPLIER_USERS_TAB?.trim() || "Users";
 const CODES_TAB = () => process.env.SUPPLIER_AUTH_CODES_TAB?.trim() || "AuthCodes";
 
@@ -63,7 +62,7 @@ function sheetTarget() {
   });
   return {
     sheets: google.sheets({ version: "v4", auth }),
-    sheetId: process.env.SUPPLIER_SHEET_ID?.trim() || DEFAULT_SHEET_ID,
+    sheetId: process.env.SUPPLIER_SHEET_ID?.trim() || getCredentialsSpreadsheetId(),
   };
 }
 

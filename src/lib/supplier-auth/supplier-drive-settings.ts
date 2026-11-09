@@ -1,4 +1,5 @@
 import { google } from "googleapis";
+import { getCredentialsSpreadsheetId } from "@/lib/config/credentials-sheet";
 import { loadServiceAccountCredentials } from "@/lib/providers/google-workspace/config";
 import { SupplierAuthError } from "./errors";
 import { supplierMasterUsername } from "./master-admin";
@@ -34,7 +35,7 @@ function sheetTarget() {
       500
     );
   }
-  const defaultSheet = process.env.SUPPLIER_SHEET_ID?.trim() || "156m4HFAUnqubtCJumBJZ9BCCel_kNVcU_ZV9kHi4HtY";
+  const defaultSheet = process.env.SUPPLIER_SHEET_ID?.trim() || getCredentialsSpreadsheetId();
   const auth = new google.auth.JWT({
     email: creds.client_email,
     key: creds.private_key,
