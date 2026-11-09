@@ -3,6 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ImagePlus, Trash2, X } from "lucide-react";
 import { SUPPLIER_GUDANG_OPTIONS, SUPPLIER_MAX_SJ_FILES } from "@/lib/config/supplier-gudang";
+import type { SheetUploadProgressPhase } from "@/lib/services/sheet-only-upload";
+import {
+  UploadProgressPanel,
+  uploadProgressPercent,
+  type UploadProgressState,
+} from "@/components/supplier/upload-progress-panel";
 
 type StagedFile = {
   id: string;
@@ -44,7 +50,15 @@ export function SupplierUploadForm() {
   const [result, setResult] = useState<UploadResult | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [progress, setProgress] = useState("");
+  const [uploadProgress, setUploadProgress] = useState<UploadProgressState>({
+    active: false,
+    fileIndex: 0,
+    fileTotal: 0,
+    fileName: "",
+    message: "",
+    phase: "prepare",
+    percent: 0,
+  });
 
   useEffect(() => {
     fetch("/api/app-mode")
@@ -112,32 +126,177 @@ export function SupplierUploadForm() {
     setVerifyOpen(true);
   }
 
+  async function consumeSheetOnlyStream(
+    form: FormData,
+    fileTotal: number
+  ): Promise<UploadResult | null> {
+    const res = await fetch("/api/supplier/upload-sheet-only/stream", { method: "POST", body: form });
+    const contentType = res.headers.get("content-type") ?? "";
+
+    if (!res.ok) {
+      if (contentType.includes("json")) {
+        const data = await res.json();
+        throw new Error(typeof data.error === "string" ? data.error : "Upload gagal");
+      }
+      throw new Error("Upload gagal");
+    }
+    if (!res.body) throw new Error("Tidak ada respons dari server");
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let finalPayload: UploadResult | null = null;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        const event = JSON.parse(trimmed) as {
+          type: string;
+          fileIndex?: number;
+          fileTotal?: number;
+          fileName?: string;
+          phase?: string;
+          message?: string;
+          payload?: UploadResult;
+        };
+
+        if (event.type === "file_start" && event.fileIndex && event.fileTotal && event.fileName) {
+          setUploadProgress({
+            active: true,
+            fileIndex: event.fileIndex,
+            fileTotal: event.fileTotal,
+            fileName: event.fileName,
+            message: "Memulai pemrosesan gambar…",
+            phase: "prepare",
+            percent: uploadProgressPercent(event.fileIndex, event.fileTotal, "prepare"),
+          });
+        }
+
+        if (
+          event.type === "step" &&
+          event.fileIndex &&
+          event.fileTotal &&
+          event.fileName &&
+          event.message &&
+          event.phase
+        ) {
+          const phase = event.phase as SheetUploadProgressPhase;
+          setUploadProgress({
+            active: true,
+            fileIndex: event.fileIndex,
+            fileTotal: event.fileTotal,
+            fileName: event.fileName,
+            message: event.message,
+            phase,
+            percent: uploadProgressPercent(event.fileIndex, event.fileTotal, phase),
+          });
+        }
+
+        if (event.type === "file_done" && event.fileIndex && event.fileTotal) {
+          setUploadProgress((prev) => ({
+            ...prev,
+            active: true,
+            fileIndex: event.fileIndex!,
+            fileTotal: event.fileTotal!,
+            percent: uploadProgressPercent(event.fileIndex!, event.fileTotal!, "done"),
+            message: "SJ ini selesai — lanjut ke berikutnya jika ada…",
+            phase: "done",
+          }));
+        }
+
+        if (event.type === "complete" && event.payload) {
+          finalPayload = event.payload;
+          setUploadProgress((prev) => ({
+            ...prev,
+            active: true,
+            percent: 100,
+            message: "Semua Surat Jalan selesai diproses.",
+            phase: "done",
+          }));
+        }
+
+        if (event.type === "error") {
+          throw new Error(event.message ?? "Upload gagal");
+        }
+      }
+    }
+
+    if (!finalPayload) {
+      throw new Error("Proses selesai tanpa hasil — coba lagi.");
+    }
+    return finalPayload;
+  }
+
   async function confirmSubmit() {
     setVerifyOpen(false);
     setLoading(true);
     setError("");
     setResult(null);
-    setProgress(`Memproses ${staged.length} file…`);
+
     const form = new FormData();
     staged.forEach((s) => form.append("files", s.file));
     form.append("gudang", gudang);
     form.append("notes", notes);
     form.append("vehicleInfo", vehicleInfo);
-    const uploadUrl = sheetOnly ? "/api/supplier/upload-sheet-only" : "/api/supplier/upload";
-    const res = await fetch(uploadUrl, { method: "POST", body: form });
-    const data = await res.json();
-    setLoading(false);
-    setProgress("");
-    if (!res.ok) {
-      setError(data.error ?? "Upload gagal");
-      return;
+    const fileTotal = staged.length;
+
+    try {
+      let data: UploadResult | null = null;
+
+      if (sheetOnly) {
+        setUploadProgress({
+          active: true,
+          fileIndex: 1,
+          fileTotal,
+          fileName: staged[0]?.file.name ?? "",
+          message: "Mengirim data ke server…",
+          phase: "prepare",
+          percent: 0,
+        });
+        data = await consumeSheetOnlyStream(form, fileTotal);
+      } else {
+        setUploadProgress({
+          active: true,
+          fileIndex: 1,
+          fileTotal,
+          fileName: staged[0]?.file.name ?? "",
+          message: `Mengunggah ${fileTotal} file ke sistem GBC…`,
+          phase: "prepare",
+          percent: 10,
+        });
+        const res = await fetch("/api/supplier/upload", { method: "POST", body: form });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error ?? "Upload gagal");
+        data = json;
+        setUploadProgress((prev) => ({
+          ...prev,
+          percent: 100,
+          message: "Upload selesai.",
+          phase: "done",
+        }));
+      }
+
+      if (data) setResult(data);
+      revokeAll(staged);
+      setStaged([]);
+      setNotes("");
+      setVehicleInfo("");
+      setGudang("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Upload gagal");
+    } finally {
+      setLoading(false);
+      setTimeout(() => {
+        setUploadProgress((prev) => ({ ...prev, active: false }));
+      }, 600);
     }
-    setResult(data);
-    revokeAll(staged);
-    setStaged([]);
-    setNotes("");
-    setVehicleInfo("");
-    setGudang("");
   }
 
   return (
@@ -267,8 +426,6 @@ export function SupplierUploadForm() {
         {error && (
           <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>
         )}
-        {progress && <p className="text-sm text-blue-700">{progress}</p>}
-
         {result && (
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-sm text-emerald-900">
             <p className="font-semibold">Berhasil dikirim</p>
@@ -385,6 +542,8 @@ export function SupplierUploadForm() {
           </div>
         </div>
       )}
+
+      <UploadProgressPanel progress={uploadProgress} />
     </>
   );
 }

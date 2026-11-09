@@ -24,6 +24,13 @@ export type SheetOnlyUploadResult = {
   ocrWarnings: string[];
 };
 
+export type SheetUploadProgressPhase = "prepare" | "ocr" | "drive" | "sheet" | "done";
+
+export type SheetUploadProgressEvent = {
+  phase: SheetUploadProgressPhase;
+  message: string;
+};
+
 function makeSubmissionRef(): string {
   const d = new Date();
   const p = (n: number) => String(n).padStart(2, "0");
@@ -46,6 +53,7 @@ export async function processSheetOnlyUpload(params: {
   notes?: string;
   vehicleInfo?: string;
   gudang?: string;
+  onProgress?: (event: SheetUploadProgressEvent) => void | Promise<void>;
 }): Promise<SheetOnlyUploadResult> {
   if (!isGoogleExportConfigured()) {
     throw new Error(
@@ -53,7 +61,14 @@ export async function processSheetOnlyUpload(params: {
     );
   }
 
+  const report = async (phase: SheetUploadProgressPhase, message: string) => {
+    await params.onProgress?.({ phase, message });
+  };
+
+  await report("prepare", "Menyiapkan gambar untuk diproses…");
+
   const ocr = new GeminiOCRProvider();
+  await report("ocr", "Gemini Vision membaca & mengekstrak teks Surat Jalan…");
   const result = await ocr.processImage(params.file.buffer, params.file.mimeType);
   if (result.isDemo) {
     throw new Error("OCR demo tidak dipakai di Sheet-only — set GEMINI_API_KEY + OCR_PROVIDER=gemini.");
@@ -78,6 +93,7 @@ export async function processSheetOnlyUpload(params: {
   let fileUrl = "";
   let driveWarning: string | undefined;
 
+  await report("drive", "Mengunggah foto Surat Jalan ke Google Drive…");
   try {
     const uploaded = await uploadFileToDrive({
       config,
@@ -112,7 +128,14 @@ export async function processSheetOnlyUpload(params: {
   });
   rows = tagRowsWithGudang(rows, params.gudang);
 
+  await report("sheet", `Menulis ${rows.length} baris hasil OCR ke spreadsheet…`);
   const sheetAppend = await appendRowsToSheet({ config, rows });
+  await report(
+    "done",
+    result.suratJalanNumber
+      ? `Selesai — No. SJ ${result.suratJalanNumber}`
+      : "Selesai — data tersimpan di spreadsheet"
+  );
 
   return {
     submissionRef,
