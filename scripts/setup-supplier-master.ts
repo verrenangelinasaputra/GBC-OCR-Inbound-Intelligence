@@ -1,19 +1,18 @@
-import { hashPassword } from "../src/lib/auth/password";
 import { loadEnvFile } from "./load-env";
+import { supplierMasterPasswordExpected, supplierMasterUsername } from "../src/lib/supplier-auth/master-admin";
 
 loadEnvFile();
 
-async function main() {
-  const username = (process.env.SUPPLIER_MASTER_USERNAME || "admin_supplier").trim();
-  const password = process.env.SUPPLIER_MASTER_PASSWORD || "MasterSupplier!2026";
-  const hash = await hashPassword(password);
-  console.log("Tambahkan ke .env dan Vercel:\n");
-  console.log(`SUPPLIER_MASTER_USERNAME="${username}"`);
-  console.log(`SUPPLIER_MASTER_PASSWORD_HASH="${hash}"`);
-  console.log(`\nLogin: /supplier/login — username ${username}, password (dari SUPPLIER_MASTER_PASSWORD saat generate).`);
+function main() {
+  const username = supplierMasterUsername();
+  const password = supplierMasterPasswordExpected();
+  console.log("Master supplier (tanpa hash bcrypt):\n");
+  console.log(`  Username : ${username}`);
+  console.log(`  Password : ${password}`);
+  console.log("\nOpsional di Vercel — override:");
+  console.log(`  SUPPLIER_MASTER_USERNAME="${username}"`);
+  console.log(`  SUPPLIER_MASTER_PASSWORD="${password}"`);
+  console.log("\nLogin: /supplier/login");
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+main();
