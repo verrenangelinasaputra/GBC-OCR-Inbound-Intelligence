@@ -9,31 +9,26 @@ import { applySummaryDashboardFormatting } from "./summary-sheet-format";
 export const SUMMARY_TAB_NAME = "Summary";
 export const DATA_CALC_TAB_NAME = "_DataCalc";
 
-/** Baris 1-based — ruang kosong agar hasil QUERY (spill) tidak menimpa judul section berikutnya. */
-export const SUMMARY_QUERY_LAYOUT = {
-  weeklyHeader: 19,
-  weeklyQuery: 20,
-  weeklyBlockEnd: 44,
-  itemHeader: 45,
-  itemQuery: 46,
-  itemBlockEnd: 95,
-  deliveryHeader: 96,
-  deliveryQuery: 97,
-  deliveryBlockEnd: 196,
-  supplierHeader: 197,
-  supplierQuery: 198,
-  supplierBlockEnd: 247,
-  warehouseHeader: 248,
-  warehouseQuery: 249,
-  warehouseBlockEnd: 298,
+/**
+ * Tabel QUERY di baris sama, kolom berbeda — spill vertikal tanpa tabrakan (#REF!),
+ * tanpa jarak baris kosong besar (Google Sheets tidak bisa "insert row" otomatis).
+ */
+export const SUMMARY_BAND_LAYOUT = {
+  headerRow: 19,
+  queryRow: 20,
+  wideColumns: 32,
+  /** Indeks kolom 0-based pada baris QUERY (A=0, F=5, M=12, V=21, AB=27). */
+  bandColIndex: {
+    weekly: 0,
+    item: 5,
+    delivery: 12,
+    supplier: 21,
+    warehouse: 27,
+  },
 } as const;
 
-const BLANK_ROW = ["", "", "", "", "", ""];
-
-function padSummaryRows(rows: string[][], target1BasedRow: number): void {
-  while (rows.length < target1BasedRow - 1) {
-    rows.push([...BLANK_ROW]);
-  }
+function wideSummaryRow(fill = ""): string[] {
+  return Array(SUMMARY_BAND_LAYOUT.wideColumns).fill(fill);
 }
 
 /**
@@ -106,7 +101,7 @@ function summaryFilterAndKpiRows(sep: string, dcLabel: string): string[][] {
     `(${calc}!C2:C>=${sum}!$B$5)*(${calc}!C2:C<=${sum}!$B$6)*(IF(${sum}!$B$7="ALL"${sep}1${sep}${calc}!A2:A=${sum}!$B$7))*(IF(${sum}!$B$8="ALL"${sep}1${sep}${calc}!B2:B=${sum}!$B$8))*(IF(LEN(${sum}!$B$9)=0${sep}1${sep}REGEXMATCH(${calc}!E2:E${sep}"(?i)"&${sum}!$B$9)))${extra}`;
 
   const q = (query: string) => `=QUERY(${calcRange}${sep} "${query}"${sep} 0)`;
-  const L = SUMMARY_QUERY_LAYOUT;
+  const band = SUMMARY_BAND_LAYOUT.bandColIndex;
 
   const rows: string[][] = [
     ["GBC Inbound Goods Monitoring — Management Dashboard", "", "", "", "", ""],
@@ -178,64 +173,29 @@ function summaryFilterAndKpiRows(sep: string, dcLabel: string): string[][] {
     ["", "", "", "", "", ""],
   ];
 
-  padSummaryRows(rows, L.weeklyHeader);
-  rows.push(["Weekly Inbound Overview", "", "", "", "", ""]);
-  padSummaryRows(rows, L.weeklyQuery);
-  rows.push([
-    q("select J, count(E), sum(G) where G > 0 and J is not null group by J"),
-    "",
-    "",
-    "",
-    "",
-    "",
-  ]);
-  padSummaryRows(rows, L.itemHeader);
-  rows.push(["Weekly Item Summary (by product & warehouse)", "", "", "", "", ""]);
-  padSummaryRows(rows, L.itemQuery);
-  rows.push([
-    q("select J, F, E, A, sum(G), H where E is not null and G > 0 group by J, F, E, A, H"),
-    "",
-    "",
-    "",
-    "",
-    "",
-  ]);
-  padSummaryRows(rows, L.deliveryHeader);
-  rows.push(["Delivery Breakdown (detail)", "", "", "", "", ""]);
-  padSummaryRows(rows, L.deliveryQuery);
-  rows.push([
-    q("select C, J, A, B, D, F, E, G, H where C is not null and G > 0 order by C desc"),
-    "",
-    "",
-    "",
-    "",
-    "",
-  ]);
-  padSummaryRows(rows, L.supplierHeader);
-  rows.push(["Supplier Summary", "", "", "", "", ""]);
-  padSummaryRows(rows, L.supplierQuery);
-  rows.push([
-    q(
-      "select B, sum(G), count(D), count(E), min(C), max(C) where B is not null and G > 0 and C is not null group by B"
-    ),
-    "",
-    "",
-    "",
-    "",
-    "",
-  ]);
-  padSummaryRows(rows, L.warehouseHeader);
-  rows.push(["Warehouse Performance", "", "", "", "", ""]);
-  padSummaryRows(rows, L.warehouseQuery);
-  rows.push([
-    q("select A, sum(G), count(E), count(D), count(B) where A is not null and G > 0 group by A"),
-    "",
-    "",
-    "",
-    "",
-    "",
-  ]);
-  padSummaryRows(rows, L.warehouseBlockEnd);
+  const headerRow = wideSummaryRow();
+  headerRow[band.weekly] = "Weekly Inbound Overview";
+  headerRow[band.item] = "Weekly Item Summary (by product & warehouse)";
+  headerRow[band.delivery] = "Delivery Breakdown (detail)";
+  headerRow[band.supplier] = "Supplier Summary";
+  headerRow[band.warehouse] = "Warehouse Performance";
+  rows.push(headerRow);
+
+  const queryRow = wideSummaryRow();
+  queryRow[band.weekly] = q("select J, count(E), sum(G) where G > 0 and J is not null group by J");
+  queryRow[band.item] = q(
+    "select J, F, E, A, sum(G), H where E is not null and G > 0 group by J, F, E, A, H"
+  );
+  queryRow[band.delivery] = q(
+    "select C, J, A, B, D, F, E, G, H where C is not null and G > 0 order by C desc"
+  );
+  queryRow[band.supplier] = q(
+    "select B, sum(G), count(D), count(E), min(C), max(C) where B is not null and G > 0 and C is not null group by B"
+  );
+  queryRow[band.warehouse] = q(
+    "select A, sum(G), count(E), count(D), count(B) where A is not null and G > 0 group by A"
+  );
+  rows.push(queryRow);
 
   return rows;
 }
@@ -368,7 +328,7 @@ export async function ensureInboundMonitoringWorkbook(
   const summaryValues = summaryFilterAndKpiRows(sep, dcTab);
   await sheets.spreadsheets.values.clear({
     spreadsheetId,
-    range: `'${SUMMARY_TAB_NAME}'!A1:J400`,
+    range: `'${SUMMARY_TAB_NAME}'!A1:AF30`,
   });
   await sheets.spreadsheets.values.update({
     spreadsheetId,

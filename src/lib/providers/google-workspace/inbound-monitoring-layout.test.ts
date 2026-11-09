@@ -3,7 +3,7 @@ import {
   dataCalcColumnFormulasForLocale,
   formulaArgSeparator,
   resolveDataCompilationTabTitle,
-  SUMMARY_QUERY_LAYOUT,
+  SUMMARY_BAND_LAYOUT,
 } from "./inbound-monitoring-layout";
 
 function parenBalance(s: string): number {
@@ -26,10 +26,13 @@ describe("inbound monitoring formulas", () => {
     expect(resolveDataCompilationTabTitle(["Data Compilation", "Sheet1"])).toBe("Data Compilation");
   });
 
-  it("reserves row gaps between Summary QUERY anchors", () => {
-    expect(SUMMARY_QUERY_LAYOUT.weeklyBlockEnd).toBeGreaterThan(SUMMARY_QUERY_LAYOUT.weeklyQuery);
-    expect(SUMMARY_QUERY_LAYOUT.itemHeader).toBeGreaterThan(SUMMARY_QUERY_LAYOUT.weeklyBlockEnd);
-    expect(SUMMARY_QUERY_LAYOUT.deliveryHeader).toBeGreaterThan(SUMMARY_QUERY_LAYOUT.itemBlockEnd);
+  it("places Summary QUERY bands on separate columns at the same row", () => {
+    const { bandColIndex, queryRow } = SUMMARY_BAND_LAYOUT;
+    expect(queryRow).toBe(20);
+    expect(bandColIndex.item).toBeGreaterThan(bandColIndex.weekly + 2);
+    expect(bandColIndex.delivery).toBeGreaterThan(bandColIndex.item + 5);
+    expect(bandColIndex.supplier).toBeGreaterThan(bandColIndex.delivery + 8);
+    expect(bandColIndex.warehouse).toBeGreaterThan(bandColIndex.supplier + 5);
   });
 
   it("generates balanced ARRAYFORMULA with empty IF branch for id_ID", () => {

@@ -1,22 +1,23 @@
 import type { sheets_v4 } from "googleapis";
-import { SUMMARY_QUERY_LAYOUT } from "./inbound-monitoring-layout";
+import { SUMMARY_BAND_LAYOUT } from "./inbound-monitoring-layout";
 
 const NAVY = { red: 0.12, green: 0.23, blue: 0.54 };
 const WHITE = { red: 1, green: 1, blue: 1 };
 const SLATE_HEADER = { red: 0.85, green: 0.89, blue: 0.94 };
 const INPUT_FILL = { red: 1, green: 0.98, blue: 0.85 };
 
-function sectionHeaderRow(sheetId: number, row0: number) {
+function bandHeader(sheetId: number, row0: number, startCol: number, endCol: number) {
   return {
     repeatCell: {
-      range: { sheetId, startRowIndex: row0, endRowIndex: row0 + 1, startColumnIndex: 0, endColumnIndex: 8 },
+      range: { sheetId, startRowIndex: row0, endRowIndex: row0 + 1, startColumnIndex: startCol, endColumnIndex: endCol },
       cell: {
         userEnteredFormat: {
           backgroundColor: SLATE_HEADER,
           textFormat: { bold: true, fontSize: 11 },
+          wrapStrategy: "WRAP",
         },
       },
-      fields: "userEnteredFormat(backgroundColor,textFormat)",
+      fields: "userEnteredFormat(backgroundColor,textFormat,wrapStrategy)",
     },
   };
 }
@@ -27,14 +28,9 @@ export async function applySummaryDashboardFormatting(
   spreadsheetId: string,
   sheetId: number
 ): Promise<void> {
-  const L = SUMMARY_QUERY_LAYOUT;
-  const sectionRows0 = [
-    L.weeklyHeader - 1,
-    L.itemHeader - 1,
-    L.deliveryHeader - 1,
-    L.supplierHeader - 1,
-    L.warehouseHeader - 1,
-  ];
+  const { headerRow, queryRow, bandColIndex } = SUMMARY_BAND_LAYOUT;
+  const h = headerRow - 1;
+  const q0 = queryRow - 1;
 
   const requests: object[] = [
     {
@@ -146,7 +142,11 @@ export async function applySummaryDashboardFormatting(
         fields: "userEnteredFormat(textFormat,horizontalAlignment,numberFormat)",
       },
     },
-    ...sectionRows0.map((row0) => sectionHeaderRow(sheetId, row0)),
+    bandHeader(sheetId, h, bandColIndex.weekly, bandColIndex.weekly + 3),
+    bandHeader(sheetId, h, bandColIndex.item, bandColIndex.item + 6),
+    bandHeader(sheetId, h, bandColIndex.delivery, bandColIndex.delivery + 9),
+    bandHeader(sheetId, h, bandColIndex.supplier, bandColIndex.supplier + 6),
+    bandHeader(sheetId, h, bandColIndex.warehouse, bandColIndex.warehouse + 5),
     {
       updateSheetProperties: {
         properties: {
@@ -156,21 +156,23 @@ export async function applySummaryDashboardFormatting(
         fields: "gridProperties.frozenRowCount",
       },
     },
-    ...[280, 120, 100, 100, 100, 100, 100, 100, 90].map((pixelSize, startIndex) => ({
-      updateDimensionProperties: {
-        range: { sheetId, dimension: "COLUMNS", startIndex, endIndex: startIndex + 1 },
-        properties: { pixelSize },
-        fields: "pixelSize",
-      },
-    })),
+    ...[72, 72, 72, 100, 100, 100, 100, 100, 90, 80, 80, 80, 88, 72, 72, 72, 72, 72, 72, 72, 72, 88, 72, 72, 72, 72, 72, 88, 72, 72, 72, 72].map(
+      (pixelSize, startIndex) => ({
+        updateDimensionProperties: {
+          range: { sheetId, dimension: "COLUMNS", startIndex, endIndex: startIndex + 1 },
+          properties: { pixelSize },
+          fields: "pixelSize",
+        },
+      })
+    ),
     {
       repeatCell: {
         range: {
           sheetId,
-          startRowIndex: L.deliveryQuery - 1,
-          endRowIndex: L.deliveryBlockEnd,
-          startColumnIndex: 0,
-          endColumnIndex: 1,
+          startRowIndex: q0,
+          endRowIndex: 3000,
+          startColumnIndex: bandColIndex.delivery,
+          endColumnIndex: bandColIndex.delivery + 1,
         },
         cell: {
           userEnteredFormat: { numberFormat: { type: "DATE", pattern: "dd/MM/yyyy" } },
@@ -182,10 +184,10 @@ export async function applySummaryDashboardFormatting(
       repeatCell: {
         range: {
           sheetId,
-          startRowIndex: L.supplierQuery - 1,
-          endRowIndex: L.supplierBlockEnd,
-          startColumnIndex: 4,
-          endColumnIndex: 6,
+          startRowIndex: q0,
+          endRowIndex: 3000,
+          startColumnIndex: bandColIndex.supplier + 4,
+          endColumnIndex: bandColIndex.supplier + 6,
         },
         cell: {
           userEnteredFormat: { numberFormat: { type: "DATE", pattern: "dd/MM/yyyy" } },
