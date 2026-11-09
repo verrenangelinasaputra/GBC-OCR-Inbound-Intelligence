@@ -5,10 +5,12 @@ import { isDriveOAuthConfigured } from "@/lib/providers/google-workspace/drive-o
 import {
   appendRowsToSheet,
   buildGoogleSheetRows,
+  buildSuratJalanDriveSubfolderName,
   buildSuratJalanFileName,
   getGoogleExportConfig,
   isGoogleExportConfigured,
   uploadFileToDrive,
+  uploadSuratJalanToGudangDrive,
 } from "@/lib/providers/google-workspace";
 
 export type SheetOnlyUploadResult = {
@@ -53,6 +55,9 @@ export async function processSheetOnlyUpload(params: {
   notes?: string;
   vehicleInfo?: string;
   gudang?: string;
+  supplierName?: string;
+  batchIndex?: number;
+  batchTotal?: number;
   onProgress?: (event: SheetUploadProgressEvent) => void | Promise<void>;
 }): Promise<SheetOnlyUploadResult> {
   if (!isGoogleExportConfigured()) {
@@ -84,23 +89,52 @@ export async function processSheetOnlyUpload(params: {
   const tanggalForName = payload.tanggal || result.documentDate || "";
   const noSj = payload.no_surat_jalan || result.suratJalanNumber || submissionRef;
   const ext = params.file.name.match(/\.[a-z0-9]+$/i)?.[0] || ".jpeg";
+  const gudangLabel = params.gudang?.trim() ?? "";
+  const supplierName = params.supplierName?.trim() ?? "";
   const fileName = buildSuratJalanFileName({
     tanggal: tanggalForName,
     noSuratJalan: noSj,
     ext,
+    supplierName: supplierName || undefined,
+    gudang: gudangLabel || undefined,
+    batchIndex: params.batchIndex,
+    batchTotal: params.batchTotal,
   });
+  const driveSubfolder =
+    gudangLabel && supplierName
+      ? buildSuratJalanDriveSubfolderName({
+          tanggal: tanggalForName,
+          noSuratJalan: noSj,
+          supplierName,
+        })
+      : "";
 
   let fileUrl = "";
   let driveWarning: string | undefined;
 
-  await report("drive", "Mengunggah foto Surat Jalan ke Google Drive…");
+  await report(
+    "drive",
+    driveSubfolder
+      ? `Membuat folder Drive (${gudangLabel}) lalu mengunggah foto…`
+      : "Mengunggah foto Surat Jalan ke Google Drive…"
+  );
   try {
-    const uploaded = await uploadFileToDrive({
-      config,
-      buffer: params.file.buffer,
-      fileName,
-      mimeType: params.file.mimeType || "image/jpeg",
-    });
+    const uploaded =
+      gudangLabel && supplierName && driveSubfolder
+        ? await uploadSuratJalanToGudangDrive({
+            config,
+            buffer: params.file.buffer,
+            fileName,
+            mimeType: params.file.mimeType || "image/jpeg",
+            gudang: gudangLabel,
+            subfolderName: driveSubfolder,
+          })
+        : await uploadFileToDrive({
+            config,
+            buffer: params.file.buffer,
+            fileName,
+            mimeType: params.file.mimeType || "image/jpeg",
+          });
     fileUrl = uploaded.fileUrl;
   } catch (err) {
     const raw = err instanceof Error ? err.message : "Upload Drive gagal";

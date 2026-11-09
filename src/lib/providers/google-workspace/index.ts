@@ -12,10 +12,13 @@ export {
   OCR_SHEET_HEADERS,
   buildGoogleSheetRows,
   buildSuratJalanFileName,
+  buildSuratJalanDriveSubfolderName,
   parseGeminiPayloadFromStructured,
 } from "./google-sj-export-rows";
 export {
   uploadFileToDrive,
+  uploadSuratJalanToGudangDrive,
+  findOrCreateDriveFolder,
   appendRowsToSheet,
   ensureOcrSheetHeaders,
   resolveSheetTabName,

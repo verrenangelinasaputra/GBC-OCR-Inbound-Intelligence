@@ -2,6 +2,7 @@ import { jsonError } from "@/lib/api/auth-context";
 import { getSession } from "@/lib/auth/session";
 import { isSheetOnlyMode } from "@/lib/config/app-mode";
 import { SUPPLIER_GUDANG_OPTIONS, SUPPLIER_MAX_SJ_FILES } from "@/lib/config/supplier-gudang";
+import { resolveSupplierCompanyName } from "@/lib/supplier-auth/resolve-company";
 import { processSheetOnlyUpload } from "@/lib/services/sheet-only-upload";
 
 const ALLOWED = new Set(["image/jpeg", "image/jpg", "image/png"]);
@@ -70,6 +71,8 @@ export async function POST(request: Request) {
     return jsonError(new Error("Pilih gudang tujuan yang valid"), 400);
   }
 
+  const supplierName = await resolveSupplierCompanyName(session.username);
+
   const prepared: { name: string; mimeType: string; buffer: Buffer }[] = [];
   for (let i = 0; i < files.length; i += 1) {
     const file = files[i];
@@ -115,6 +118,9 @@ export async function POST(request: Request) {
           notes: notes || undefined,
           vehicleInfo: vehicleInfo || undefined,
           gudang,
+          supplierName,
+          batchIndex: fileIndex,
+          batchTotal: fileTotal,
           onProgress: async (p) => {
             await write({
               type: "step",

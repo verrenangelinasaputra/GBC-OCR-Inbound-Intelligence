@@ -106,7 +106,9 @@ Lihat [.env.example](./.env.example).
 3. **Share** folder Drive dan spreadsheet di atas ke **`gbc-inbound-export@gbc-inbound-intelligence.iam.gserviceaccount.com`** (atau email SA Anda) sebagai **Editor**.
 4. `GOOGLE_EXPORT_ENABLED=true` **atau** `SHEET_ONLY_MODE=true` (export otomatis aktif di mode pilot).
 5. Cek: `npm run google:test` → menu **Integrations** menampilkan status Google.
-6. Setelah upload supplier + OCR Gemini: **baris per item** di sheet + **foto** di folder Drive (nama file `Surat Jalan_<tanggal>_<no SJ>.jpeg`).
+6. Setelah upload supplier + OCR Gemini: **baris per item** di sheet + **foto** di Drive dengan struktur:
+   - `[GOOGLE_DRIVE_FOLDER_ID]/Gudang <nama>/YYYY-MM-DD - <No SJ> - <Nama Supplier>/`
+   - File: `SJ_YYYYMMDD_<Nama Supplier>_<No SJ>_<Nama Gudang>.jpg` — upload banyak file: sufiks ` (2)`, ` (3)`, … sebelum ekstensi.
 
 **Kalau upload sukses tapi sheet target kosong:** cek env `GOOGLE_SHEET_ID` di Vercel — jika masih ID lama `1XDSWH-...`, data masuk spreadsheet **salah**. Gunakan `1o2No4lV_...` atau hapus variable itu (default kode + deploy terbaru mengabaikan ID legacy). Setelah submit, portal supplier menampilkan link **Buka spreadsheet hasil OCR**.
 

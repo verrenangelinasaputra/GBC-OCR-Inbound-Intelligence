@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildGoogleSheetRows,
+  buildSuratJalanDriveSubfolderName,
   buildSuratJalanFileName,
   nextOcrDataRowNumber,
   OCR_SHEET_HEADERS,
@@ -16,6 +17,44 @@ describe("buildSuratJalanFileName", () => {
         ext: ".jpeg",
       })
     ).toBe("Surat Jalan_21-09-2026_SG071351.jpeg");
+  });
+
+  it("formats supplier portal Drive name with gudang", () => {
+    expect(
+      buildSuratJalanFileName({
+        tanggal: "09/11/2026",
+        noSuratJalan: "SJ00123",
+        ext: ".jpg",
+        supplierName: "PT Maju Jaya",
+        gudang: "Gudang Karanggan",
+      })
+    ).toBe("SJ_20261109_PT Maju Jaya_SJ00123_Gudang Karanggan.jpg");
+  });
+
+  it("appends batch index when multiple images in one submit", () => {
+    expect(
+      buildSuratJalanFileName({
+        tanggal: "09/11/2026",
+        noSuratJalan: "SJ00123",
+        ext: ".jpg",
+        supplierName: "PT Maju Jaya",
+        gudang: "Gudang Pusat",
+        batchIndex: 2,
+        batchTotal: 3,
+      })
+    ).toBe("SJ_20261109_PT Maju Jaya_SJ00123_Gudang Pusat (2).jpg");
+  });
+});
+
+describe("buildSuratJalanDriveSubfolderName", () => {
+  it("uses ISO date and SJ number", () => {
+    expect(
+      buildSuratJalanDriveSubfolderName({
+        tanggal: "17/10/2023",
+        noSuratJalan: "SG072236",
+        supplierName: "PT Maju Jaya",
+      })
+    ).toBe("2023-10-17 - SG072236 - PT Maju Jaya");
   });
 });
 

@@ -63,9 +63,10 @@ export async function uploadFileToDrive(params: {
   buffer: Buffer;
   fileName: string;
   mimeType: string;
+  folderId?: string;
 }): Promise<{ fileId: string; fileUrl: string }> {
   const payload = {
-    folderId: params.config.driveFolderId,
+    folderId: params.folderId?.trim() || params.config.driveFolderId,
     buffer: params.buffer,
     fileName: params.fileName,
     mimeType: params.mimeType,
@@ -231,6 +232,109 @@ export function parseDriveFileId(fileUrl: string): string | null {
   return m?.[1] ?? null;
 }
 
+async function createDriveAuthForWrite(config: GoogleExportConfig) {
+  if (preferOAuthDriveUpload()) {
+    const oauth = createDriveOAuthClient();
+    if (oauth) return oauth;
+  }
+  const jwt = createGoogleAuthClient(config);
+  try {
+    await jwt.authorize();
+    return jwt;
+  } catch {
+    const oauth = createDriveOAuthClient();
+    if (oauth) return oauth;
+    return jwt;
+  }
+}
+
+async function listChildren(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  drive: any,
+  parentId: string,
+  mimeTypeFilter?: "folder" | "file"
+): Promise<Array<{ id: string; name: string; mimeType: string }>> {
+  const items: Array<{ id: string; name: string; mimeType: string }> = [];
+  let pageToken: string | undefined;
+  do {
+    const res = await drive.files.list({
+      q: `'${parentId}' in parents and trashed = false`,
+      fields: "nextPageToken,files(id,name,mimeType)",
+      pageSize: 200,
+      pageToken,
+      supportsAllDrives: true,
+      includeItemsFromAllDrives: true,
+    });
+    for (const f of res.data.files ?? []) {
+      if (!f.id || !f.name) continue;
+      const mime = f.mimeType || "";
+      if (mimeTypeFilter === "folder" && mime !== "application/vnd.google-apps.folder") continue;
+      if (mimeTypeFilter === "file" && mime === "application/vnd.google-apps.folder") continue;
+      items.push({ id: f.id, name: f.name, mimeType: mime });
+    }
+    pageToken = res.data.nextPageToken ?? undefined;
+  } while (pageToken);
+  return items;
+}
+
+export async function findOrCreateDriveFolder(params: {
+  config: GoogleExportConfig;
+  parentId: string;
+  folderName: string;
+}): Promise<string> {
+  const name = params.folderName.trim();
+  if (!name) throw new Error("Nama folder Drive kosong");
+
+  const auth = await createDriveAuthForWrite(params.config);
+  const drive = google.drive({ version: "v3", auth });
+
+  const children = await listChildren(drive, params.parentId, "folder");
+  const existing = children.find((c) => c.name === name);
+  if (existing) return existing.id;
+
+  const res = await drive.files.create({
+    requestBody: {
+      name,
+      mimeType: "application/vnd.google-apps.folder",
+      parents: [params.parentId],
+    },
+    fields: "id",
+    supportsAllDrives: true,
+    enforceSingleParent: true,
+  });
+  const id = res.data.id;
+  if (!id) throw new Error(`Gagal membuat folder Drive: ${name}`);
+  return id;
+}
+
+/** `…/Gudang X/[tanggal] - no - supplier/` lalu unggah file di dalamnya. */
+export async function uploadSuratJalanToGudangDrive(params: {
+  config: GoogleExportConfig;
+  buffer: Buffer;
+  fileName: string;
+  mimeType: string;
+  gudang: string;
+  subfolderName: string;
+}): Promise<{ fileId: string; fileUrl: string }> {
+  const gudangFolderId = await findOrCreateDriveFolder({
+    config: params.config,
+    parentId: params.config.driveFolderId,
+    folderName: params.gudang.trim(),
+  });
+  const batchFolderId = await findOrCreateDriveFolder({
+    config: params.config,
+    parentId: gudangFolderId,
+    folderName: params.subfolderName.trim(),
+  });
+  return uploadFileToDrive({
+    config: params.config,
+    buffer: params.buffer,
+    fileName: params.fileName,
+    mimeType: params.mimeType,
+    folderId: batchFolderId,
+  });
+}
+
 async function createDriveAuthForRead(config: GoogleExportConfig) {
   if (preferOAuthDriveUpload()) {
     const oauth = createDriveOAuthClient();
@@ -247,10 +351,6 @@ async function createDriveAuthForRead(config: GoogleExportConfig) {
   }
 }
 
-function escapeDriveQueryLiteral(value: string): string {
-  return value.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
-}
-
 export async function findDriveFileInFolder(params: {
   config: GoogleExportConfig;
   fileName: string;
@@ -259,17 +359,27 @@ export async function findDriveFileInFolder(params: {
   if (!name) return null;
   const auth = await createDriveAuthForRead(params.config);
   const drive = google.drive({ version: "v3", auth });
-  const q = `'${params.config.driveFolderId}' in parents and name = '${escapeDriveQueryLiteral(name)}' and trashed = false`;
-  const res = await drive.files.list({
-    q,
-    fields: "files(id,mimeType)",
-    pageSize: 5,
-    supportsAllDrives: true,
-    includeItemsFromAllDrives: true,
-  });
-  const file = res.data.files?.[0];
-  if (!file?.id) return null;
-  return { fileId: file.id, mimeType: file.mimeType || "image/jpeg" };
+  const root = params.config.driveFolderId;
+  const queue = [root];
+  const seen = new Set<string>();
+
+  while (queue.length > 0) {
+    const folderId = queue.shift()!;
+    if (seen.has(folderId)) continue;
+    seen.add(folderId);
+
+    const children = await listChildren(drive, folderId);
+    for (const child of children) {
+      if (child.mimeType === "application/vnd.google-apps.folder") {
+        queue.push(child.id);
+        continue;
+      }
+      if (child.name === name) {
+        return { fileId: child.id, mimeType: child.mimeType || "image/jpeg" };
+      }
+    }
+  }
+  return null;
 }
 
 export async function downloadDriveFile(params: {

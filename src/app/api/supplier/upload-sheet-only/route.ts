@@ -2,6 +2,7 @@ import { jsonError } from "@/lib/api/auth-context";
 import { getSession } from "@/lib/auth/session";
 import { isSheetOnlyMode } from "@/lib/config/app-mode";
 import { SUPPLIER_GUDANG_OPTIONS, SUPPLIER_MAX_SJ_FILES } from "@/lib/config/supplier-gudang";
+import { resolveSupplierCompanyName } from "@/lib/supplier-auth/resolve-company";
 import { processSheetOnlyUpload } from "@/lib/services/sheet-only-upload";
 
 const ALLOWED = new Set(["image/jpeg", "image/jpg", "image/png"]);
@@ -20,6 +21,8 @@ export async function POST(request: Request) {
   if (!session?.roles.includes("SUPPLIER_USER") && !session?.roles.includes("SUPER_ADMIN")) {
     return jsonError(new Error("UNAUTHORIZED"), 401);
   }
+
+  const supplierName = await resolveSupplierCompanyName(session.username);
 
   try {
     const form = await request.formData();
@@ -58,6 +61,9 @@ export async function POST(request: Request) {
         notes: notes || undefined,
         vehicleInfo: vehicleInfo || undefined,
         gudang,
+        supplierName,
+        batchIndex: i + 1,
+        batchTotal: files.length,
       });
       uploads.push(result);
       if (result.driveWarning) driveWarnings.push(result.driveWarning);

@@ -57,15 +57,74 @@ function lineStatus(item: GeminiSJItem): "OK" | "CEK" {
   return "OK";
 }
 
+function tanggalToYyyyMmDd(tanggal: string | undefined | null): string {
+  const slash = formatDateDdMmYyyy(tanggal ?? "");
+  const m = slash.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (m) return `${m[3]}${m[2]}${m[1]}`;
+  const iso = String(tanggal ?? "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[1]}${iso[2]}${iso[3]}`;
+  return "";
+}
+
+function tanggalToIsoDate(tanggal: string | undefined | null): string {
+  const ymd = tanggalToYyyyMmDd(tanggal);
+  if (ymd.length === 8) {
+    return `${ymd.slice(0, 4)}-${ymd.slice(4, 6)}-${ymd.slice(6, 8)}`;
+  }
+  return "unknown-date";
+}
+
+function sanitizeDriveFileSegment(value: string): string {
+  return value
+    .trim()
+    .replace(/[\\/:*?"<>|]/g, " ")
+    .replace(/\s+/g, " ")
+    .slice(0, 120);
+}
+
+function sanitizeSuratJalanToken(value: string): string {
+  const cleaned = value.trim().replace(/[^\w\-]+/g, "_").replace(/_+/g, "_");
+  return cleaned || "UNKNOWN";
+}
+
+/** Subfolder di Drive: `2026-11-09 - SG072236 - PT Maju Jaya` */
+export function buildSuratJalanDriveSubfolderName(params: {
+  tanggal: string;
+  noSuratJalan: string;
+  supplierName: string;
+}): string {
+  const dateLabel = tanggalToIsoDate(params.tanggal);
+  const noSj = (params.noSuratJalan || "UNKNOWN").trim().toUpperCase();
+  const supplier = sanitizeDriveFileSegment(params.supplierName || "Supplier");
+  return `${dateLabel} - ${noSj} - ${supplier}`;
+}
+
 export function buildSuratJalanFileName(params: {
   tanggal: string;
   noSuratJalan: string;
   ext: string;
+  supplierName?: string;
+  gudang?: string;
+  /** Urutan gambar dalam satu submit (1-based). Dipakai bila `batchTotal` > 1. */
+  batchIndex?: number;
+  batchTotal?: number;
 }): string {
-  const datePart = formatDateDdMmYyyy(params.tanggal).replace(/\//g, "-") || "unknown-date";
-  const no = (params.noSuratJalan || "UNKNOWN").replace(/[^\w\-]+/g, "_");
   const ext = params.ext.startsWith(".") ? params.ext : `.${params.ext}`;
-  return `Surat Jalan_${datePart}_${no}${ext}`;
+  const noSj = sanitizeSuratJalanToken(params.noSuratJalan || "UNKNOWN");
+  const batchTotal = params.batchTotal ?? 1;
+  const batchIndex = params.batchIndex ?? 1;
+  const batchSuffix =
+    batchTotal > 1 && batchIndex >= 1 ? ` (${batchIndex})` : "";
+
+  if (params.supplierName?.trim() && params.gudang?.trim()) {
+    const datePart = tanggalToYyyyMmDd(params.tanggal) || "unknown";
+    const supplier = sanitizeDriveFileSegment(params.supplierName);
+    const gudang = sanitizeDriveFileSegment(params.gudang);
+    return `SJ_${datePart}_${supplier}_${noSj}_${gudang}${batchSuffix}${ext}`;
+  }
+
+  const datePart = formatDateDdMmYyyy(params.tanggal).replace(/\//g, "-") || "unknown-date";
+  return `Surat Jalan_${datePart}_${noSj}${batchSuffix}${ext}`;
 }
 
 /** Satu baris sheet = satu item (kolom sesuai template GBC). */
