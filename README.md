@@ -195,9 +195,9 @@ Tanpa migrate + seed, login `admin` / password seed akan gagal (user belum ada d
 Cocok untuk **pilot upload Surat Jalan di Vercel** tanpa PostgreSQL:
 
 - **Bisa:** `/supplier/register` → kode email dari **nomarcengkareng@gmail.com** → login username + password → upload → OCR Gemini → spreadsheet operasional + Drive.
-- Semua kredensial (supplier + warehouse) di satu spreadsheet: [GBC Credentials](https://docs.google.com/spreadsheets/d/1CNmLX2Qca-9GxDJTh77W8VaVaDAcMchqj7tzeeYEyZw/edit) (`CREDENTIALS_SHEET_ID`).
-- Tab **Users** + **AuthCodes** → register/login supplier. Tab **Sheet1** (`INTERNAL_SHEET_TAB`) + **WarehouseAuthCodes** → register/login Warehouse Intelligence (`/register`, `/login`).
-- Tab dibuat otomatis saat pertama kali dipakai; cek akses: `npm run credentials:peek`.
+- **Warehouse** (`/login`, `/register`): [Warehouse Credentials](https://docs.google.com/spreadsheets/d/1CNmLX2Qca-9GxDJTh77W8VaVaDAcMchqj7tzeeYEyZw/edit) — tab **Users** + **AuthCodes** (sama pola supplier).
+- **Supplier** (`/supplier/*`): [Supplier Credentials](https://docs.google.com/spreadsheets/d/156m4HFAUnqubtCJumBJZ9BCCel_kNVcU_ZV9kHi4HtY/edit) — tab **Users** + **AuthCodes** (`SUPPLIER_SHEET_ID`).
+- Inisialisasi tab warehouse: `npm run credentials:init-warehouse` · cek akses: `npm run credentials:peek`.
 - **Upload SJ:** hanya menambah baris ke tab data OCR (ringan). Tab **Summary / monitoring** diperbarui dengan `npm run sheet:monitoring` — jangan set `GOOGLE_SHEET_MONITORING_ON_UPLOAD=true` di production (memicu error kuota Sheets).
 - Buat user `admin` sekali: `npm run internal:setup` (butuh service account + share Editor ke sheet).
 - Menu PP / invoice / dll. tetap butuh Supabase jika ingin data live di app; dashboard mode spreadsheet menampilkan angka 0 + petunjuk.
@@ -219,9 +219,10 @@ Env **Vercel** (Production):
 | `GOOGLE_DRIVE_FOLDER_ID` | `1_eQPA9BXJj1RjLgfyCPnlgZEsJdpjHnA` (default di kode jika dikosongkan) |
 | `GOOGLE_SHEET_ID` | `1o2No4lV_r1Hrfi3qiyKI0ZX-VUaQaZdcxCbo4qJ1LDc` |
 | `GOOGLE_SHEET_TAB` | `Sheet1` |
-| `CREDENTIALS_SHEET_ID` | `1CNmLX2Qca-9GxDJTh77W8VaVaDAcMchqj7tzeeYEyZw` (default; bisa override per `SUPPLIER_SHEET_ID` / `INTERNAL_SHEET_ID`) |
-| `INTERNAL_SHEET_TAB` | `Sheet1` — akun warehouse internal |
-| `INTERNAL_AUTH_CODES_TAB` | `WarehouseAuthCodes` |
+| `CREDENTIALS_SHEET_ID` | `1CNmLX2Qca-9GxDJTh77W8VaVaDAcMchqj7tzeeYEyZw` (warehouse) |
+| `SUPPLIER_SHEET_ID` | `156m4HFAUnqubtCJumBJZ9BCCel_kNVcU_ZV9kHi4HtY` (supplier — terpisah) |
+| `INTERNAL_SHEET_TAB` | `Users` |
+| `INTERNAL_AUTH_CODES_TAB` | `AuthCodes` |
 | `SUPPLIER_USERS_TAB` | `Users` |
 | `SUPPLIER_AUTH_CODES_TAB` | `AuthCodes` |
 | `SMTP_HOST` | `smtp.gmail.com` |
@@ -235,13 +236,14 @@ Env **Vercel** (Production):
 
 Urutan setup (jangan dilewati):
 
-1. Spreadsheet [Credentials](https://docs.google.com/spreadsheets/d/1CNmLX2Qca-9GxDJTh77W8VaVaDAcMchqj7tzeeYEyZw/edit) → **Share** → **Restricted** (bukan publik).
-2. Share sebagai **Editor** ke email `client_email` di JSON service account (bukan ke email pribadi saja).
-3. Di Google Account **nomarcengkareng@gmail.com**: aktifkan 2-Step Verification → **App passwords** → buat password untuk Mail → tempel ke `SMTP_PASS` (bukan password login Gmail).
-4. Isi env di atas, **Redeploy**.
-5. Supplier buka `/supplier/register`, isi perusahaan, kontak, username, email, telepon, dan password. Kode 6 digit masuk ke email mereka, pengirimnya nomarcengkareng@gmail.com.
-6. Setelah verifikasi, baris `ACTIVE` muncul di tab **Users**. Login berikutnya: username + password. Lupa password: `/supplier/forgot-password`.
-7. Untuk menonaktifkan supplier, ubah kolom `status` di tab Users menjadi `DISABLED`. Inbox nomarcengkareng@gmail.com juga menerima pemberitahuan akun baru.
+1. Spreadsheet **warehouse** [1CNmLX…](https://docs.google.com/spreadsheets/d/1CNmLX2Qca-9GxDJTh77W8VaVaDAcMchqj7tzeeYEyZw/edit) + **supplier** [156m4HFA…](https://docs.google.com/spreadsheets/d/156m4HFAUnqubtCJumBJZ9BCCel_kNVcU_ZV9kHi4HtY/edit) → **Share** → **Restricted**.
+2. Share keduanya sebagai **Editor** ke email `client_email` service account.
+3. Jalankan `npm run credentials:init-warehouse` sekali (buat tab **Users** / **AuthCodes** di spreadsheet warehouse).
+4. Di Google Account **nomarcengkareng@gmail.com**: aktifkan 2-Step Verification → **App passwords** → buat password untuk Mail → tempel ke `SMTP_PASS` (bukan password login Gmail).
+5. Isi env di atas, **Redeploy**.
+6. Supplier buka `/supplier/register`, isi perusahaan, kontak, username, email, telepon, dan password. Kode 6 digit masuk ke email mereka, pengirimnya nomarcengkareng@gmail.com.
+7. Setelah verifikasi, baris `ACTIVE` muncul di tab **Users**. Login berikutnya: username + password. Lupa password: `/supplier/forgot-password`.
+8. Untuk menonaktifkan supplier, ubah kolom `status` di tab Users menjadi `DISABLED`. Inbox nomarcengkareng@gmail.com juga menerima pemberitahuan akun baru.
 
 Buka: `https://your-app.vercel.app/supplier/login`.
 

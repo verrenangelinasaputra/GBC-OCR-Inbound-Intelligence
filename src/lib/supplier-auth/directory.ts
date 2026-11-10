@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { google } from "googleapis";
 import { loadServiceAccountCredentials } from "@/lib/providers/google-workspace/config";
 import { hashVerificationCode, verificationCodeMatches } from "./code";
-import { getCredentialsSpreadsheetId } from "@/lib/config/credentials-sheet";
+import { getSupplierCredentialsSpreadsheetId } from "@/lib/config/credentials-sheet";
 import { replaceSheetRows, SHEET_QUOTA_USER_MESSAGE, sheetQuotaError } from "@/lib/google-sheets/sheet-values";
 import { isTabSetupCached, markTabSetupCached, tabSetupCacheKey } from "@/lib/google-sheets/tab-setup-cache";
 import { SupplierAuthError } from "./errors";
@@ -64,7 +64,7 @@ function sheetTarget() {
   });
   return {
     sheets: google.sheets({ version: "v4", auth }),
-    sheetId: process.env.SUPPLIER_SHEET_ID?.trim() || getCredentialsSpreadsheetId(),
+    sheetId: getSupplierCredentialsSpreadsheetId(),
   };
 }
 

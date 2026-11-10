@@ -1,11 +1,11 @@
-import { getCredentialsSpreadsheetId } from "./credentials-sheet";
+import { getWarehouseCredentialsSpreadsheetId } from "./credentials-sheet";
 
 export function getInternalSheetId(): string {
-  return process.env.INTERNAL_SHEET_ID?.trim() || getCredentialsSpreadsheetId();
+  return process.env.INTERNAL_SHEET_ID?.trim() || getWarehouseCredentialsSpreadsheetId();
 }
 
 export function getInternalUsersTab(): string {
-  return process.env.INTERNAL_SHEET_TAB?.trim() || "Sheet1";
+  return process.env.INTERNAL_SHEET_TAB?.trim() || "Users";
 }
 
 /** Login admin/internal dari spreadsheet (tanpa Supabase). */

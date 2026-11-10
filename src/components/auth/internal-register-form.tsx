@@ -71,7 +71,7 @@ export function InternalRegisterForm() {
       setError(data.error ?? "Verifikasi gagal");
       return;
     }
-    const tab = data.savedTo?.tab ?? "Sheet1";
+    const tab = data.savedTo?.tab ?? "Users";
     setInfo(
       `${data.message ?? "Berhasil."} Baris akun ada di tab "${tab}" spreadsheet credentials GBC.`
     );
@@ -117,7 +117,7 @@ export function InternalRegisterForm() {
             />
             <p className="text-xs text-slate-500">
               Setelah kode dikirim, cek email lalu verifikasi — baru setelah itu data masuk tab{" "}
-              <strong>Sheet1</strong> di spreadsheet credentials.
+              <strong>Users</strong> di spreadsheet warehouse credentials.
             </p>
             {error && <p className="text-sm text-red-600">{error}</p>}
             <button

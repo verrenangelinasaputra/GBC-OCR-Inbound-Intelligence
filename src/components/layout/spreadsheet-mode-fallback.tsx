@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getGoogleExportConfigOptional } from "@/lib/providers/google-workspace";
-import { getCredentialsSpreadsheetId } from "@/lib/config/credentials-sheet";
+import { getSupplierCredentialsSpreadsheetId, getWarehouseCredentialsSpreadsheetId } from "@/lib/config/credentials-sheet";
 import { getInternalSheetId } from "@/lib/config/internal-sheet";
 import { GBC_OCR_RESULTS_SHEET_URL, GBC_SURAT_JALAN_DRIVE_FOLDER_URL } from "@/lib/config/ocr-export-target";
 
@@ -10,7 +10,7 @@ function sheetUrl(id: string) {
 
 export function SpreadsheetModeFallback({ moduleTitle }: { moduleTitle: string }) {
   const ocr = getGoogleExportConfigOptional();
-  const supplierId = process.env.SUPPLIER_SHEET_ID?.trim() || getCredentialsSpreadsheetId();
+  const supplierId = getSupplierCredentialsSpreadsheetId();
 
   return (
     <div className="max-w-2xl rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-700">

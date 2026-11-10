@@ -20,6 +20,7 @@
     "drive:upload-test": "tsx scripts/test-drive-upload.ts",
     "internal:setup": "tsx scripts/setup-internal-admin.ts",
     "credentials:peek": "tsx scripts/peek-credentials-sheet.ts",
+    "credentials:init-warehouse": "tsx scripts/setup-warehouse-credentials.ts",
     "supplier:master-setup": "tsx scripts/setup-supplier-master.ts"
   },
   "prisma": {

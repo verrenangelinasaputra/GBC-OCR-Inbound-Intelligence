@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { hashPassword } from "@/lib/auth/password";
-import { getCredentialsSpreadsheetId } from "@/lib/config/credentials-sheet";
+import { getWarehouseCredentialsSpreadsheetId } from "@/lib/config/credentials-sheet";
 import { getInternalUsersTab } from "@/lib/config/internal-sheet";
 import { normalizeGudangSelection } from "@/lib/config/supplier-gudang";
 import { generateVerificationCode } from "@/lib/supplier-auth/code";
@@ -136,7 +136,7 @@ export async function verifyInternalRegisterCode(
   return {
     message: "Akun berhasil dibuat. Silakan login di halaman Warehouse Intelligence.",
     savedTo: {
-      spreadsheetId: getCredentialsSpreadsheetId(),
+      spreadsheetId: getWarehouseCredentialsSpreadsheetId(),
       tab: getInternalUsersTab(),
     },
   };
