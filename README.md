@@ -198,6 +198,7 @@ Cocok untuk **pilot upload Surat Jalan di Vercel** tanpa PostgreSQL:
 - Semua kredensial (supplier + warehouse) di satu spreadsheet: [GBC Credentials](https://docs.google.com/spreadsheets/d/1CNmLX2Qca-9GxDJTh77W8VaVaDAcMchqj7tzeeYEyZw/edit) (`CREDENTIALS_SHEET_ID`).
 - Tab **Users** + **AuthCodes** → register/login supplier. Tab **Sheet1** (`INTERNAL_SHEET_TAB`) + **WarehouseAuthCodes** → register/login Warehouse Intelligence (`/register`, `/login`).
 - Tab dibuat otomatis saat pertama kali dipakai; cek akses: `npm run credentials:peek`.
+- **Upload SJ:** hanya menambah baris ke tab data OCR (ringan). Tab **Summary / monitoring** diperbarui dengan `npm run sheet:monitoring` — jangan set `GOOGLE_SHEET_MONITORING_ON_UPLOAD=true` di production (memicu error kuota Sheets).
 - Buat user `admin` sekali: `npm run internal:setup` (butuh service account + share Editor ke sheet).
 - Menu PP / invoice / dll. tetap butuh Supabase jika ingin data live di app; dashboard mode spreadsheet menampilkan angka 0 + petunjuk.
 

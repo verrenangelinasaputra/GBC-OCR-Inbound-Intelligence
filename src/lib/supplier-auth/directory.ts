@@ -3,6 +3,8 @@ import { google } from "googleapis";
 import { loadServiceAccountCredentials } from "@/lib/providers/google-workspace/config";
 import { hashVerificationCode, verificationCodeMatches } from "./code";
 import { getCredentialsSpreadsheetId } from "@/lib/config/credentials-sheet";
+import { replaceSheetRows, SHEET_QUOTA_USER_MESSAGE, sheetQuotaError } from "@/lib/google-sheets/sheet-values";
+import { isTabSetupCached, markTabSetupCached, tabSetupCacheKey } from "@/lib/google-sheets/tab-setup-cache";
 import { SupplierAuthError } from "./errors";
 const USERS_TAB = () => process.env.SUPPLIER_USERS_TAB?.trim() || "Users";
 const CODES_TAB = () => process.env.SUPPLIER_AUTH_CODES_TAB?.trim() || "AuthCodes";
@@ -88,6 +90,9 @@ function timestampJakarta(date = new Date()): string {
 function wrapSheetError(error: unknown): never {
   if (error instanceof SupplierAuthError) throw error;
   const message = error instanceof Error ? error.message : String(error);
+  if (sheetQuotaError(message)) {
+    throw new SupplierAuthError(SHEET_QUOTA_USER_MESSAGE, 429);
+  }
   if (/403|permission|not found|404|requested entity was not found/i.test(message)) {
     throw new SupplierAuthError(
       "Spreadsheet Supplier Credentials tidak bisa diakses. Share sebagai Editor ke email service account, dan ubah akses dari Anyone with the link menjadi Restricted.",
@@ -99,6 +104,8 @@ function wrapSheetError(error: unknown): never {
 
 async function ensureTab(tab: string, headers: readonly string[]): Promise<void> {
   const { sheets, sheetId } = sheetTarget();
+  const cacheKey = tabSetupCacheKey(sheetId, tab, headers[0]);
+  if (isTabSetupCached(cacheKey)) return;
   const meta = await sheets.spreadsheets.get({
     spreadsheetId: sheetId,
     fields: "sheets.properties.title",
@@ -115,7 +122,10 @@ async function ensureTab(tab: string, headers: readonly string[]): Promise<void>
     range: a1(tab, "1:1"),
   });
   const first = String(head.data.values?.[0]?.[0] ?? "").trim().toLowerCase();
-  if (first === headers[0]) return;
+  if (first === headers[0]) {
+    markTabSetupCached(cacheKey);
+    return;
+  }
   if (first) {
     throw new SupplierAuthError(
       `Baris 1 tab ${tab} harus kosong atau header ${headers[0]}.`,
@@ -128,6 +138,7 @@ async function ensureTab(tab: string, headers: readonly string[]): Promise<void>
     valueInputOption: "RAW",
     requestBody: { values: [Array.from(headers)] },
   });
+  markTabSetupCached(cacheKey);
 }
 
 async function readTab(tab: string): Promise<string[][]> {
@@ -139,16 +150,10 @@ async function readTab(tab: string): Promise<string[][]> {
   return (res.data.values ?? []).map((row) => row.map((cell) => String(cell ?? "")));
 }
 
-async function writeTab(tab: string, rows: string[][]): Promise<void> {
+async function writeTab(tab: string, rows: string[][], priorRowCount?: number): Promise<void> {
   const { sheets, sheetId } = sheetTarget();
-  await sheets.spreadsheets.values.clear({ spreadsheetId: sheetId, range: a1(tab, "A:Z") });
   if (rows.length === 0) return;
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: sheetId,
-    range: a1(tab, "A1"),
-    valueInputOption: "RAW",
-    requestBody: { values: rows },
-  });
+  await replaceSheetRows(sheets, sheetId, tab, rows, "Z", priorRowCount);
 }
 
 function accountFromRow(row: string[], rowNumber: number): SupplierAccount {
@@ -310,7 +315,7 @@ export async function saveAuthCode(params: {
       new Date(now).toISOString(),
       params.payload ? JSON.stringify(params.payload) : "",
     ]);
-    await writeTab(CODES_TAB(), kept);
+    await writeTab(CODES_TAB(), kept, rows.length);
   } catch (error) {
     wrapSheetError(error);
   }
@@ -338,7 +343,7 @@ export async function consumeAuthCode(
     if (match < 0) return null;
     const payloadRaw = rows[match]?.[5] ?? "";
     const kept = rows.filter((_, index) => index !== match);
-    await writeTab(CODES_TAB(), kept.length ? kept : [Array.from(CODE_HEADERS)]);
+    await writeTab(CODES_TAB(), kept.length ? kept : [Array.from(CODE_HEADERS)], rows.length);
     if (!payloadRaw) return { supplierName: "", contactName: "", email: "", phone: "", passwordHash: "" };
     return JSON.parse(payloadRaw) as RegisterPayload;
   } catch (error) {

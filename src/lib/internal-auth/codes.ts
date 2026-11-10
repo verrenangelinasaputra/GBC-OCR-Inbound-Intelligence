@@ -1,6 +1,8 @@
 import { google } from "googleapis";
 import { getInternalSheetId } from "@/lib/config/internal-sheet";
 import { loadServiceAccountCredentials } from "@/lib/providers/google-workspace/config";
+import { replaceSheetRows } from "@/lib/google-sheets/sheet-values";
+import { isTabSetupCached, markTabSetupCached, tabSetupCacheKey } from "@/lib/google-sheets/tab-setup-cache";
 import { hashVerificationCode, verificationCodeMatches } from "@/lib/supplier-auth/code";
 import { SupplierAuthError } from "@/lib/supplier-auth/errors";
 
@@ -38,6 +40,8 @@ function a1(tab: string, cells: string): string {
 async function ensureCodesTab(): Promise<void> {
   const { sheets, sheetId } = sheetClient();
   const tab = CODES_TAB();
+  const cacheKey = tabSetupCacheKey(sheetId, tab);
+  if (isTabSetupCached(cacheKey)) return;
   const meta = await sheets.spreadsheets.get({
     spreadsheetId: sheetId,
     fields: "sheets.properties.title",
@@ -60,6 +64,7 @@ async function ensureCodesTab(): Promise<void> {
       requestBody: { values: [Array.from(CODE_HEADERS)] },
     });
   }
+  markTabSetupCached(cacheKey);
 }
 
 async function loadCodeRows(): Promise<string[][]> {
@@ -72,18 +77,10 @@ async function loadCodeRows(): Promise<string[][]> {
   return res.data.values ?? [];
 }
 
-async function writeCodeRows(rows: string[][]): Promise<void> {
+async function writeCodeRows(rows: string[][], priorRowCount?: number): Promise<void> {
   const { sheets, sheetId } = sheetClient();
   const tab = CODES_TAB();
-  await sheets.spreadsheets.values.clear({ spreadsheetId: sheetId, range: a1(tab, "A:F") });
-  if (rows.length) {
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: sheetId,
-      range: a1(tab, "A1"),
-      valueInputOption: "RAW",
-      requestBody: { values: rows },
-    });
-  }
+  await replaceSheetRows(sheets, sheetId, tab, rows, "F", priorRowCount);
 }
 
 export async function assertInternalCodeResendAllowed(username: string): Promise<void> {
@@ -125,7 +122,7 @@ export async function saveInternalAuthCode(params: {
     new Date(now).toISOString(),
     JSON.stringify(params.payload),
   ]);
-  await writeCodeRows(kept);
+  await writeCodeRows(kept, rows.length);
 }
 
 export async function consumeInternalAuthCode(
@@ -149,7 +146,7 @@ export async function consumeInternalAuthCode(
   if (match < 0) return null;
   const payloadRaw = rows[match]?.[5] ?? "";
   const kept = rows.filter((_, idx) => idx !== match);
-  await writeCodeRows(kept.length ? kept : [Array.from(CODE_HEADERS)]);
+  await writeCodeRows(kept.length ? kept : [Array.from(CODE_HEADERS)], rows.length);
   if (!payloadRaw) return null;
   return JSON.parse(payloadRaw) as InternalRegisterPayload;
 }

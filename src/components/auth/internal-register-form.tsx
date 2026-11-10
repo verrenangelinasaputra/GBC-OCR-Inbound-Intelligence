@@ -47,10 +47,11 @@ export function InternalRegisterForm() {
       setError(data.error ?? "Gagal mengirim kode");
       return;
     }
+    const base = data.devHint
+      ? `${data.message} ${data.devHint}`
+      : `${data.message} (${data.maskedEmail ?? email})`;
     setInfo(
-      data.devHint
-        ? `${data.message} ${data.devHint}`
-        : `${data.message} (${data.maskedEmail ?? email})`
+      `${base} Baris akun masuk spreadsheet setelah Anda memasukkan kode verifikasi (langkah berikutnya).`
     );
     setStep("code");
   }
@@ -70,6 +71,11 @@ export function InternalRegisterForm() {
       setError(data.error ?? "Verifikasi gagal");
       return;
     }
+    const tab = data.savedTo?.tab ?? "Sheet1";
+    setInfo(
+      `${data.message ?? "Berhasil."} Baris akun ada di tab "${tab}" spreadsheet credentials GBC.`
+    );
+    await new Promise((r) => setTimeout(r, 2500));
     router.push("/login?registered=1");
     router.refresh();
   }
@@ -109,6 +115,10 @@ export function InternalRegisterForm() {
               type="password"
               autoComplete="new-password"
             />
+            <p className="text-xs text-slate-500">
+              Setelah kode dikirim, cek email lalu verifikasi — baru setelah itu data masuk tab{" "}
+              <strong>Sheet1</strong> di spreadsheet credentials.
+            </p>
             {error && <p className="text-sm text-red-600">{error}</p>}
             <button
               type="submit"

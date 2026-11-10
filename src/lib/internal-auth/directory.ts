@@ -1,5 +1,7 @@
 import { google } from "googleapis";
 import { getInternalSheetId, getInternalUsersTab } from "@/lib/config/internal-sheet";
+import { replaceSheetRows, SHEET_QUOTA_USER_MESSAGE, sheetQuotaError } from "@/lib/google-sheets/sheet-values";
+import { isTabSetupCached, markTabSetupCached, tabSetupCacheKey } from "@/lib/google-sheets/tab-setup-cache";
 import { loadServiceAccountCredentials } from "@/lib/providers/google-workspace/config";
 import { SupplierAuthError } from "@/lib/supplier-auth/errors";
 
@@ -72,6 +74,9 @@ function timestampJakarta(date = new Date()): string {
 function wrapSheetError(error: unknown): never {
   if (error instanceof SupplierAuthError) throw error;
   const message = error instanceof Error ? error.message : String(error);
+  if (sheetQuotaError(message)) {
+    throw new SupplierAuthError(SHEET_QUOTA_USER_MESSAGE, 429);
+  }
   if (/403|permission|not found|404|requested entity was not found/i.test(message)) {
     throw new SupplierAuthError(
       "Spreadsheet internal tidak bisa diakses. Share sebagai Editor ke email service account (Users / akun admin).",
@@ -88,15 +93,69 @@ function parseRoles(raw: string): string[] {
     .filter(Boolean);
 }
 
+function isLegacyInternalHeader(headerRow: string[] | undefined): boolean {
+  const h = (headerRow ?? []).map((c) => String(c ?? "").trim().toLowerCase());
+  return h[0] === "user_id" && h[4] === "password_hash";
+}
+
+function isModernInternalHeader(headerRow: string[] | undefined): boolean {
+  const h = (headerRow ?? []).map((c) => String(c ?? "").trim().toLowerCase());
+  return h[0] === "user_id" && h[4] === "phone";
+}
+
+/** Header lama 9 kolom (password di E) → format baru 11 kolom agar append register tidak salah kolom. */
+async function migrateLegacyInternalUsersTab(): Promise<void> {
+  const { sheets, sheetId, tab } = sheetTarget();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: sheetId,
+    range: a1(tab, "A:Z"),
+  });
+  const rows = res.data.values ?? [];
+  const next: string[][] = [Array.from(INTERNAL_USER_HEADERS)];
+  for (let index = 1; index < rows.length; index += 1) {
+    const r = rows[index] ?? [];
+    const userId = String(r[0] ?? "").trim();
+    if (!userId) continue;
+    next.push([
+      userId,
+      r[1] ?? "",
+      r[2] ?? "",
+      r[3] ?? "",
+      "",
+      "",
+      r[4] ?? "",
+      r[5] ?? "WAREHOUSE_OPERATOR",
+      r[6] ?? "ACTIVE",
+      r[7] ?? "",
+      r[8] ?? "",
+    ]);
+  }
+  await replaceSheetRows(sheets, sheetId, tab, next, "K", rows.length);
+}
+
 async function ensureHeaders(): Promise<void> {
   const { sheets, sheetId, tab } = sheetTarget();
+  const cacheKey = tabSetupCacheKey(sheetId, tab, "users-header");
+  if (isTabSetupCached(cacheKey)) return;
   try {
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
       range: a1(tab, "A1:K1"),
     });
-    const first = String(res.data.values?.[0]?.[0] ?? "").trim().toLowerCase();
-    if (first === "user_id") return;
+    const headerRow = res.data.values?.[0];
+    const first = String(headerRow?.[0] ?? "").trim().toLowerCase();
+    if (first === "user_id") {
+      if (isLegacyInternalHeader(headerRow)) {
+        await migrateLegacyInternalUsersTab();
+      } else if (!isModernInternalHeader(headerRow)) {
+        throw new SupplierAuthError(
+          "Header tab warehouse tidak dikenali. Kosongkan baris 1 atau gunakan format user_id + phone di kolom E.",
+          500
+        );
+      }
+      markTabSetupCached(cacheKey);
+      return;
+    }
     if (first) {
       throw new SupplierAuthError(
         "Baris 1 spreadsheet internal harus kosong atau header user_id.",
@@ -109,6 +168,7 @@ async function ensureHeaders(): Promise<void> {
       valueInputOption: "RAW",
       requestBody: { values: [Array.from(INTERNAL_USER_HEADERS)] },
     });
+    markTabSetupCached(cacheKey);
   } catch (error) {
     wrapSheetError(error);
   }

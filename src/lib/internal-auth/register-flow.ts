@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { hashPassword } from "@/lib/auth/password";
+import { getCredentialsSpreadsheetId } from "@/lib/config/credentials-sheet";
+import { getInternalUsersTab } from "@/lib/config/internal-sheet";
 import { normalizeGudangSelection } from "@/lib/config/supplier-gudang";
 import { generateVerificationCode } from "@/lib/supplier-auth/code";
 import { SupplierAuthError } from "@/lib/supplier-auth/errors";
@@ -92,7 +94,7 @@ export async function sendInternalRegisterCode(body: {
 export async function verifyInternalRegisterCode(
   usernameRaw: string,
   codeRaw: string
-): Promise<{ message: string }> {
+): Promise<{ message: string; savedTo: { spreadsheetId: string; tab: string } }> {
   const username = validateUsername(usernameRaw);
   const code = codeRaw.replace(/\D/g, "");
   if (code.length !== 6) throw new SupplierAuthError("Kode harus 6 digit.");
@@ -131,5 +133,11 @@ export async function verifyInternalRegisterCode(
     /* notifikasi admin opsional */
   }
 
-  return { message: "Akun berhasil dibuat. Silakan login di halaman Warehouse Intelligence." };
+  return {
+    message: "Akun berhasil dibuat. Silakan login di halaman Warehouse Intelligence.",
+    savedTo: {
+      spreadsheetId: getCredentialsSpreadsheetId(),
+      tab: getInternalUsersTab(),
+    },
+  };
 }

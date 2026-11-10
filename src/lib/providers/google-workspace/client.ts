@@ -12,9 +12,13 @@ import {
   ocrSheetFullColumnsRange,
   ocrSheetRowRange,
 } from "./ocr-sheet-columns";
+import { isTabSetupCached, markTabSetupCached, tabSetupCacheKey } from "@/lib/google-sheets/tab-setup-cache";
+import { SHEET_QUOTA_USER_MESSAGE, sheetQuotaError } from "@/lib/google-sheets/sheet-values";
 import { applyOcrSheetFormatting } from "./ocr-sheet-format";
 import { ensureInboundMonitoringWorkbook } from "./inbound-monitoring-layout";
 import { DATA_COMPILATION_TAB_NAME } from "@/lib/config/ocr-export-target";
+
+const resolvedOcrTabBySpreadsheet = new Map<string, string>();
 
 function driveScopes(config: GoogleExportConfig): string[] {
   return [
@@ -139,8 +143,14 @@ async function resolveSheetGridId(
   return sheetId;
 }
 
-/** Sisipkan baris header jika sheet sudah berisi data tanpa header (row 1 langsung ekspor OCR). */
+/**
+ * Pastikan baris header OCR ada. Sengaja ringan untuk upload — tidak rebuild tab Summary/monitoring
+ * (itu `npm run sheet:monitoring` saja; rebuild tiap foto memicu kuota 60 writes/menit).
+ */
 export async function ensureOcrSheetHeaders(config: GoogleExportConfig): Promise<void> {
+  const headerCacheKey = tabSetupCacheKey(config.sheetId, config.sheetTab, "ocr-header-ok");
+  if (isTabSetupCached(headerCacheKey)) return;
+
   const auth = createGoogleAuthClient(config);
   const sheets = google.sheets({ version: "v4", auth });
   const sheetTab = await resolveSheetTabName(config);
@@ -153,9 +163,13 @@ export async function ensureOcrSheetHeaders(config: GoogleExportConfig): Promise
   const first = head.data.values?.[0];
   const headerOk = firstRowIsCurrentOcrHeader(first);
 
+  if (headerOk) {
+    markTabSetupCached(headerCacheKey);
+    return;
+  }
+
   const hasContent = (first ?? []).some((c) => String(c ?? "").trim() !== "");
   if (
-    !headerOk &&
     hasContent &&
     (firstRowLooksLikeOcrData(first) || String(first?.[0] ?? "").trim() === OCR_SHEET_LEGACY_HEADER)
   ) {
@@ -174,24 +188,34 @@ export async function ensureOcrSheetHeaders(config: GoogleExportConfig): Promise
     });
   }
 
-  if (!headerOk) {
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: config.sheetId,
-      range: `${sheetTab}!A1:${OCR_SHEET_RANGE_COL}1`,
-      valueInputOption: "USER_ENTERED",
-      requestBody: { values: [Array.from(OCR_SHEET_HEADERS)] },
-    });
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: config.sheetId,
+    range: `${sheetTab}!A1:${OCR_SHEET_RANGE_COL}1`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [Array.from(OCR_SHEET_HEADERS)] },
+  });
+
+  const formatKey = tabSetupCacheKey(config.sheetId, sheetTab, "ocr-format");
+  if (!isTabSetupCached(formatKey)) {
+    await applyOcrSheetFormatting(sheets, config.sheetId, sheetId);
+    markTabSetupCached(formatKey);
   }
 
-  await applyOcrSheetFormatting(sheets, config.sheetId, sheetId);
-  try {
-    await ensureInboundMonitoringWorkbook(config, sheets);
-  } catch (err) {
-    console.warn("ensureInboundMonitoringWorkbook gagal (tab monitoring mungkin belum diperbarui):", err);
+  markTabSetupCached(headerCacheKey);
+
+  if (process.env.GOOGLE_SHEET_MONITORING_ON_UPLOAD === "true") {
+    try {
+      await ensureInboundMonitoringWorkbook(config, sheets);
+    } catch (err) {
+      console.warn("ensureInboundMonitoringWorkbook:", err);
+    }
   }
 }
 
 export async function resolveSheetTabName(config: GoogleExportConfig): Promise<string> {
+  const cached = resolvedOcrTabBySpreadsheet.get(config.sheetId);
+  if (cached) return cached;
+
   const auth = createGoogleAuthClient(config);
   const sheets = google.sheets({ version: "v4", auth });
   const meta = await sheets.spreadsheets.get({
@@ -199,11 +223,13 @@ export async function resolveSheetTabName(config: GoogleExportConfig): Promise<s
     fields: "sheets.properties.title",
   });
   const titles = meta.data.sheets?.map((s) => s.properties?.title).filter(Boolean) as string[];
-  if (titles.includes(config.sheetTab)) return config.sheetTab;
-  if (titles.includes(DATA_COMPILATION_TAB_NAME)) return DATA_COMPILATION_TAB_NAME;
-  if (titles.includes("Sheet1")) return "Sheet1";
-  if (titles[0]) return titles[0];
-  return config.sheetTab;
+  let tab = config.sheetTab;
+  if (titles.includes(config.sheetTab)) tab = config.sheetTab;
+  else if (titles.includes(DATA_COMPILATION_TAB_NAME)) tab = DATA_COMPILATION_TAB_NAME;
+  else if (titles.includes("Sheet1")) tab = "Sheet1";
+  else if (titles[0]) tab = titles[0];
+  resolvedOcrTabBySpreadsheet.set(config.sheetId, tab);
+  return tab;
 }
 
 export async function appendRowsToSheet(params: {
@@ -226,14 +252,23 @@ export async function appendRowsToSheet(params: {
   const endRow = startRow + params.rows.length - 1;
   const range = ocrSheetRowRange(sheetTab, startRow, endRow);
 
-  const res = await sheets.spreadsheets.values.update({
-    spreadsheetId: params.config.sheetId,
-    range,
-    valueInputOption: "USER_ENTERED",
-    requestBody: { values: params.rows },
-  });
-
-  return { updatedRange: res.data.updatedRange ?? undefined, sheetTab };
+  try {
+    const res = await sheets.spreadsheets.values.update({
+      spreadsheetId: params.config.sheetId,
+      range,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: params.rows },
+    });
+    return { updatedRange: res.data.updatedRange ?? undefined, sheetTab };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (sheetQuotaError(message)) {
+      throw new Error(
+        `${SHEET_QUOTA_USER_MESSAGE} Upload foto hanya perlu 1–2 tulis ke sheet; hindari upload banyak file sekaligus atau tunggu 1 menit. Jalankan \`npm run sheet:monitoring\` terpisah (bukan saat upload).`
+      );
+    }
+    throw err;
+  }
 }
 
 function bufferToStream(buffer: Buffer) {
