@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/layout/app-shell";
+import { WarehouseProfileChip } from "@/components/layout/warehouse-profile-chip";
 import { hasDatabase } from "@/lib/db";
 import { getDashboardMetrics } from "@/lib/services/dashboard-metrics";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -19,6 +20,9 @@ export default async function DashboardPage() {
 
   return (
     <AppShell title="Dashboard">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <WarehouseProfileChip />
+      </div>
       {spreadsheetMode && (
         <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           Mode spreadsheet — login admin dari Google Sheet. Data operasional Surat Jalan ada di spreadsheet

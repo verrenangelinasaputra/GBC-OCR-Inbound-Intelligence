@@ -10,6 +10,10 @@ import {
   type OcrSheetRowFields,
 } from "@/lib/providers/google-workspace/ocr-sheet-columns";
 import {
+  pickDominantReviewStatus,
+  normalizeOcrReviewStatus,
+} from "@/lib/ocr-review/workflow-status";
+import {
   decodeOcrSheetDocKey,
   firstRowIsOcrHeader,
   sheetRowMatchesDocKey,
@@ -19,6 +23,7 @@ export type OcrSheetLine = OcrSheetRowFields & { sheetRow: number };
 
 export type OcrSheetDocumentDetail = {
   docKey: string;
+  supplier: string;
   gudang: string;
   exportTimestamp: string;
   tanggal: string;
@@ -32,6 +37,8 @@ export type OcrSheetDocumentDetail = {
   kendaraanDriver: string;
   catatan: string;
   lineStatus: string;
+  statusReview: string;
+  linkRevisi: string;
   lines: OcrSheetLine[];
 };
 
@@ -84,8 +91,11 @@ export async function getOcrSheetDocumentDetail(docKey: string): Promise<OcrShee
 
   const head = lines[0];
   const statuses = new Set(lines.map((l) => l.status));
+  const reviewStatuses = lines.map((l) => normalizeOcrReviewStatus(l.statusReview));
+  const dominantReview = pickDominantReviewStatus(reviewStatuses);
   return {
     docKey,
+    supplier: head.supplier,
     gudang: head.gudang,
     exportTimestamp: head.exportTimestamp,
     tanggal: head.tanggal,
@@ -99,6 +109,8 @@ export async function getOcrSheetDocumentDetail(docKey: string): Promise<OcrShee
     kendaraanDriver: head.kendaraanDriver,
     catatan: head.catatan,
     lineStatus: statuses.has("CEK") ? "CEK" : head.status || "OK",
+    statusReview: dominantReview,
+    linkRevisi: head.linkRevisi?.startsWith("http") ? head.linkRevisi : "",
     lines,
   };
 }

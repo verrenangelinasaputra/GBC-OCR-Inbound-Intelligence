@@ -26,7 +26,7 @@ async function main() {
   for (const row of rows) {
     console.log(row.join(" | "));
   }
-  const codesTab = process.env.INTERNAL_AUTH_CODES_TAB?.trim() || "WarehouseAuthCodes";
+  const codesTab = process.env.INTERNAL_AUTH_CODES_TAB?.trim() || "AuthCodes";
   try {
     const codes = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,

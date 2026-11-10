@@ -8,6 +8,7 @@ import {
   type OcrSheetHeaderPatch,
   type OcrSheetLinePatch,
 } from "@/lib/services/ocr-sheet-detail";
+import { markOcrDocumentOpened } from "@/lib/services/ocr-sheet-review";
 
 function sheetReviewEnabled(): boolean {
   return isSheetOnlyMode() || !hasDatabase();
@@ -33,7 +34,9 @@ export async function GET(_request: Request, context: { params: Promise<{ key: s
     await requireOcrSheetView();
     const { key } = await context.params;
     const doc = await getOcrSheetDocumentDetail(key);
-    return Response.json({ doc });
+    await markOcrDocumentOpened(key).catch(() => null);
+    const refreshed = await getOcrSheetDocumentDetail(key);
+    return Response.json({ doc: refreshed });
   } catch (e) {
     return jsonError(e);
   }

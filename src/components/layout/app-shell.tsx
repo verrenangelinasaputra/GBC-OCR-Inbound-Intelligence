@@ -1,4 +1,5 @@
 import { AppSidebar } from "./app-sidebar";
+import { WarehouseProfileChip } from "./warehouse-profile-chip";
 import { getSession } from "@/lib/auth/session";
 import Link from "next/link";
 
@@ -15,7 +16,8 @@ export async function AppShell({ children, title }: { children: React.ReactNode;
             <p className="text-sm text-slate-500">GBC Inbound Intelligence</p>
           </div>
           <div className="flex items-center gap-4 text-sm text-slate-600">
-            <span>{session?.username}</span>
+            <WarehouseProfileChip />
+            <span className="hidden sm:inline">{session?.username}</span>
             <form action="/api/auth/logout" method="post">
               <button type="submit" className="text-blue-600 hover:underline">
                 Logout

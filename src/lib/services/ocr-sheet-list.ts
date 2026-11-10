@@ -1,6 +1,11 @@
 import { google } from "googleapis";
 import { createGoogleAuthClient, resolveSheetTabName } from "@/lib/providers/google-workspace/client";
 import { getGoogleExportConfigOptional } from "@/lib/providers/google-workspace";
+import {
+  normalizeOcrReviewStatus,
+  pickDominantReviewStatus,
+  type OcrReviewStatus,
+} from "@/lib/ocr-review/workflow-status";
 import { mapOcrSheetRow, ocrSheetFullColumnsRange } from "@/lib/providers/google-workspace/ocr-sheet-columns";
 import { encodeOcrSheetDocKey, isMeaningfulOcrDataRow } from "@/lib/services/ocr-sheet-keys";
 
@@ -14,9 +19,15 @@ export type OcrSheetDocument = {
   fileUrl: string;
   lineCount: number;
   lineStatus: string;
+  gudang: string;
+  supplier: string;
+  statusReview: OcrReviewStatus;
 };
 
-export async function listOcrDocumentsFromSheet(limit = 80): Promise<OcrSheetDocument[]> {
+export async function listOcrDocumentsFromSheet(
+  limit = 80,
+  gudangFilter?: string[]
+): Promise<OcrSheetDocument[]> {
   const config = getGoogleExportConfigOptional();
   if (!config) return [];
 
@@ -29,7 +40,10 @@ export async function listOcrDocumentsFromSheet(limit = 80): Promise<OcrSheetDoc
   });
 
   const rows = res.data.values ?? [];
-  const map = new Map<string, OcrSheetDocument & { statuses: Set<string> }>();
+  const map = new Map<
+    string,
+    OcrSheetDocument & { statuses: Set<string>; reviewStatuses: Set<OcrReviewStatus> }
+  >();
 
   for (let i = 1; i < rows.length; i += 1) {
     const row = rows[i] ?? [];
@@ -38,9 +52,11 @@ export async function listOcrDocumentsFromSheet(limit = 80): Promise<OcrSheetDoc
     const key = fields.fileName || `${fields.noSuratJalan}|${fields.tanggal}|${i}`;
     const existing = map.get(key);
     const status = fields.status || "OK";
+    const review = normalizeOcrReviewStatus(fields.statusReview);
     if (existing) {
       existing.lineCount += 1;
       if (status) existing.statuses.add(status);
+      existing.reviewStatuses.add(review);
       continue;
     }
     map.set(key, {
@@ -53,18 +69,27 @@ export async function listOcrDocumentsFromSheet(limit = 80): Promise<OcrSheetDoc
       fileUrl: fields.fileUrl.startsWith("http") ? fields.fileUrl : "",
       lineCount: 1,
       lineStatus: status,
+      gudang: fields.gudang,
+      supplier: fields.supplier,
+      statusReview: review,
       statuses: new Set(status ? [status] : []),
+      reviewStatuses: new Set([review]),
     });
   }
 
   const docs = Array.from(map.values())
-    .map(({ statuses, ...doc }) => ({
+    .map(({ statuses, reviewStatuses, ...doc }) => ({
       ...doc,
       lineStatus: statuses.has("CEK") ? "CEK" : doc.lineStatus,
+      statusReview: pickDominantReviewStatus(reviewStatuses),
       fileUrl: doc.fileUrl.startsWith("http") ? doc.fileUrl : "",
     }))
     .slice(-limit)
     .reverse();
 
+  if (gudangFilter?.length) {
+    const set = new Set(gudangFilter);
+    return docs.filter((d) => !d.gudang || set.has(d.gudang));
+  }
   return docs;
 }

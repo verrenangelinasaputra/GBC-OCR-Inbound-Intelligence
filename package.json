@@ -21,6 +21,8 @@
     "internal:setup": "tsx scripts/setup-internal-admin.ts",
     "credentials:peek": "tsx scripts/peek-credentials-sheet.ts",
     "credentials:init-warehouse": "tsx scripts/setup-warehouse-credentials.ts",
+    "credentials:migrate": "tsx scripts/migrate-warehouse-users.ts",
+    "sheet:review-columns": "tsx scripts/extend-ocr-review-columns.ts",
     "supplier:master-setup": "tsx scripts/setup-supplier-master.ts"
   },
   "prisma": {

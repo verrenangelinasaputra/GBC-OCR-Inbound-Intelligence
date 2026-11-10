@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import type { OcrSheetDocumentDetail, OcrSheetLine } from "@/lib/services/ocr-sheet-detail";
+import { ReviewStatusBadge } from "@/components/ocr-review/review-status-badge";
 import { StatusBadge } from "@/components/ui/status-badge";
 import Link from "next/link";
 
@@ -26,6 +27,7 @@ export function SheetOcrReviewPanel({
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [imageError, setImageError] = useState(false);
+  const [deciding, setDeciding] = useState(false);
 
   const save = useCallback(async () => {
     setSaving(true);
@@ -72,6 +74,42 @@ export function SheetOcrReviewPanel({
     }
   }, [docKey, header, lines]);
 
+  async function decide(decision: "approve" | "reject") {
+    setDeciding(true);
+    setError("");
+    setMessage("");
+    try {
+      if (decision === "reject") {
+        await save();
+      }
+      const res = await fetch(`/api/ocr-sheet/documents/${docKey}/decision`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ decision }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(typeof data.error === "string" ? data.error : "Gagal memproses keputusan");
+        return;
+      }
+      const detailRes = await fetch(`/api/ocr-sheet/documents/${docKey}`);
+      const detailJson = await detailRes.json();
+      if (detailJson.doc) {
+        setDoc(detailJson.doc);
+        setLines(detailJson.doc.lines);
+      }
+      setMessage(
+        decision === "approve"
+          ? "Disetujui — status Terverifikasi & Disetujui."
+          : `Tidak sesuai — gambar [REVISI] di Drive: ${data.revisionUrl ?? ""}`
+      );
+    } catch {
+      setError("Gagal verifikasi — cek koneksi.");
+    } finally {
+      setDeciding(false);
+    }
+  }
+
   function patchLine(sheetRow: number, patch: Partial<OcrSheetLine>) {
     setLines((prev) => prev.map((l) => (l.sheetRow === sheetRow ? { ...l, ...patch } : l)));
   }
@@ -87,6 +125,12 @@ export function SheetOcrReviewPanel({
           label={doc.lineStatus}
           tone={doc.lineStatus === "CEK" ? "warning" : "success"}
         />
+        <ReviewStatusBadge status={doc.statusReview} />
+        {doc.linkRevisi && (
+          <a href={doc.linkRevisi} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline">
+            Lihat [REVISI]
+          </a>
+        )}
         <span className="text-sm text-slate-500">
           {lines.length} baris item · diekspor {doc.exportTimestamp || "—"}
         </span>
@@ -245,11 +289,27 @@ export function SheetOcrReviewPanel({
       <div className="flex flex-wrap gap-3">
         <button
           type="button"
-          disabled={saving}
+          disabled={saving || deciding}
           onClick={() => void save()}
           className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
         >
           {saving ? "Menyimpan…" : "Simpan ke spreadsheet"}
+        </button>
+        <button
+          type="button"
+          disabled={saving || deciding}
+          onClick={() => void decide("approve")}
+          className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+        >
+          {deciding ? "…" : "Setujui (barang sesuai)"}
+        </button>
+        <button
+          type="button"
+          disabled={saving || deciding}
+          onClick={() => void decide("reject")}
+          className="rounded-lg border border-amber-400 bg-amber-50 px-5 py-2 text-sm font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+        >
+          {deciding ? "…" : "Tidak sesuai → [REVISI]"}
         </button>
       </div>
     </div>

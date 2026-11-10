@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import type { SubmissionHistoryRow } from "@/lib/services/ocr-sheet-submissions";
+import { ReviewStatusBadge } from "@/components/ocr-review/review-status-badge";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { downloadSubmissionsWord } from "@/lib/utils/export-submissions-table";
 import { ArrowDownUp, FileDown, Package, Printer, RefreshCw, Search, Truck } from "lucide-react";
@@ -18,7 +19,8 @@ const COLUMNS: { key: SortKey; label: string; className?: string }[] = [
   { key: "noKendaraan", label: "Kendaraan" },
   { key: "namaBarang", label: "Barang" },
   { key: "jumlah", label: "Jumlah" },
-  { key: "status", label: "Status" },
+  { key: "status", label: "Status OCR" },
+  { key: "statusReview", label: "Status gudang" },
 ];
 
 function compareValues(a: string, b: string, dir: SortDir): number {
@@ -346,6 +348,8 @@ export function SupplierSubmissionsHistory({
                           label={r.status || "—"}
                           tone={r.status === "CEK" ? "warning" : "success"}
                         />
+                      ) : col.key === "statusReview" ? (
+                        <ReviewStatusBadge status={r.statusReview} />
                       ) : (
                         String(r[col.key] ?? "—")
                       )}

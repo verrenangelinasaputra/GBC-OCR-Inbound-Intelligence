@@ -1,3 +1,4 @@
+import { DEFAULT_OCR_REVIEW_STATUS, normalizeOcrReviewStatus } from "@/lib/ocr-review/workflow-status";
 import { OCR_SHEET_HEADERS } from "./google-sj-export-rows";
 
 /** Indeks kolom (0-based) — layout v3 (Data Compilation). */
@@ -21,11 +22,13 @@ export const OCR_COL = {
   KENDARAAN_DRIVER: 16,
   CATATAN: 17,
   STATUS: 18,
+  STATUS_REVIEW: 19,
+  LINK_REVISI: 20,
 } as const;
 
 export const OCR_SHEET_COLUMN_COUNT = OCR_SHEET_HEADERS.length;
 
-export const OCR_SHEET_RANGE_COL = "S";
+export const OCR_SHEET_RANGE_COL = "U";
 
 export function ocrSheetRowRange(sheetTab: string, startRow: number, endRow?: number): string {
   const end = endRow ?? startRow;
@@ -75,6 +78,8 @@ export type OcrSheetRowFields = {
   kendaraanDriver: string;
   catatan: string;
   status: string;
+  statusReview: string;
+  linkRevisi: string;
 };
 
 export function mapOcrSheetRow(row: string[] | undefined): OcrSheetRowFields {
@@ -100,6 +105,8 @@ export function mapOcrSheetRow(row: string[] | undefined): OcrSheetRowFields {
       kendaraanDriver: "",
       catatan: "",
       status: String(r[14] ?? "").trim() || "OK",
+      statusReview: DEFAULT_OCR_REVIEW_STATUS,
+      linkRevisi: "",
     };
   }
   if (isLegacyOcrGudangOnlyRow(r)) {
@@ -123,6 +130,8 @@ export function mapOcrSheetRow(row: string[] | undefined): OcrSheetRowFields {
       kendaraanDriver: String(r[15] ?? ""),
       catatan: String(r[16] ?? ""),
       status: String(r[17] ?? "").trim() || "OK",
+      statusReview: DEFAULT_OCR_REVIEW_STATUS,
+      linkRevisi: "",
     };
   }
   return {
@@ -145,6 +154,8 @@ export function mapOcrSheetRow(row: string[] | undefined): OcrSheetRowFields {
     kendaraanDriver: String(r[OCR_COL.KENDARAAN_DRIVER] ?? ""),
     catatan: String(r[OCR_COL.CATATAN] ?? ""),
     status: String(r[OCR_COL.STATUS] ?? "").trim() || "OK",
+    statusReview: normalizeOcrReviewStatus(r[OCR_COL.STATUS_REVIEW]),
+    linkRevisi: String(r[OCR_COL.LINK_REVISI] ?? "").trim(),
   };
 }
 
@@ -169,5 +180,7 @@ export function ocrSheetRowToValues(fields: OcrSheetRowFields): string[] {
     fields.kendaraanDriver,
     fields.catatan,
     fields.status,
+    fields.statusReview,
+    fields.linkRevisi,
   ];
 }

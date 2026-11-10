@@ -1,6 +1,8 @@
 import { ModuleListPage } from "@/components/layout/module-list-page";
 import { SpreadsheetModePage, spreadsheetModeActive } from "@/components/layout/spreadsheet-mode-page";
-import { SheetExportTable } from "@/components/surat-jalan/sheet-export-table";
+import { OcrReviewQueueTable } from "@/components/ocr-review/ocr-review-queue-table";
+import { getSession } from "@/lib/auth/session";
+import { getInternalUserProfile } from "@/lib/internal-auth/profile";
 import { prisma } from "@/lib/db";
 import { listOcrDocumentsFromSheet } from "@/lib/services/ocr-sheet-list";
 import Link from "next/link";
@@ -10,18 +12,19 @@ export default async function OcrReviewPage() {
   if (spreadsheetModeActive()) {
     let docs: Awaited<ReturnType<typeof listOcrDocumentsFromSheet>> = [];
     try {
-      const all = await listOcrDocumentsFromSheet();
-      docs = all.filter((d) => d.lineStatus === "CEK");
-      if (docs.length === 0) docs = all;
+      const session = await getSession();
+      const profile = session ? await getInternalUserProfile(session.username) : null;
+      const gudangFilter = profile?.gudangList.length ? profile.gudangList : undefined;
+      docs = await listOcrDocumentsFromSheet(120, gudangFilter);
     } catch {
-      return <SpreadsheetModePage title="OCR Review Queue" />;
+      return <SpreadsheetModePage title="Tinjauan Surat Jalan" />;
     }
     return (
       <ModuleListPage
-        title="OCR Review Queue"
-        description="Mode spreadsheet — baris status CEK dari sheet export OCR (atau semua jika tidak ada CEK)."
+        title="Tinjauan Surat Jalan"
+        description="Daftar upload supplier — filter sesuai gudang di profil Anda. Buka detail untuk meninjau dan verifikasi."
       >
-        <SheetExportTable docs={docs} />
+        <OcrReviewQueueTable docs={docs} />
       </ModuleListPage>
     );
   }

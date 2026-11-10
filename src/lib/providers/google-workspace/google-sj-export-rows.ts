@@ -1,4 +1,5 @@
 import type { GeminiSJItem, GeminiSJPayload } from "@/lib/providers/ocr/gemini-surat-jalan";
+import { DEFAULT_OCR_REVIEW_STATUS } from "@/lib/ocr-review/workflow-status";
 
 /** Kolom A–R — selaras `buildGoogleSheetRows`, `ocr-sheet-columns`, dan review. */
 export const OCR_SHEET_HEADERS = [
@@ -21,6 +22,8 @@ export const OCR_SHEET_HEADERS = [
   "Kendaraan / Driver",
   "Catatan",
   "Status",
+  "Status Review",
+  "Link Revisi",
 ] as const;
 
 export const OCR_SHEET_LEGACY_HEADER = "Tanggal Ekspor";
@@ -200,6 +203,8 @@ export function buildGoogleSheetRows(params: {
         kendaraanDriver,
         catatan,
         "CEK",
+        DEFAULT_OCR_REVIEW_STATUS,
+        "",
       ],
     ];
   }
@@ -229,6 +234,8 @@ export function buildGoogleSheetRows(params: {
       kendaraanDriver,
       catatan,
       lineStatus(item),
+      DEFAULT_OCR_REVIEW_STATUS,
+      "",
     ];
   });
 }
