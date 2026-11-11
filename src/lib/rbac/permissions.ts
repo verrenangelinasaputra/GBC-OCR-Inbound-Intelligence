@@ -47,6 +47,10 @@ const ROLE_MATRIX: Record<RoleCode, PermissionKey[]> = {
   ],
   WAREHOUSE_OPERATOR: [
     "dashboard:VIEW",
+    "surat_jalan:VIEW",
+    "ocr_review:VIEW",
+    "ocr_review:EDIT",
+    "ocr_review:SUBMIT",
     "purchase_orders:VIEW",
     "goods_receiving:VIEW",
     "goods_receiving:CREATE",

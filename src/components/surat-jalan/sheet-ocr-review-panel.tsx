@@ -26,7 +26,7 @@ export function SheetOcrReviewPanel({
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [imageError, setImageError] = useState(false);
+  const [imageError, setImageError] = useState("");
   const [deciding, setDeciding] = useState(false);
 
   const save = useCallback(async () => {
@@ -118,6 +118,32 @@ export function SheetOcrReviewPanel({
   const isPdf = (doc.fileName || "").toLowerCase().endsWith(".pdf");
   const canShowMedia = (doc.fileUrl || doc.fileName) && !imageError;
 
+  const reportImageLoadError = useCallback(async () => {
+    try {
+      const res = await fetch(imageSrc, { credentials: "include" });
+      if (res.status === 401) {
+        setImageError("Sesi login habis — login ulang lalu buka halaman ini lagi.");
+        return;
+      }
+      if (res.status === 403) {
+        setImageError(
+          "Akun tidak punya akses ocr_review — ubah kolom roles di spreadsheet Users (mis. DBM_OPERATOR) atau minta admin."
+        );
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      const apiMsg = typeof data.error === "string" ? data.error : "";
+      setImageError(
+        apiMsg ||
+          "Foto tidak bisa dimuat — cek folder Drive dibagikan ke service account / OAuth, atau isi kolom Link Drive di spreadsheet."
+      );
+    } catch {
+      setImageError(
+        "Foto tidak bisa dimuat — cek koneksi atau akses Drive/OAuth di server (Vercel env)."
+      );
+    }
+  }, [imageSrc]);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
@@ -160,7 +186,7 @@ export function SheetOcrReviewPanel({
                   src={imageSrc}
                   alt={doc.fileName || "Surat Jalan"}
                   className="mt-3 max-h-[70vh] w-full rounded-lg border border-slate-200 bg-slate-100 object-contain"
-                  onError={() => setImageError(true)}
+                  onError={() => void reportImageLoadError()}
                 />
               )}
               {doc.fileUrl && (
@@ -176,9 +202,8 @@ export function SheetOcrReviewPanel({
             </>
           ) : (
             <p className="mt-3 text-sm text-amber-800">
-              {imageError
-                ? "Foto tidak bisa dimuat — cek folder Drive dibagikan ke service account / OAuth, atau isi kolom Link Drive di spreadsheet."
-                : "Belum ada nama file di sheet — upload ulang atau isi kolom Nama File."}
+              {imageError ||
+                "Belum ada nama file di sheet — upload ulang atau isi kolom Nama File."}
             </p>
           )}
         </section>
