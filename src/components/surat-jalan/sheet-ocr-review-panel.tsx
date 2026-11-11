@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { OcrSheetDocumentDetail, OcrSheetLine } from "@/lib/services/ocr-sheet-detail";
 import { ReviewStatusBadge } from "@/components/ocr-review/review-status-badge";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -40,6 +40,15 @@ export function SheetOcrReviewPanel({
       alamat: updated.alamat,
     });
   }, []);
+
+  useEffect(() => {
+    void fetch(`/api/ocr-sheet/documents/${docKey}`)
+      .then((r) => r.json())
+      .then((data: { doc?: OcrSheetDocumentDetail }) => {
+        if (data.doc) syncStateFromDoc(data.doc);
+      })
+      .catch(() => null);
+  }, [docKey, syncStateFromDoc]);
 
   async function decide(decision: "approve" | "reject") {
     setDeciding(true);

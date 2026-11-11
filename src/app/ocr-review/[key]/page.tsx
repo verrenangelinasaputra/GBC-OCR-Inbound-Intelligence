@@ -2,6 +2,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { SpreadsheetModePage, spreadsheetModeActive } from "@/components/layout/spreadsheet-mode-page";
 import { SheetOcrReviewPanel } from "@/components/surat-jalan/sheet-ocr-review-panel";
 import { getOcrSheetDocumentDetail } from "@/lib/services/ocr-sheet-detail";
+import { markOcrDocumentOpened } from "@/lib/services/ocr-sheet-review";
 import Link from "next/link";
 
 export default async function OcrReviewSheetDetailPage({
@@ -24,6 +25,7 @@ export default async function OcrReviewSheetDetailPage({
 
   const { key } = await params;
   try {
+    await markOcrDocumentOpened(key).catch(() => null);
     const doc = await getOcrSheetDocumentDetail(key);
     return (
       <AppShell title={`OCR Review — ${doc.noSuratJalan || doc.fileName || "Surat Jalan"}`}>

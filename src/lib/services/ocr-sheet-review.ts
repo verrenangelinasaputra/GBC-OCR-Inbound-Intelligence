@@ -64,9 +64,7 @@ export async function markOcrDocumentOpened(docKey: string): Promise<void> {
   for (let i = 1; i < rows.length; i += 1) {
     const row = rows[i] ?? [];
     if (!sheetRowMatchesDocKey(row, rawKey)) continue;
-    const st = normalizeOcrReviewStatus(String(row[19] ?? ""));
-    if (st === DEFAULT_OCR_REVIEW_STATUS) needs = true;
-    break;
+    if (mapOcrSheetRow(row).statusReview === DEFAULT_OCR_REVIEW_STATUS) needs = true;
   }
   if (needs) await setOcrDocumentReviewStatus({ docKey, status: "SUDAH_DITINJAU" });
 }
