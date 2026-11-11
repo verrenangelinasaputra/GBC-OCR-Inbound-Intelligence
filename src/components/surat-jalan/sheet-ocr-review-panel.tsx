@@ -23,21 +23,34 @@ export function SheetOcrReviewPanel({
     alamat: initial.alamat,
   });
   const [lines, setLines] = useState<OcrSheetLine[]>(initial.lines);
-  const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [imageError, setImageError] = useState("");
   const [deciding, setDeciding] = useState(false);
 
-  const save = useCallback(async () => {
-    setSaving(true);
+  const syncStateFromDoc = useCallback((updated: OcrSheetDocumentDetail) => {
+    setDoc(updated);
+    setLines(updated.lines);
+    setHeader({
+      tanggal: updated.tanggal,
+      noSuratJalan: updated.noSuratJalan,
+      noKendaraan: updated.noKendaraan,
+      noPo: updated.noPo,
+      namaPenerima: updated.namaPenerima,
+      alamat: updated.alamat,
+    });
+  }, []);
+
+  async function decide(decision: "approve" | "reject") {
+    setDeciding(true);
     setError("");
     setMessage("");
     try {
-      const res = await fetch(`/api/ocr-sheet/documents/${docKey}`, {
-        method: "PATCH",
+      const res = await fetch(`/api/ocr-sheet/documents/${docKey}/decision`, {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          decision,
           header,
           lines: lines.map((l) => ({
             sheetRow: l.sheetRow,
@@ -52,56 +65,18 @@ export function SheetOcrReviewPanel({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(typeof data.error === "string" ? data.error : "Gagal menyimpan");
-        return;
-      }
-      const updated = data.doc as OcrSheetDocumentDetail;
-      setDoc(updated);
-      setLines(updated.lines);
-      setHeader({
-        tanggal: updated.tanggal,
-        noSuratJalan: updated.noSuratJalan,
-        noKendaraan: updated.noKendaraan,
-        noPo: updated.noPo,
-        namaPenerima: updated.namaPenerima,
-        alamat: updated.alamat,
-      });
-      setMessage("Tersimpan — spreadsheet diperbarui.");
-    } catch {
-      setError("Gagal menyimpan — cek koneksi.");
-    } finally {
-      setSaving(false);
-    }
-  }, [docKey, header, lines]);
-
-  async function decide(decision: "approve" | "reject") {
-    setDeciding(true);
-    setError("");
-    setMessage("");
-    try {
-      if (decision === "reject") {
-        await save();
-      }
-      const res = await fetch(`/api/ocr-sheet/documents/${docKey}/decision`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ decision }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
         setError(typeof data.error === "string" ? data.error : "Gagal memproses keputusan");
         return;
       }
       const detailRes = await fetch(`/api/ocr-sheet/documents/${docKey}`);
       const detailJson = await detailRes.json();
       if (detailJson.doc) {
-        setDoc(detailJson.doc);
-        setLines(detailJson.doc.lines);
+        syncStateFromDoc(detailJson.doc);
       }
       setMessage(
         decision === "approve"
-          ? "Disetujui — status Terverifikasi & Disetujui."
-          : `Tidak sesuai — gambar [REVISI] di Drive: ${data.revisionUrl ?? ""}`
+          ? "Disetujui — data tersimpan di spreadsheet, status Terverifikasi & Disetujui."
+          : `Tidak sesuai — data + gambar [REVISI] tersimpan. ${data.revisionUrl ?? ""}`
       );
     } catch {
       setError("Gagal verifikasi — cek koneksi.");
@@ -237,7 +212,9 @@ export function SheetOcrReviewPanel({
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
         <div className="border-b border-slate-100 px-4 py-3">
           <h2 className="font-medium">Baris item (per baris di spreadsheet)</h2>
-          <p className="text-xs text-slate-500">Edit lalu Simpan — setiap baris = satu produk di sheet.</p>
+          <p className="text-xs text-slate-500">
+            Edit lalu pilih Setujui atau Tidak sesuai — perubahan otomatis tersimpan ke spreadsheet.
+          </p>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
@@ -314,27 +291,19 @@ export function SheetOcrReviewPanel({
       <div className="flex flex-wrap gap-3">
         <button
           type="button"
-          disabled={saving || deciding}
-          onClick={() => void save()}
-          className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-        >
-          {saving ? "Menyimpan…" : "Simpan ke spreadsheet"}
-        </button>
-        <button
-          type="button"
-          disabled={saving || deciding}
+          disabled={deciding}
           onClick={() => void decide("approve")}
           className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
         >
-          {deciding ? "…" : "Setujui (barang sesuai)"}
+          {deciding ? "Menyimpan & memproses…" : "Setujui (barang sesuai)"}
         </button>
         <button
           type="button"
-          disabled={saving || deciding}
+          disabled={deciding}
           onClick={() => void decide("reject")}
           className="rounded-lg border border-amber-400 bg-amber-50 px-5 py-2 text-sm font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
         >
-          {deciding ? "…" : "Tidak sesuai → [REVISI]"}
+          {deciding ? "Menyimpan & memproses…" : "Tidak sesuai → [REVISI]"}
         </button>
       </div>
     </div>

@@ -7,7 +7,12 @@ import {
   buildSuratJalanDriveSubfolderName,
   uploadSuratJalanToGudangDrive,
 } from "@/lib/providers/google-workspace";
-import { getOcrSheetDocumentDetail } from "@/lib/services/ocr-sheet-detail";
+import {
+  getOcrSheetDocumentDetail,
+  saveOcrSheetDocumentEdits,
+  type OcrSheetHeaderPatch,
+  type OcrSheetLinePatch,
+} from "@/lib/services/ocr-sheet-detail";
 import { setOcrDocumentReviewStatus } from "@/lib/services/ocr-sheet-review";
 import { renderSuratJalanRevisionPng, revisionFileName } from "@/lib/surat-jalan/revision-image";
 
@@ -28,6 +33,10 @@ export async function POST(request: Request, context: { params: Promise<{ key: s
     if (decision !== "approve" && decision !== "reject") {
       return jsonError(new Error("decision harus approve atau reject"), 400);
     }
+
+    const header = body.header as OcrSheetHeaderPatch | undefined;
+    const lines = Array.isArray(body.lines) ? (body.lines as OcrSheetLinePatch[]) : undefined;
+    await saveOcrSheetDocumentEdits({ docKey: key, header, lines });
 
     const doc = await getOcrSheetDocumentDetail(key);
     const config = getGoogleExportConfigOptional();
