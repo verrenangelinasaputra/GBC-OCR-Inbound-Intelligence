@@ -89,13 +89,13 @@ export async function POST(request: Request, context: { params: Promise<{ key: s
 
     await setOcrDocumentReviewStatus({
       docKey: key,
-      status: "TIDAK_SESUAI_KONFIRMASI",
+      status: "MENUNGGU_REVISI_SUPPLIER",
       linkRevisi: mergedLinks,
     });
 
     return Response.json({
       ok: true,
-      status: "TIDAK_SESUAI_KONFIRMASI",
+      status: "MENUNGGU_REVISI_SUPPLIER",
       revisionUrl: uploaded.fileUrl,
       revisionSequence: nextSeq,
       revisionLinks: parseRevisionLinks(mergedLinks),

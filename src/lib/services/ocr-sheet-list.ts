@@ -25,9 +25,10 @@ export type OcrSheetDocument = {
 };
 
 export async function listOcrDocumentsFromSheet(
-  limit = 80,
+  limit?: number,
   gudangFilter?: string[]
 ): Promise<OcrSheetDocument[]> {
+  const maxRows = limit && limit > 0 ? limit : undefined;
   const config = getGoogleExportConfigOptional();
   if (!config) return [];
 
@@ -77,15 +78,14 @@ export async function listOcrDocumentsFromSheet(
     });
   }
 
-  const docs = Array.from(map.values())
-    .map(({ statuses, reviewStatuses, ...doc }) => ({
-      ...doc,
-      lineStatus: statuses.has("CEK") ? "CEK" : doc.lineStatus,
-      statusReview: pickDominantReviewStatus(reviewStatuses),
-      fileUrl: doc.fileUrl.startsWith("http") ? doc.fileUrl : "",
-    }))
-    .slice(-limit)
-    .reverse();
+  let docs = Array.from(map.values()).map(({ statuses, reviewStatuses, ...doc }) => ({
+    ...doc,
+    lineStatus: statuses.has("CEK") ? "CEK" : doc.lineStatus,
+    statusReview: pickDominantReviewStatus(reviewStatuses),
+    fileUrl: doc.fileUrl.startsWith("http") ? doc.fileUrl : "",
+  }));
+  docs = docs.reverse();
+  if (maxRows) docs = docs.slice(0, maxRows);
 
   if (gudangFilter?.length) {
     const set = new Set(gudangFilter);

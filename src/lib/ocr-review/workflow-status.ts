@@ -2,9 +2,23 @@ export const OCR_REVIEW_STATUS = [
   "BELUM_DITINJAU",
   "SUDAH_DITINJAU",
   "TERVERIFIKASI_DISETUJUI",
+  "MEMERLUKAN_REVISI",
+  "MENUNGGU_REVISI_SUPPLIER",
   "TIDAK_SESUAI_KONFIRMASI",
   "SELESAI",
 ] as const;
+
+/** Status untuk kartu dashboard & filter OCR Review (6 bucket). */
+export const OCR_REVIEW_DASHBOARD_BUCKETS = [
+  "BELUM_DITINJAU",
+  "SUDAH_DITINJAU",
+  "TERVERIFIKASI_DISETUJUI",
+  "MEMERLUKAN_REVISI",
+  "MENUNGGU_REVISI_SUPPLIER",
+  "SELESAI",
+] as const;
+
+export type OcrReviewDashboardBucket = (typeof OCR_REVIEW_DASHBOARD_BUCKETS)[number];
 
 export type OcrReviewStatus = (typeof OCR_REVIEW_STATUS)[number];
 
@@ -14,7 +28,9 @@ const LABELS: Record<OcrReviewStatus, string> = {
   BELUM_DITINJAU: "Belum Ditinjau",
   SUDAH_DITINJAU: "Sudah Ditinjau",
   TERVERIFIKASI_DISETUJUI: "Terverifikasi & Disetujui",
-  TIDAK_SESUAI_KONFIRMASI: "Tidak Sesuai, memerlukan Konfirmasi",
+  MEMERLUKAN_REVISI: "Memerlukan Revisi",
+  MENUNGGU_REVISI_SUPPLIER: "Menunggu Revisi Supplier",
+  TIDAK_SESUAI_KONFIRMASI: "Menunggu Revisi Supplier",
   SELESAI: "Selesai",
 };
 
@@ -24,8 +40,17 @@ const TONES: Record<OcrReviewStatus, ReviewStatusTone> = {
   BELUM_DITINJAU: "neutral",
   SUDAH_DITINJAU: "info",
   TERVERIFIKASI_DISETUJUI: "success",
+  MEMERLUKAN_REVISI: "danger",
+  MENUNGGU_REVISI_SUPPLIER: "warning",
   TIDAK_SESUAI_KONFIRMASI: "warning",
   SELESAI: "success",
+};
+
+const STATUS_ALIASES: Record<string, OcrReviewStatus> = {
+  TIDAK_SESUAI: "MENUNGGU_REVISI_SUPPLIER",
+  TIDAK_SESUAI_KONFIRMASI: "MENUNGGU_REVISI_SUPPLIER",
+  MENUNGGU_REVISI: "MENUNGGU_REVISI_SUPPLIER",
+  MEMERLUKAN_KONFIRMASI: "MENUNGGU_REVISI_SUPPLIER",
 };
 
 export function normalizeOcrReviewStatus(raw: string | undefined | null): OcrReviewStatus {
@@ -33,6 +58,7 @@ export function normalizeOcrReviewStatus(raw: string | undefined | null): OcrRev
     .trim()
     .toUpperCase()
     .replace(/\s+/g, "_");
+  if (STATUS_ALIASES[key]) return STATUS_ALIASES[key];
   if (OCR_REVIEW_STATUS.includes(key as OcrReviewStatus)) {
     return key as OcrReviewStatus;
   }
@@ -41,7 +67,15 @@ export function normalizeOcrReviewStatus(raw: string | undefined | null): OcrRev
 }
 
 export function ocrReviewStatusLabel(status: OcrReviewStatus): string {
-  return LABELS[status];
+  return LABELS[normalizeOcrReviewStatus(status)];
+}
+
+export function ocrReviewDashboardBucketLabel(bucket: OcrReviewDashboardBucket): string {
+  return LABELS[bucket];
+}
+
+export function ocrReviewDashboardBucketTone(bucket: OcrReviewDashboardBucket): ReviewStatusTone {
+  return TONES[bucket];
 }
 
 export function ocrReviewStatusTone(status: OcrReviewStatus): ReviewStatusTone {
@@ -52,9 +86,11 @@ export function ocrReviewStatusTone(status: OcrReviewStatus): ReviewStatusTone {
 const RANK: Record<OcrReviewStatus, number> = {
   BELUM_DITINJAU: 0,
   SUDAH_DITINJAU: 1,
-  TIDAK_SESUAI_KONFIRMASI: 2,
-  TERVERIFIKASI_DISETUJUI: 3,
-  SELESAI: 4,
+  MEMERLUKAN_REVISI: 2,
+  MENUNGGU_REVISI_SUPPLIER: 3,
+  TIDAK_SESUAI_KONFIRMASI: 3,
+  TERVERIFIKASI_DISETUJUI: 4,
+  SELESAI: 5,
 };
 
 export function pickDominantReviewStatus(statuses: Iterable<OcrReviewStatus>): OcrReviewStatus {

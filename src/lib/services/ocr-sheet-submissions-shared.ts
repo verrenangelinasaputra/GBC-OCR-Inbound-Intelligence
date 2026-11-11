@@ -1,5 +1,5 @@
 import type { OcrSheetRowFields } from "@/lib/providers/google-workspace/ocr-sheet-columns";
-import type { OcrReviewStatus } from "@/lib/ocr-review/workflow-status";
+import { normalizeOcrReviewStatus, type OcrReviewStatus } from "@/lib/ocr-review/workflow-status";
 
 export type SubmissionHistoryRow = OcrSheetRowFields & {
   rowKey: string;
@@ -13,7 +13,12 @@ export function submissionDocRawKey(fields: Pick<OcrSheetRowFields, "fileName" |
 }
 
 export function supplierCanConfirmReceipt(status: OcrReviewStatus): boolean {
-  return status === "TIDAK_SESUAI_KONFIRMASI" || status === "TERVERIFIKASI_DISETUJUI";
+  const s = normalizeOcrReviewStatus(status);
+  return (
+    s === "TERVERIFIKASI_DISETUJUI" ||
+    s === "MENUNGGU_REVISI_SUPPLIER" ||
+    s === "MEMERLUKAN_REVISI"
+  );
 }
 
 export function filterRowsForSupplier(
