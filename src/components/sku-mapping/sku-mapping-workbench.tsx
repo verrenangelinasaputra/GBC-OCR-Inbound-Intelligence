@@ -151,16 +151,22 @@ export function SkuMappingWorkbench({
                   <td className="px-3 py-3 text-xs">{selected?.barcode || "—"}</td>
                   <td className="px-3 py-3 text-xs">{selected?.sumberLembar || "—"}</td>
                   <td className="px-3 py-3">
-                    {canFinalize && selected ? (
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 rounded border-slate-300"
-                        disabled={busyKey === row.line.rowKey}
-                        onChange={(e) => setConfirmKey(e.target.checked ? row.line.rowKey : null)}
-                        checked={confirmKey === row.line.rowKey}
-                      />
+                    {selected ? (
+                      <button
+                        type="button"
+                        title={
+                          canFinalize
+                            ? "Simpan ke Data Barang Masuk"
+                            : "Akun tidak punya izin sku_mapping"
+                        }
+                        disabled={!canFinalize || busyKey === row.line.rowKey || !row.suggestions.length}
+                        onClick={() => setConfirmKey(row.line.rowKey)}
+                        className="whitespace-nowrap rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                      >
+                        {busyKey === row.line.rowKey ? "…" : "Finalisasi"}
+                      </button>
                     ) : (
-                      <span className="text-xs text-slate-400">—</span>
+                      <span className="text-xs text-slate-400">Pilih SKU</span>
                     )}
                   </td>
                   <td className="px-3 py-3 text-right">

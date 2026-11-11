@@ -1,5 +1,5 @@
 import { jsonError, requireApiSession } from "@/lib/api/auth-context";
-import { requirePermission } from "@/lib/rbac/permissions";
+import { hasPermission } from "@/lib/rbac/permissions";
 import { isSheetOnlyMode } from "@/lib/config/app-mode";
 import { hasDatabase } from "@/lib/db";
 import { getInternalUserProfile, userCanAccessGudang } from "@/lib/internal-auth/profile";
@@ -20,7 +20,12 @@ export async function POST(request: Request) {
 
   try {
     const session = await requireApiSession();
-    requirePermission(session.roles, "sku_mapping", "APPROVE");
+    const canApprove =
+      hasPermission(session.roles, "sku_mapping", "APPROVE") ||
+      hasPermission(session.roles, "sku_mapping", "EDIT");
+    if (!canApprove) {
+      return jsonError(new Error("FORBIDDEN"), 403);
+    }
 
     const profile = await getInternalUserProfile(session.username);
     const gudangFilter = profile?.gudangList.length ? profile.gudangList : undefined;
