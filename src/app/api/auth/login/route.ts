@@ -3,8 +3,22 @@ import { verifyPassword } from "@/lib/auth/password";
 import { createSessionToken, setSessionCookie } from "@/lib/auth/session";
 import { isInternalSheetAuthEnabled } from "@/lib/config/internal-sheet";
 import { loginInternalFromSheet } from "@/lib/internal-auth/login";
+import { ASSIGNABLE_NAV_MODULES } from "@/lib/rbac/nav-modules";
+import { NO_MODULE_ACCESS_PATH, usesPerUserModuleAccess } from "@/lib/rbac/permissions";
+import type { AppModule } from "@/lib/rbac/modules";
 import { writeAuditLog } from "@/lib/services/audit";
 import { SupplierAuthError } from "@/lib/supplier-auth/errors";
+
+function internalSheetRedirect(roles: string[], allowedModules: AppModule[]): string {
+  if (roles.includes("SUPPLIER_USER") && !roles.includes("SUPER_ADMIN")) return "/supplier";
+  if (usesPerUserModuleAccess(roles)) {
+    if (!allowedModules.length) return NO_MODULE_ACCESS_PATH;
+    if (allowedModules.includes("dashboard")) return "/dashboard";
+    const first = ASSIGNABLE_NAV_MODULES.find((m) => allowedModules.includes(m.module));
+    return first?.href ?? NO_MODULE_ACCESS_PATH;
+  }
+  return "/dashboard";
+}
 
 export async function POST(request: Request) {
   try {
@@ -23,10 +37,7 @@ export async function POST(request: Request) {
         allowedModules: account.allowedModules,
       });
       await setSessionCookie(token);
-      const redirect =
-        roles.includes("SUPPLIER_USER") && !roles.includes("SUPER_ADMIN")
-          ? "/supplier"
-          : "/dashboard";
+      const redirect = internalSheetRedirect(roles, account.allowedModules);
       return Response.json({ ok: true, redirect, roles, auth: "internal-sheet" });
     }
 

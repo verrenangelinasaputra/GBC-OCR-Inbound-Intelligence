@@ -173,9 +173,7 @@ export function InternalUsersAdmin() {
                   </td>
                   <td className="px-3 py-2 text-xs">{u.gudang || "—"}</td>
                   <td className="px-3 py-2 text-xs text-slate-600">
-                    {u.allowedModules.length
-                      ? `${u.allowedModules.length} halaman`
-                      : "Ikut role (belum diatur)"}
+                    {u.allowedModules.length ? `${u.allowedModules.length} halaman` : "Belum ada halaman"}
                   </td>
                   <td className="px-3 py-2 text-right">
                     <button

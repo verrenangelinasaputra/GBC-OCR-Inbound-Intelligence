@@ -29,6 +29,7 @@ import {
 import { useMemo, useState } from "react";
 import type { AppModule } from "@/lib/rbac/modules";
 import { ASSIGNABLE_NAV_MODULES } from "@/lib/rbac/nav-modules";
+import { usesPerUserModuleAccess } from "@/lib/rbac/permissions";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -65,8 +66,15 @@ export function AppSidebar({
 
   const navItems = useMemo(() => {
     if (isSuperAdmin) return NAV;
+    if (usesPerUserModuleAccess(roles)) {
+      const mods = allowedModules ?? [];
+      return NAV.filter((item) => {
+        const entry = ASSIGNABLE_NAV_MODULES.find((m) => m.href === item.href);
+        if (!entry) return false;
+        return mods.includes(entry.module);
+      });
+    }
     if (allowedModules?.length) {
-      const hrefByModule = new Map(ASSIGNABLE_NAV_MODULES.map((m) => [m.module, m.href]));
       return NAV.filter((item) => {
         const entry = ASSIGNABLE_NAV_MODULES.find((m) => m.href === item.href);
         if (!entry) return true;
@@ -74,7 +82,12 @@ export function AppSidebar({
       });
     }
     return NAV;
-  }, [allowedModules, isSuperAdmin]);
+  }, [allowedModules, isSuperAdmin, roles]);
+
+  const menuAwaitingAdmin =
+    !isSuperAdmin &&
+    usesPerUserModuleAccess(roles) &&
+    navItems.length === 0;
 
   return (
     <aside
@@ -100,6 +113,11 @@ export function AppSidebar({
         </button>
       </div>
       <nav className="flex-1 overflow-y-auto p-2">
+        {menuAwaitingAdmin && !collapsed ? (
+          <p className="rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-3 text-xs leading-relaxed text-amber-100">
+            Tunggu sampai admin verifikasi dan mengaktifkan menu untuk akun Anda.
+          </p>
+        ) : null}
         {navItems.map((item) => {
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
           const Icon = item.icon;

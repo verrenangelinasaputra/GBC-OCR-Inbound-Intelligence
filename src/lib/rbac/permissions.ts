@@ -1,6 +1,19 @@
 import { PermissionAction } from "@prisma/client";
+import { isSheetOnlyMode } from "@/lib/config/app-mode";
 import type { AppModule, RoleCode } from "./modules";
 import { pathnameToModule } from "./nav-modules";
+
+const SHEET_INTERNAL_ROLES: RoleCode[] = ["DBM_OPERATOR", "WAREHOUSE_OPERATOR", "MANAGEMENT_VIEWER"];
+
+/** Halaman aman bila user belum punya modul apa pun (Opsi B). */
+export const NO_MODULE_ACCESS_PATH = "/no-access";
+
+/** Mode spreadsheet: akses halaman hanya dari kolom `allowed_modules`, bukan matriks role. */
+export function usesPerUserModuleAccess(roles: string[]): boolean {
+  if (!isSheetOnlyMode()) return false;
+  if (roles.includes("SUPER_ADMIN")) return false;
+  return roles.some((r) => SHEET_INTERNAL_ROLES.includes(r as RoleCode));
+}
 
 export type PermissionKey = `${AppModule}:${PermissionAction}`;
 
@@ -132,6 +145,9 @@ export function hasPermission(
   allowedModules?: AppModule[] | null
 ): boolean {
   if (roles.includes("SUPER_ADMIN")) return true;
+  if (usesPerUserModuleAccess(roles)) {
+    return (allowedModules ?? []).includes(module);
+  }
   if (allowedModules && allowedModules.length > 0) {
     return allowedModules.includes(module);
   }
@@ -148,6 +164,12 @@ export function canAccessRoute(
   allowedModules: AppModule[] | undefined | null
 ): boolean {
   if (roles.includes("SUPER_ADMIN")) return true;
+  if (
+    pathname === NO_MODULE_ACCESS_PATH ||
+    pathname.startsWith(`${NO_MODULE_ACCESS_PATH}/`)
+  ) {
+    return usesPerUserModuleAccess(roles);
+  }
   const mod = pathnameToModule(pathname);
   if (!mod) return true;
   return hasPermission(roles, mod, "VIEW", allowedModules);

@@ -2,7 +2,6 @@ import { jsonError, requireSuperAdmin } from "@/lib/api/auth-context";
 import { isSheetOnlyMode } from "@/lib/config/app-mode";
 import { hasDatabase } from "@/lib/db";
 import { listInternalUsers, updateInternalUserAdmin } from "@/lib/internal-auth/directory";
-import { DEFAULT_APPROVED_USER_MODULES } from "@/lib/internal-auth/default-modules";
 import type { AppModule } from "@/lib/rbac/modules";
 import { normalizeGudangSelection } from "@/lib/config/supplier-gudang";
 
@@ -60,10 +59,6 @@ export async function PATCH(request: Request) {
     let allowedModules: AppModule[] | undefined;
     if (Array.isArray(body.allowedModules)) {
       allowedModules = body.allowedModules.map((m: unknown) => String(m).trim()) as AppModule[];
-    }
-
-    if (status === "ACTIVE" && (!allowedModules || allowedModules.length === 0)) {
-      allowedModules = [...DEFAULT_APPROVED_USER_MODULES];
     }
 
     const updated = await updateInternalUserAdmin(username, {
