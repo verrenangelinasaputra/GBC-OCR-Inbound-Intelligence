@@ -26,7 +26,9 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import type { AppModule } from "@/lib/rbac/modules";
+import { ASSIGNABLE_NAV_MODULES } from "@/lib/rbac/nav-modules";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -50,9 +52,29 @@ const NAV = [
   { href: "/settings", label: "System Settings", icon: Settings },
 ];
 
-export function AppSidebar() {
+export function AppSidebar({
+  roles,
+  allowedModules,
+}: {
+  roles: string[];
+  allowedModules?: AppModule[];
+}) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const isSuperAdmin = roles.includes("SUPER_ADMIN");
+
+  const navItems = useMemo(() => {
+    if (isSuperAdmin) return NAV;
+    if (allowedModules?.length) {
+      const hrefByModule = new Map(ASSIGNABLE_NAV_MODULES.map((m) => [m.module, m.href]));
+      return NAV.filter((item) => {
+        const entry = ASSIGNABLE_NAV_MODULES.find((m) => m.href === item.href);
+        if (!entry) return true;
+        return allowedModules.includes(entry.module);
+      });
+    }
+    return NAV;
+  }, [allowedModules, isSuperAdmin]);
 
   return (
     <aside
@@ -78,7 +100,7 @@ export function AppSidebar() {
         </button>
       </div>
       <nav className="flex-1 overflow-y-auto p-2">
-        {NAV.map((item) => {
+        {navItems.map((item) => {
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
           const Icon = item.icon;
           return (

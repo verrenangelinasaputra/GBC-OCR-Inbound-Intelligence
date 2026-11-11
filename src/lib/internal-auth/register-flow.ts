@@ -134,7 +134,8 @@ export async function verifyInternalRegisterCode(
   }
 
   return {
-    message: "Akun berhasil dibuat. Silakan login di halaman Warehouse Intelligence.",
+    message:
+      "Pendaftaran berhasil. Akun menunggu persetujuan Super Admin — Anda baru bisa login setelah disetujui.",
     savedTo: {
       spreadsheetId: getWarehouseCredentialsSpreadsheetId(),
       tab: getInternalUsersTab(),

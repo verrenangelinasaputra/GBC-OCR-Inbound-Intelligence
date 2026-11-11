@@ -13,7 +13,15 @@ export async function requireApiSession() {
 
 export async function requireApiPermission(module: AppModule, action: PermissionAction) {
   const session = await requireApiSession();
-  requirePermission(session.roles, module, action);
+  requirePermission(session.roles, module, action, session.allowedModules);
+  return session;
+}
+
+export async function requireSuperAdmin() {
+  const session = await requireApiSession();
+  if (!session.roles.includes("SUPER_ADMIN")) {
+    throw new Error("FORBIDDEN");
+  }
   return session;
 }
 

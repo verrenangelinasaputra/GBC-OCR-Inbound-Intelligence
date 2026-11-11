@@ -14,7 +14,7 @@ export async function GET(_request: Request, context: { params: Promise<{ key: s
   }
   try {
     const session = await requireApiSession();
-    requirePermission(session.roles, "ocr_review", "VIEW");
+    requirePermission(session.roles, "ocr_review", "VIEW", session.allowedModules);
     const { key } = await context.params;
     const { buffer, mimeType } = await getOcrSheetDocumentImage(key);
     const displayMime =

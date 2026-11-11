@@ -14,7 +14,7 @@ export async function GET(request: Request, context: { params: Promise<{ key: st
   }
   try {
     const session = await requireApiSession();
-    requirePermission(session.roles, "ocr_review", "VIEW");
+    requirePermission(session.roles, "ocr_review", "VIEW", session.allowedModules);
     const { key } = await context.params;
     const url = new URL(request.url);
     const index = Number(url.searchParams.get("index") ?? "-1");

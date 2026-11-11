@@ -8,7 +8,10 @@ export async function AppShell({ children, title }: { children: React.ReactNode;
 
   return (
     <div className="flex min-h-screen bg-slate-50">
-      <AppSidebar />
+      <AppSidebar
+        roles={session?.roles ?? []}
+        allowedModules={session?.allowedModules}
+      />
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
           <div>

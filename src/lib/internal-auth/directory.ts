@@ -4,6 +4,8 @@ import { replaceSheetRows, SHEET_QUOTA_USER_MESSAGE, sheetQuotaError } from "@/l
 import { isTabSetupCached, markTabSetupCached, tabSetupCacheKey } from "@/lib/google-sheets/tab-setup-cache";
 import { loadServiceAccountCredentials } from "@/lib/providers/google-workspace/config";
 import { SupplierAuthError } from "@/lib/supplier-auth/errors";
+import type { AppModule } from "@/lib/rbac/modules";
+import { formatAllowedModulesCell, parseAllowedModulesCell } from "@/lib/rbac/nav-modules";
 
 export const INTERNAL_USER_HEADERS = [
   "user_id",
@@ -17,6 +19,7 @@ export const INTERNAL_USER_HEADERS = [
   "status",
   "created_at",
   "last_login_at",
+  "allowed_modules",
 ] as const;
 
 export type InternalAccount = {
@@ -30,6 +33,8 @@ export type InternalAccount = {
   passwordHash: string;
   roles: string[];
   status: string;
+  allowedModules: AppModule[];
+  createdAt: string;
 };
 
 function sheetTarget() {
@@ -128,9 +133,10 @@ async function migrateLegacyInternalUsersTab(): Promise<void> {
       r[6] ?? "ACTIVE",
       r[7] ?? "",
       r[8] ?? "",
+      "",
     ]);
   }
-  await replaceSheetRows(sheets, sheetId, tab, next, "K", rows.length);
+  await replaceSheetRows(sheets, sheetId, tab, next, "L", rows.length);
 }
 
 async function ensureHeaders(): Promise<void> {
@@ -140,7 +146,7 @@ async function ensureHeaders(): Promise<void> {
   try {
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: a1(tab, "A1:K1"),
+      range: a1(tab, "A1:L1"),
     });
     const headerRow = res.data.values?.[0];
     const first = String(headerRow?.[0] ?? "").trim().toLowerCase();
@@ -153,6 +159,14 @@ async function ensureHeaders(): Promise<void> {
           500
         );
       }
+      if (String(headerRow?.[11] ?? "").trim().toLowerCase() !== "allowed_modules") {
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: sheetId,
+          range: a1(tab, "L1"),
+          valueInputOption: "RAW",
+          requestBody: { values: [["allowed_modules"]] },
+        });
+      }
       markTabSetupCached(cacheKey);
       return;
     }
@@ -164,7 +178,7 @@ async function ensureHeaders(): Promise<void> {
     }
     await sheets.spreadsheets.values.update({
       spreadsheetId: sheetId,
-      range: a1(tab, "A1:K1"),
+      range: a1(tab, "A1:L1"),
       valueInputOption: "RAW",
       requestBody: { values: [Array.from(INTERNAL_USER_HEADERS)] },
     });
@@ -189,6 +203,8 @@ function accountFromRow(row: string[], rowNumber: number): InternalAccount {
     status: String(legacy ? row[6] : row[8] ?? "ACTIVE")
       .trim()
       .toUpperCase() || "ACTIVE",
+    allowedModules: legacy ? [] : parseAllowedModulesCell(row[11]),
+    createdAt: legacy ? "" : String(row[9] ?? ""),
   };
 }
 
@@ -199,7 +215,7 @@ export async function findInternalUserByUsername(username: string): Promise<Inte
     await ensureHeaders();
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: a1(tab, "A:K"),
+      range: a1(tab, "A:L"),
     });
     const rows = res.data.values ?? [];
     for (let index = 1; index < rows.length; index += 1) {
@@ -210,6 +226,78 @@ export async function findInternalUserByUsername(username: string): Promise<Inte
   } catch (error) {
     wrapSheetError(error);
   }
+}
+
+export async function listInternalUsers(): Promise<InternalAccount[]> {
+  const { sheets, sheetId, tab } = sheetTarget();
+  try {
+    await ensureHeaders();
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: a1(tab, "A:L"),
+    });
+    const rows = res.data.values ?? [];
+    const accounts: InternalAccount[] = [];
+    for (let index = 1; index < rows.length; index += 1) {
+      const userId = String(rows[index]?.[0] ?? "").trim();
+      if (!userId) continue;
+      accounts.push(accountFromRow(rows[index] ?? [], index + 1));
+    }
+    return accounts;
+  } catch (error) {
+    wrapSheetError(error);
+  }
+}
+
+export type InternalUserAdminPatch = {
+  status?: string;
+  gudang?: string;
+  roles?: string[];
+  allowedModules?: AppModule[];
+};
+
+export async function updateInternalUserAdmin(
+  username: string,
+  patch: InternalUserAdminPatch
+): Promise<InternalAccount> {
+  const account = await findInternalUserByUsername(username);
+  if (!account) throw new SupplierAuthError("User tidak ditemukan.", 404);
+
+  const { sheets, sheetId, tab } = sheetTarget();
+  const status = (patch.status ?? account.status).trim().toUpperCase();
+  const gudang = patch.gudang !== undefined ? patch.gudang : account.gudang;
+  const roles = patch.roles ?? account.roles;
+  const allowedModules = patch.allowedModules ?? account.allowedModules;
+
+  const row = [
+    account.userId,
+    account.fullName,
+    account.username,
+    account.email,
+    account.phone,
+    gudang,
+    account.passwordHash,
+    roles.join(","),
+    status,
+    account.createdAt,
+    "",
+    formatAllowedModulesCell(allowedModules),
+  ];
+
+  try {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: sheetId,
+      range: a1(tab, `A${account.rowNumber}:L${account.rowNumber}`),
+      valueInputOption: "RAW",
+      requestBody: { values: [row] },
+    });
+  } catch (error) {
+    wrapSheetError(error);
+  }
+
+  const updated = await findInternalUserByUsername(username);
+  if (!updated) throw new SupplierAuthError("Gagal membaca user setelah update.", 500);
+  return updated;
 }
 
 export async function markInternalLogin(rowNumber: number): Promise<void> {
@@ -242,7 +330,7 @@ export async function appendInternalUser(row: {
     await ensureHeaders();
     await sheets.spreadsheets.values.append({
       spreadsheetId: sheetId,
-      range: a1(tab, "A:K"),
+      range: a1(tab, "A:L"),
       valueInputOption: "RAW",
       insertDataOption: "INSERT_ROWS",
       requestBody: {
@@ -256,8 +344,9 @@ export async function appendInternalUser(row: {
             row.gudang ?? "",
             row.passwordHash,
             row.roles.join(","),
-            "ACTIVE",
+            "PENDING_APPROVAL",
             now,
+            "",
             "",
           ],
         ],

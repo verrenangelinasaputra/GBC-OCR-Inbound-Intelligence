@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { verifySessionToken, SESSION_COOKIE } from "@/lib/auth/session";
 import { isSheetOnlyMode } from "@/lib/config/app-mode";
+import { canAccessRoute } from "@/lib/rbac/permissions";
 
 const PUBLIC_PATHS = [
   "/login",
@@ -74,6 +75,9 @@ export async function middleware(request: NextRequest) {
 
     if (session) {
       if (isInternalStaff(session.roles)) {
+        if (!canAccessRoute(session.roles, pathname, session.allowedModules)) {
+          return NextResponse.redirect(new URL("/dashboard", request.url));
+        }
         return nextWithPath(request);
       }
       const isSupplierMaster = session.roles.includes("SUPPLIER_MASTER_ADMIN");

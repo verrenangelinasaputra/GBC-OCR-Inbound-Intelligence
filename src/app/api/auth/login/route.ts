@@ -20,6 +20,7 @@ export async function POST(request: Request) {
         username: account.username,
         roles,
         supplierId: null,
+        allowedModules: account.allowedModules,
       });
       await setSessionCookie(token);
       const redirect =

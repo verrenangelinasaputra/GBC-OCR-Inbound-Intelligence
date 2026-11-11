@@ -18,6 +18,7 @@ export async function GET() {
   return Response.json({
     username: session.username,
     roles: session.roles,
+    allowedModules: session.allowedModules ?? [],
     profile,
   });
 }

@@ -9,8 +9,20 @@ export async function loginInternalFromSheet(usernameRaw: string, password: stri
   }
 
   const account = await findInternalUserByUsername(username);
-  if (!account || account.status !== "ACTIVE") {
+  if (!account) {
     throw new SupplierAuthError("Username atau password salah.", 401);
+  }
+  if (account.status === "PENDING_APPROVAL") {
+    throw new SupplierAuthError(
+      "Akun menunggu persetujuan Super Admin. Anda akan bisa login setelah disetujui.",
+      403
+    );
+  }
+  if (account.status === "REJECTED") {
+    throw new SupplierAuthError("Pendaftaran ditolak. Hubungi administrator GBC.", 403);
+  }
+  if (account.status !== "ACTIVE") {
+    throw new SupplierAuthError("Akun tidak aktif. Hubungi administrator GBC.", 403);
   }
 
   const ok = await verifyPassword(password, account.passwordHash);
@@ -26,5 +38,6 @@ export async function loginInternalFromSheet(usernameRaw: string, password: stri
     username: account.username,
     fullName: account.fullName,
     roles,
+    allowedModules: account.allowedModules,
   };
 }

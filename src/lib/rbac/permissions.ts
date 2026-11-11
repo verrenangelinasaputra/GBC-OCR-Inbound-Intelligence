@@ -1,5 +1,6 @@
 import { PermissionAction } from "@prisma/client";
 import type { AppModule, RoleCode } from "./modules";
+import { pathnameToModule } from "./nav-modules";
 
 export type PermissionKey = `${AppModule}:${PermissionAction}`;
 
@@ -124,13 +125,32 @@ function buildAll(): PermissionKey[] {
   return modules.flatMap((m) => actions.map((a) => `${m}:${a}` as PermissionKey));
 }
 
-export function hasPermission(roles: string[], module: AppModule, action: PermissionAction): boolean {
+export function hasPermission(
+  roles: string[],
+  module: AppModule,
+  action: PermissionAction,
+  allowedModules?: AppModule[] | null
+): boolean {
   if (roles.includes("SUPER_ADMIN")) return true;
+  if (allowedModules && allowedModules.length > 0) {
+    return allowedModules.includes(module);
+  }
   for (const role of roles as RoleCode[]) {
     const perms = ROLE_MATRIX[role];
     if (perms?.includes(`${module}:${action}` as PermissionKey)) return true;
   }
   return false;
+}
+
+export function canAccessRoute(
+  roles: string[],
+  pathname: string,
+  allowedModules: AppModule[] | undefined | null
+): boolean {
+  if (roles.includes("SUPER_ADMIN")) return true;
+  const mod = pathnameToModule(pathname);
+  if (!mod) return true;
+  return hasPermission(roles, mod, "VIEW", allowedModules);
 }
 
 export async function loadUserPermissions(userId: string): Promise<{
@@ -158,9 +178,10 @@ export async function loadUserPermissions(userId: string): Promise<{
 export function requirePermission(
   roles: string[],
   module: AppModule,
-  action: PermissionAction
+  action: PermissionAction,
+  allowedModules?: AppModule[] | null
 ): void {
-  if (!hasPermission(roles, module, action)) {
+  if (!hasPermission(roles, module, action, allowedModules)) {
     throw new Error("FORBIDDEN");
   }
 }

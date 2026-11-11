@@ -21,8 +21,8 @@ export async function POST(request: Request) {
   try {
     const session = await requireApiSession();
     const canApprove =
-      hasPermission(session.roles, "sku_mapping", "APPROVE") ||
-      hasPermission(session.roles, "sku_mapping", "EDIT");
+      hasPermission(session.roles, "sku_mapping", "APPROVE", session.allowedModules) ||
+      hasPermission(session.roles, "sku_mapping", "EDIT", session.allowedModules);
     if (!canApprove) {
       return jsonError(new Error("FORBIDDEN"), 403);
     }

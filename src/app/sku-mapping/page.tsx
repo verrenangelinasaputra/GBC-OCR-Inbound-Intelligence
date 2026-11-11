@@ -36,8 +36,8 @@ export default async function SkuMappingPage() {
 
     const session = await getSession();
     const canFinalize = session
-      ? hasPermission(session.roles, "sku_mapping", "APPROVE") ||
-        hasPermission(session.roles, "sku_mapping", "EDIT")
+      ? hasPermission(session.roles, "sku_mapping", "APPROVE", session.allowedModules) ||
+        hasPermission(session.roles, "sku_mapping", "EDIT", session.allowedModules)
       : false;
 
     const lineCount = workbench.length;

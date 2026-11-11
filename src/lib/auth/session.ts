@@ -3,11 +3,15 @@ import { cookies } from "next/headers";
 
 export const SESSION_COOKIE = "gbc_session";
 
+import type { AppModule } from "@/lib/rbac/modules";
+
 export type SessionPayload = {
   userId: string;
   username: string;
   roles: string[];
   supplierId?: string | null;
+  /** Ops B: modul halaman yang boleh diakses (dari sheet `allowed_modules`). */
+  allowedModules?: AppModule[];
 };
 
 function getSecret(): Uint8Array {

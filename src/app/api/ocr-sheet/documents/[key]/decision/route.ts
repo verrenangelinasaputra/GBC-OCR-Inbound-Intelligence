@@ -29,7 +29,7 @@ export async function POST(request: Request, context: { params: Promise<{ key: s
   }
   try {
     const session = await requireApiSession();
-    requirePermission(session.roles, "ocr_review", "EDIT");
+    requirePermission(session.roles, "ocr_review", "EDIT", session.allowedModules);
     const { key } = await context.params;
     const body = await request.json();
     const decision = String(body.decision ?? "").trim().toLowerCase();

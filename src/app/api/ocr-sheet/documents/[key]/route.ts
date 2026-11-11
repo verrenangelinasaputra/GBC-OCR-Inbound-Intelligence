@@ -17,13 +17,13 @@ function sheetReviewEnabled(): boolean {
 
 async function requireOcrSheetEdit() {
   const session = await requireApiSession();
-  requirePermission(session.roles, "ocr_review", "EDIT");
+  requirePermission(session.roles, "ocr_review", "EDIT", session.allowedModules);
   return session;
 }
 
 async function requireOcrSheetView() {
   const session = await requireApiSession();
-  requirePermission(session.roles, "ocr_review", "VIEW");
+  requirePermission(session.roles, "ocr_review", "VIEW", session.allowedModules);
   return session;
 }
 
