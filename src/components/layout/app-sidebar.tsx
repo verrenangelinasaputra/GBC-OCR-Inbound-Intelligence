@@ -3,55 +3,34 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import clsx from "clsx";
+import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard,
-  Truck,
-  FileText,
   ScanLine,
   Link2,
-  ShoppingCart,
-  PackageCheck,
   Package,
-  AlertTriangle,
-  Tags,
-  Receipt,
-  Wallet,
-  Building2,
-  BarChart3,
-  Bell,
-  ScrollText,
   Users,
-  Plug,
-  Settings,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { AppModule } from "@/lib/rbac/modules";
-import { ASSIGNABLE_NAV_MODULES } from "@/lib/rbac/nav-modules";
+import { PORTAL_NAV_MODULES } from "@/lib/rbac/nav-modules";
 import { usesPerUserModuleAccess } from "@/lib/rbac/permissions";
 
-const NAV = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/nkb", label: "Incoming Shipments / NKB", icon: Truck },
-  { href: "/surat-jalan", label: "Surat Jalan Documents", icon: FileText },
-  { href: "/ocr-review", label: "OCR Review Queue", icon: ScanLine },
-  { href: "/sku-mapping", label: "Product SKU Mapping", icon: Link2 },
-  { href: "/data-barang-masuk", label: "Data Barang Masuk", icon: Package },
-  { href: "/purchase-orders", label: "Purchase Orders (PP)", icon: ShoppingCart },
-  { href: "/goods-receiving", label: "Goods Receiving", icon: PackageCheck },
-  { href: "/discrepancies", label: "Discrepancy Management", icon: AlertTriangle },
-  { href: "/master-prices", label: "Master Harga Beli", icon: Tags },
-  { href: "/invoices", label: "Purchase Invoices", icon: Receipt },
-  { href: "/accounts-payable", label: "Accounts Payable", icon: Wallet },
-  { href: "/suppliers", label: "Supplier Management", icon: Building2 },
-  { href: "/reports", label: "Reports & Analytics", icon: BarChart3 },
-  { href: "/notifications", label: "Notifications", icon: Bell },
-  { href: "/audit-logs", label: "Audit Logs", icon: ScrollText },
-  { href: "/users", label: "User & Role Management", icon: Users },
-  { href: "/integrations", label: "Integration Settings", icon: Plug },
-  { href: "/settings", label: "System Settings", icon: Settings },
-];
+const NAV_ICONS: Record<string, LucideIcon> = {
+  "/dashboard": LayoutDashboard,
+  "/ocr-review": ScanLine,
+  "/sku-mapping": Link2,
+  "/data-barang-masuk": Package,
+  "/users": Users,
+};
+
+const NAV = PORTAL_NAV_MODULES.map((m) => ({
+  href: m.href,
+  label: m.label,
+  icon: NAV_ICONS[m.href] ?? LayoutDashboard,
+}));
 
 export function AppSidebar({
   roles,
@@ -69,14 +48,14 @@ export function AppSidebar({
     if (usesPerUserModuleAccess(roles)) {
       const mods = allowedModules ?? [];
       return NAV.filter((item) => {
-        const entry = ASSIGNABLE_NAV_MODULES.find((m) => m.href === item.href);
+        const entry = PORTAL_NAV_MODULES.find((m) => m.href === item.href);
         if (!entry) return false;
         return mods.includes(entry.module);
       });
     }
     if (allowedModules?.length) {
       return NAV.filter((item) => {
-        const entry = ASSIGNABLE_NAV_MODULES.find((m) => m.href === item.href);
+        const entry = PORTAL_NAV_MODULES.find((m) => m.href === item.href);
         if (!entry) return true;
         return allowedModules.includes(entry.module);
       });

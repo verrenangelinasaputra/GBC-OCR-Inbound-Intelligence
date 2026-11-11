@@ -1,7 +1,7 @@
 import { PermissionAction } from "@prisma/client";
 import { isSheetOnlyMode } from "@/lib/config/app-mode";
 import type { AppModule, RoleCode } from "./modules";
-import { pathnameToModule } from "./nav-modules";
+import { isActivePortalModule, pathnameToModule } from "./nav-modules";
 
 const SHEET_INTERNAL_ROLES: RoleCode[] = ["DBM_OPERATOR", "WAREHOUSE_OPERATOR", "MANAGEMENT_VIEWER"];
 
@@ -13,6 +13,18 @@ export function usesPerUserModuleAccess(roles: string[]): boolean {
   if (!isSheetOnlyMode()) return false;
   if (roles.includes("SUPER_ADMIN")) return false;
   return roles.some((r) => SHEET_INTERNAL_ROLES.includes(r as RoleCode));
+}
+
+function isInternalPortalUser(roles: string[]): boolean {
+  if (roles.includes("SUPER_ADMIN")) return true;
+  return roles.some((r) => SHEET_INTERNAL_ROLES.includes(r as RoleCode));
+}
+
+/** Blokir route modul yang sudah tidak dipakai di pilot spreadsheet. */
+export function isRetiredPortalPath(pathname: string): boolean {
+  if (!isSheetOnlyMode()) return false;
+  const mod = pathnameToModule(pathname);
+  return mod !== null && !isActivePortalModule(mod);
 }
 
 export type PermissionKey = `${AppModule}:${PermissionAction}`;
@@ -163,7 +175,6 @@ export function canAccessRoute(
   pathname: string,
   allowedModules: AppModule[] | undefined | null
 ): boolean {
-  if (roles.includes("SUPER_ADMIN")) return true;
   if (
     pathname === NO_MODULE_ACCESS_PATH ||
     pathname.startsWith(`${NO_MODULE_ACCESS_PATH}/`)
@@ -171,6 +182,10 @@ export function canAccessRoute(
     return usesPerUserModuleAccess(roles);
   }
   const mod = pathnameToModule(pathname);
+  if (mod && isSheetOnlyMode() && isInternalPortalUser(roles) && !isActivePortalModule(mod)) {
+    return false;
+  }
+  if (roles.includes("SUPER_ADMIN")) return true;
   if (!mod) return true;
   return hasPermission(roles, mod, "VIEW", allowedModules);
 }

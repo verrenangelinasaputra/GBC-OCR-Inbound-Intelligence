@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { verifySessionToken, SESSION_COOKIE } from "@/lib/auth/session";
 import { isSheetOnlyMode } from "@/lib/config/app-mode";
-import { canAccessRoute, NO_MODULE_ACCESS_PATH } from "@/lib/rbac/permissions";
+import { canAccessRoute, isRetiredPortalPath, NO_MODULE_ACCESS_PATH } from "@/lib/rbac/permissions";
 
 const PUBLIC_PATHS = [
   "/login",
@@ -76,7 +76,8 @@ export async function middleware(request: NextRequest) {
     if (session) {
       if (isInternalStaff(session.roles)) {
         if (!canAccessRoute(session.roles, pathname, session.allowedModules)) {
-          return NextResponse.redirect(new URL(NO_MODULE_ACCESS_PATH, request.url));
+          const fallback = isRetiredPortalPath(pathname) ? "/dashboard" : NO_MODULE_ACCESS_PATH;
+          return NextResponse.redirect(new URL(fallback, request.url));
         }
         return nextWithPath(request);
       }
