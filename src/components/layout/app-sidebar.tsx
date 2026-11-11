@@ -55,7 +55,7 @@ export function AppSidebar() {
   return (
     <aside
       className={clsx(
-        "flex h-screen flex-col border-r border-slate-200 bg-slate-950 text-slate-100 transition-all",
+        "flex min-h-screen shrink-0 flex-col self-stretch border-r border-slate-200 bg-slate-950 text-slate-100 transition-all",
         collapsed ? "w-[72px]" : "w-64"
       )}
     >

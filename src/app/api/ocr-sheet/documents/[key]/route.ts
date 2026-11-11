@@ -7,6 +7,7 @@ import {
   saveOcrSheetDocumentEdits,
   type OcrSheetHeaderPatch,
   type OcrSheetLinePatch,
+  type OcrSheetNewLineInput,
 } from "@/lib/services/ocr-sheet-detail";
 import { markOcrDocumentOpened } from "@/lib/services/ocr-sheet-review";
 
@@ -52,7 +53,17 @@ export async function PATCH(request: Request, context: { params: Promise<{ key: 
     const body = await request.json();
     const header = body.header as OcrSheetHeaderPatch | undefined;
     const lines = Array.isArray(body.lines) ? (body.lines as OcrSheetLinePatch[]) : undefined;
-    const doc = await saveOcrSheetDocumentEdits({ docKey: key, header, lines });
+    const newLines = Array.isArray(body.newLines) ? (body.newLines as OcrSheetNewLineInput[]) : undefined;
+    const deleteSheetRows = Array.isArray(body.deleteSheetRows)
+      ? (body.deleteSheetRows as number[])
+      : undefined;
+    const doc = await saveOcrSheetDocumentEdits({
+      docKey: key,
+      header,
+      lines,
+      newLines,
+      deleteSheetRows,
+    });
     return Response.json({ ok: true, doc });
   } catch (e) {
     return jsonError(e);

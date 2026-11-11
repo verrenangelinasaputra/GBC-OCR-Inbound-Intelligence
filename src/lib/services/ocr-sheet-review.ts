@@ -6,7 +6,12 @@ import {
 } from "@/lib/ocr-review/workflow-status";
 import { createGoogleAuthClient, resolveSheetTabName } from "@/lib/providers/google-workspace/client";
 import { getGoogleExportConfigOptional } from "@/lib/providers/google-workspace";
-import { mapOcrSheetRow, ocrSheetFullColumnsRange, ocrSheetRowToValues } from "@/lib/providers/google-workspace/ocr-sheet-columns";
+import {
+  mapOcrSheetRow,
+  ocrSheetFullColumnsRange,
+  OCR_SHEET_RANGE_COL,
+  ocrSheetRowToValues,
+} from "@/lib/providers/google-workspace/ocr-sheet-columns";
 import {
   decodeOcrSheetDocKey,
   firstRowIsOcrHeader,
@@ -43,7 +48,7 @@ export async function setOcrDocumentReviewStatus(params: {
     fields.statusReview = params.status;
     if (params.linkRevisi !== undefined) fields.linkRevisi = params.linkRevisi;
     updates.push({
-      range: `'${sheetTab.replace(/'/g, "''")}'!A${i + 1}:U${i + 1}`,
+      range: `'${sheetTab.replace(/'/g, "''")}'!A${i + 1}:${OCR_SHEET_RANGE_COL}${i + 1}`,
       values: [ocrSheetRowToValues(fields)],
     });
   }

@@ -1,5 +1,9 @@
 import { google } from "googleapis";
-import { createGoogleAuthClient, resolveSheetTabName } from "@/lib/providers/google-workspace/client";
+import {
+  appendRowsToSheet,
+  createGoogleAuthClient,
+  resolveSheetTabName,
+} from "@/lib/providers/google-workspace/client";
 import { getGoogleExportConfigOptional } from "@/lib/providers/google-workspace";
 import { recomputeOcrSheetLineStatus } from "@/lib/providers/google-workspace/google-sj-export-rows";
 import {
@@ -14,6 +18,7 @@ import {
   normalizeOcrReviewStatus,
 } from "@/lib/ocr-review/workflow-status";
 import { parseRevisionLinks } from "@/lib/surat-jalan/revision-links";
+import { normalizeSampleItemTag, type SampleItemTag } from "@/lib/surat-jalan/sample-item-tag";
 import {
   decodeOcrSheetDocKey,
   firstRowIsOcrHeader,
@@ -41,6 +46,7 @@ export type OcrSheetDocumentDetail = {
   statusReview: string;
   linkRevisi: string;
   revisionLinks: string[];
+  sampleType: SampleItemTag;
   lines: OcrSheetLine[];
 };
 
@@ -68,11 +74,19 @@ async function readSheetMatrix() {
   const auth = createGoogleAuthClient(config);
   const sheets = google.sheets({ version: "v4", auth });
   const sheetTab = await resolveSheetTabName(config);
+  const meta = await sheets.spreadsheets.get({
+    spreadsheetId: config.sheetId,
+    fields: "sheets.properties(sheetId,title)",
+  });
+  const sheetGridId = meta.data.sheets?.find((s) => s.properties?.title === sheetTab)?.properties
+    ?.sheetId;
+  if (sheetGridId == null) throw new Error("Tab spreadsheet tidak ditemukan");
+
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: config.sheetId,
     range: ocrSheetFullColumnsRange(sheetTab),
   });
-  return { config, sheets, sheetTab, rows: res.data.values ?? [] };
+  return { config, sheets, sheetTab, sheetGridId, rows: res.data.values ?? [] };
 }
 
 export async function getOcrSheetDocumentDetail(docKey: string): Promise<OcrSheetDocumentDetail> {
@@ -95,6 +109,11 @@ export async function getOcrSheetDocumentDetail(docKey: string): Promise<OcrShee
   const statuses = new Set(lines.map((l) => l.status));
   const reviewStatuses = lines.map((l) => normalizeOcrReviewStatus(l.statusReview));
   const dominantReview = pickDominantReviewStatus(reviewStatuses);
+  const sampleType = lines.some(
+    (l) => normalizeSampleItemTag(l.sampleType) === "BARANG SAMPLE"
+  )
+    ? "BARANG SAMPLE"
+    : "BUKAN BARANG SAMPLE";
   return {
     docKey,
     supplier: head.supplier,
@@ -114,6 +133,7 @@ export async function getOcrSheetDocumentDetail(docKey: string): Promise<OcrShee
     statusReview: dominantReview,
     linkRevisi: head.linkRevisi?.trim() ?? "",
     revisionLinks: parseRevisionLinks(head.linkRevisi),
+    sampleType,
     lines,
   };
 }
@@ -138,18 +158,60 @@ export type OcrSheetLinePatch = {
   jumlah?: string;
   keterangan?: string;
   status?: string;
+  sampleType?: string;
+};
+
+/** Baris produk baru (belum punya nomor baris sheet). */
+export type OcrSheetNewLineInput = {
+  banyaknya?: string;
+  isi?: string;
+  namaBarang?: string;
+  jumlah?: string;
+  keterangan?: string;
+  status?: string;
+  sampleType?: string;
 };
 
 export async function saveOcrSheetDocumentEdits(params: {
   docKey: string;
   header?: OcrSheetHeaderPatch;
   lines?: OcrSheetLinePatch[];
+  newLines?: OcrSheetNewLineInput[];
+  deleteSheetRows?: number[];
 }): Promise<OcrSheetDocumentDetail> {
   const rawKey = decodeOcrSheetDocKey(params.docKey);
-  const { config, sheets, sheetTab, rows } = await readSheetMatrix();
+  let { config, sheets, sheetTab, sheetGridId, rows } = await readSheetMatrix();
 
   const current = await getOcrSheetDocumentDetail(params.docKey);
-  const lineByRow = new Map(current.lines.map((l) => [l.sheetRow, { ...l }]));
+  const docSheetRows = new Set(current.lines.map((l) => l.sheetRow));
+
+  const deleteRows = [...new Set((params.deleteSheetRows ?? []).filter((n) => n > 1))]
+    .filter((rowNum) => docSheetRows.has(rowNum))
+    .sort((a, b) => b - a);
+  if (deleteRows.length > 0 && current.lines.length - deleteRows.length < 1) {
+    throw new Error("Minimal harus ada satu baris item di Surat Jalan");
+  }
+  if (deleteRows.length > 0) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: config.sheetId,
+      requestBody: {
+        requests: deleteRows.map((rowNum) => ({
+          deleteDimension: {
+            range: {
+              sheetId: sheetGridId,
+              dimension: "ROWS",
+              startIndex: rowNum - 1,
+              endIndex: rowNum,
+            },
+          },
+        })),
+      },
+    });
+    ({ config, sheets, sheetTab, sheetGridId, rows } = await readSheetMatrix());
+  }
+
+  const refreshed = await getOcrSheetDocumentDetail(params.docKey);
+  const lineByRow = new Map(refreshed.lines.map((l) => [l.sheetRow, { ...l }]));
 
   const applyHeader = (line: OcrSheetLine) => {
     if (!params.header) return;
@@ -172,6 +234,9 @@ export async function saveOcrSheetDocumentEdits(params: {
     if (patch.namaBarang !== undefined) line.namaBarang = patch.namaBarang;
     if (patch.jumlah !== undefined) line.jumlah = patch.jumlah;
     if (patch.keterangan !== undefined) line.keterangan = patch.keterangan;
+    if (patch.sampleType !== undefined) {
+      line.sampleType = normalizeSampleItemTag(patch.sampleType);
+    }
     if (patch.status !== undefined) line.status = patch.status.trim().toUpperCase();
     else
       line.status = recomputeOcrSheetLineStatus({
@@ -205,17 +270,50 @@ export async function saveOcrSheetDocumentEdits(params: {
     });
   }
 
-  if (data.length === 0) {
-    throw new Error("Tidak ada baris yang diperbarui");
+  if (data.length > 0) {
+    await sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId: config.sheetId,
+      requestBody: {
+        valueInputOption: "USER_ENTERED",
+        data,
+      },
+    });
   }
 
-  await sheets.spreadsheets.values.batchUpdate({
-    spreadsheetId: config.sheetId,
-    requestBody: {
-      valueInputOption: "USER_ENTERED",
-      data,
-    },
-  });
+  const head = refreshed.lines[0];
+  const newRowsInput = params.newLines ?? [];
+  if (newRowsInput.length > 0 && head) {
+    const values: string[][] = [];
+    for (const input of newRowsInput) {
+      let status = (input.status ?? "OK").trim().toUpperCase();
+      if (status !== "OK" && status !== "CEK") {
+        status = recomputeOcrSheetLineStatus({
+          banyaknya: input.banyaknya ?? "",
+          isi: input.isi ?? "",
+          jumlah: input.jumlah ?? "",
+          namaBarang: input.namaBarang ?? "",
+        });
+      }
+      const draft: OcrSheetLine = {
+        ...head,
+        banyaknya: input.banyaknya ?? "",
+        isi: input.isi ?? "",
+        namaBarang: input.namaBarang ?? "",
+        jumlah: input.jumlah ?? "",
+        keterangan: input.keterangan ?? "",
+        status,
+        sampleType: normalizeSampleItemTag(input.sampleType ?? head.sampleType),
+        sheetRow: 0,
+      };
+      applyHeader(draft);
+      values.push(rowFromLine(draft));
+    }
+    await appendRowsToSheet({ config, rows: values });
+  }
+
+  if (data.length === 0 && newRowsInput.length === 0 && deleteRows.length === 0) {
+    throw new Error("Tidak ada perubahan untuk disimpan");
+  }
 
   return getOcrSheetDocumentDetail(params.docKey);
 }

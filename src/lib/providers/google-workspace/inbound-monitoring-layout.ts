@@ -13,6 +13,7 @@ import {
 
 export const SUMMARY_TAB_NAME = "Summary";
 export const DATA_CALC_TAB_NAME = "_DataCalc";
+export const SAMPLE_ONLY_TAB_NAME = "Sample Only";
 
 export { SUMMARY_REPORT_TABS };
 
@@ -51,7 +52,13 @@ export function resolveDataCompilationTabTitle(titles: string[]): string {
 function gudangFilterFormula(dcTab: string, gudang: string, sep: string): string {
   const safe = gudang.replace(/'/g, "''");
   const dc = quoteTab(dcTab);
-  return `=FILTER(${dc}!$A$2:$S${sep} ${dc}!$A$2:$A="${safe}")`;
+  return `=FILTER(${dc}!$A$2:$V${sep} ${dc}!$A$2:$A="${safe}")`;
+}
+
+/** Baris dengan Tipe Sample = BARANG SAMPLE (kolom V). */
+export function sampleOnlyFilterFormula(dcTab: string, sep: string): string {
+  const dc = quoteTab(dcTab);
+  return `=FILTER(${dc}!$A$2:$V${sep} (${dc}!$V$2:$V="BARANG SAMPLE")*(LEN(${dc}!$D$2:$D)>0))`;
 }
 
 function dataCalcColumnFormulas(dcTab: string, sep: string): string[] {
@@ -218,12 +225,13 @@ export async function ensureInboundMonitoringWorkbook(
   for (const g of SUPPLIER_GUDANG_OPTIONS) {
     await ensureSheet(sheets, spreadsheetId, g, byTitle);
   }
+  await ensureSheet(sheets, spreadsheetId, SAMPLE_ONLY_TAB_NAME, byTitle);
 
   for (const g of SUPPLIER_GUDANG_OPTIONS) {
     const tabName = `'${g.replace(/'/g, "''")}'`;
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `${tabName}!A1:S1`,
+      range: `${tabName}!A1:V1`,
       valueInputOption: "RAW",
       requestBody: { values: [Array.from(OCR_SHEET_HEADERS)] },
     });
@@ -237,6 +245,24 @@ export async function ensureInboundMonitoringWorkbook(
     if (gudangSheetId != null) {
       await applyOcrSheetFormatting(sheets, spreadsheetId, gudangSheetId);
     }
+  }
+
+  const sampleTabName = `'${SAMPLE_ONLY_TAB_NAME.replace(/'/g, "''")}'`;
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${sampleTabName}!A1:V1`,
+    valueInputOption: "RAW",
+    requestBody: { values: [Array.from(OCR_SHEET_HEADERS)] },
+  });
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${sampleTabName}!A2`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [[sampleOnlyFilterFormula(dcTab, sep)]] },
+  });
+  const sampleOnlySheetId = byTitle.get(SAMPLE_ONLY_TAB_NAME);
+  if (sampleOnlySheetId != null) {
+    await applyOcrSheetFormatting(sheets, spreadsheetId, sampleOnlySheetId);
   }
 
   const calcHeaders = [

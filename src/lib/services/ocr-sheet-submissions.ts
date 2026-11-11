@@ -6,9 +6,25 @@ import {
   ocrSheetFullColumnsRange,
   type OcrSheetRowFields,
 } from "@/lib/providers/google-workspace/ocr-sheet-columns";
-import { firstRowIsOcrHeader, isMeaningfulOcrDataRow } from "@/lib/services/ocr-sheet-keys";
+import { encodeOcrSheetDocKey, firstRowIsOcrHeader, isMeaningfulOcrDataRow } from "@/lib/services/ocr-sheet-keys";
+import { parseRevisionLinks } from "@/lib/surat-jalan/revision-links";
+import type { OcrReviewStatus } from "@/lib/ocr-review/workflow-status";
+import { normalizeOcrReviewStatus } from "@/lib/ocr-review/workflow-status";
 
-export type SubmissionHistoryRow = OcrSheetRowFields & { rowKey: string };
+export type SubmissionHistoryRow = OcrSheetRowFields & {
+  rowKey: string;
+  docKey: string;
+  revisionLinks: string[];
+  statusReview: OcrReviewStatus;
+};
+
+export function submissionDocRawKey(fields: Pick<OcrSheetRowFields, "fileName" | "noSuratJalan" | "tanggal">): string {
+  return fields.fileName?.trim() || `${fields.noSuratJalan}|${fields.tanggal}`;
+}
+
+export function supplierCanConfirmReceipt(status: OcrReviewStatus): boolean {
+  return status === "TIDAK_SESUAI_KONFIRMASI" || status === "TERVERIFIKASI_DISETUJUI";
+}
 
 export async function listOcrSheetSubmissionRows(): Promise<SubmissionHistoryRow[]> {
   const config = getGoogleExportConfigOptional();
@@ -37,7 +53,13 @@ export async function listOcrSheetSubmissionRows(): Promise<SubmissionHistoryRow
       fields.jumlah,
       String(i),
     ].join("|");
-    out.push({ ...fields, rowKey });
+    out.push({
+      ...fields,
+      rowKey,
+      docKey: encodeOcrSheetDocKey(submissionDocRawKey(fields)),
+      revisionLinks: parseRevisionLinks(fields.linkRevisi),
+      statusReview: normalizeOcrReviewStatus(fields.statusReview),
+    });
   }
 
   return out.reverse();

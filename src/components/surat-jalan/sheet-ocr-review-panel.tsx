@@ -5,6 +5,12 @@ import type { OcrSheetDocumentDetail, OcrSheetLine } from "@/lib/services/ocr-sh
 import { ReviewStatusBadge } from "@/components/ocr-review/review-status-badge";
 import { StatusBadge } from "@/components/ui/status-badge";
 import Link from "next/link";
+import { Plus, Trash2 } from "lucide-react";
+import {
+  SAMPLE_ITEM_TAG,
+  normalizeSampleItemTag,
+  type SampleItemTag,
+} from "@/lib/surat-jalan/sample-item-tag";
 
 export function SheetOcrReviewPanel({
   docKey,
@@ -30,12 +36,46 @@ export function SheetOcrReviewPanel({
   const [deciding, setDeciding] = useState(false);
   const [photoView, setPhotoView] = useState<"original" | number>("original");
   const [confirmRejectOpen, setConfirmRejectOpen] = useState(false);
+  const [confirmApproveOpen, setConfirmApproveOpen] = useState(false);
+  const [pendingDeleteRows, setPendingDeleteRows] = useState<number[]>([]);
+  const [sampleType, setSampleType] = useState<SampleItemTag>(
+    normalizeSampleItemTag(initial.sampleType)
+  );
 
   const revisionCount = doc.revisionLinks?.length ?? 0;
+
+  const buildSheetLinePayload = useCallback(() => {
+    const persisted = lines.filter((l) => l.sheetRow > 0);
+    const fresh = lines.filter((l) => l.sheetRow <= 0);
+    return {
+      lines: persisted.map((l) => ({
+        sheetRow: l.sheetRow,
+        banyaknya: l.banyaknya,
+        isi: l.isi,
+        namaBarang: l.namaBarang,
+        jumlah: l.jumlah,
+        keterangan: l.keterangan,
+        status: l.status,
+        sampleType,
+      })),
+      newLines: fresh.map((l) => ({
+        banyaknya: l.banyaknya,
+        isi: l.isi,
+        namaBarang: l.namaBarang,
+        jumlah: l.jumlah,
+        keterangan: l.keterangan,
+        status: l.status,
+        sampleType,
+      })),
+      deleteSheetRows: pendingDeleteRows,
+    };
+  }, [lines, pendingDeleteRows, sampleType]);
 
   const syncStateFromDoc = useCallback((updated: OcrSheetDocumentDetail) => {
     setDoc(updated);
     setLines(updated.lines);
+    setPendingDeleteRows([]);
+    setSampleType(normalizeSampleItemTag(updated.sampleType));
     setHeader({
       tanggal: updated.tanggal,
       noSuratJalan: updated.noSuratJalan,
@@ -60,6 +100,7 @@ export function SheetOcrReviewPanel({
     setError("");
     setMessage("");
     setConfirmRejectOpen(false);
+    setConfirmApproveOpen(false);
     try {
       const res = await fetch(`/api/ocr-sheet/documents/${docKey}/decision`, {
         method: "POST",
@@ -67,15 +108,7 @@ export function SheetOcrReviewPanel({
         body: JSON.stringify({
           decision,
           header,
-          lines: lines.map((l) => ({
-            sheetRow: l.sheetRow,
-            banyaknya: l.banyaknya,
-            isi: l.isi,
-            namaBarang: l.namaBarang,
-            jumlah: l.jumlah,
-            keterangan: l.keterangan,
-            status: l.status,
-          })),
+          ...buildSheetLinePayload(),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -111,8 +144,47 @@ export function SheetOcrReviewPanel({
     setConfirmRejectOpen(true);
   }
 
+  function requestApprove() {
+    setConfirmApproveOpen(true);
+  }
+
+  function setDocumentSampleType(tag: SampleItemTag) {
+    setSampleType(tag);
+    setLines((prev) => prev.map((l) => ({ ...l, sampleType: tag })));
+  }
+
   function patchLine(sheetRow: number, patch: Partial<OcrSheetLine>) {
     setLines((prev) => prev.map((l) => (l.sheetRow === sheetRow ? { ...l, ...patch } : l)));
+  }
+
+  function addLineRow() {
+    const base = lines[0];
+    if (!base) return;
+    const tempId = -Math.max(1, ...lines.map((l) => Math.abs(l.sheetRow | 0)), Date.now() % 100000);
+    setLines((prev) => [
+      ...prev,
+      {
+        ...base,
+        sheetRow: tempId,
+        banyaknya: "",
+        isi: "",
+        namaBarang: "",
+        jumlah: "",
+        keterangan: "",
+        status: "OK",
+      },
+    ]);
+  }
+
+  function removeLineRow(sheetRow: number) {
+    if (lines.length <= 1) {
+      setError("Minimal satu baris item harus tetap ada.");
+      return;
+    }
+    if (sheetRow > 0) {
+      setPendingDeleteRows((prev) => (prev.includes(sheetRow) ? prev : [...prev, sheetRow]));
+    }
+    setLines((prev) => prev.filter((l) => l.sheetRow !== sheetRow));
   }
 
   const imageSrc = `/api/ocr-sheet/documents/${docKey}/image`;
@@ -309,10 +381,37 @@ export function SheetOcrReviewPanel({
 
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
         <div className="border-b border-slate-100 px-4 py-3">
-          <h2 className="font-medium">Baris item (per baris di spreadsheet)</h2>
-          <p className="text-xs text-slate-500">
-            Edit lalu pilih Setujui atau Tidak sesuai — perubahan otomatis tersimpan ke spreadsheet.
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="font-medium">Baris item (per baris di spreadsheet)</h2>
+              <p className="text-xs text-slate-500">
+                Edit, tambah, atau hapus baris lalu Setujui / Tidak sesuai — semua tersimpan ke spreadsheet.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                  sampleType === "BARANG SAMPLE"
+                    ? "bg-amber-100 text-amber-900 ring-1 ring-amber-300"
+                    : "bg-slate-100 text-slate-700 ring-1 ring-slate-200"
+                }`}
+              >
+                {sampleType}
+              </span>
+              <select
+                className="rounded-lg border border-slate-200 px-2 py-1 text-xs"
+                value={sampleType}
+                onChange={(e) => setDocumentSampleType(e.target.value as SampleItemTag)}
+                disabled={deciding}
+              >
+                {SAMPLE_ITEM_TAG.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
@@ -325,6 +424,7 @@ export function SheetOcrReviewPanel({
                 <th className="px-3 py-2">Jumlah</th>
                 <th className="px-3 py-2">Keterangan</th>
                 <th className="px-3 py-2">Status</th>
+                <th className="w-12 px-2 py-2" aria-label="Hapus baris" />
               </tr>
             </thead>
             <tbody>
@@ -332,7 +432,9 @@ export function SheetOcrReviewPanel({
                 <tr key={line.sheetRow} className="border-t">
                   <td className="px-3 py-2 text-slate-500">
                     {idx + 1}
-                    <span className="block text-[10px]">baris {line.sheetRow}</span>
+                    <span className="block text-[10px]">
+                      {line.sheetRow > 0 ? `baris ${line.sheetRow}` : "baris baru"}
+                    </span>
                   </td>
                   <td className="px-3 py-2">
                     <input
@@ -379,10 +481,32 @@ export function SheetOcrReviewPanel({
                       <option value="CEK">CEK</option>
                     </select>
                   </td>
+                  <td className="px-2 py-2">
+                    <button
+                      type="button"
+                      title="Hapus baris"
+                      disabled={lines.length <= 1 || deciding}
+                      onClick={() => removeLineRow(line.sheetRow)}
+                      className="rounded p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-30"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+        <div className="border-t border-slate-100 px-4 py-3">
+          <button
+            type="button"
+            onClick={addLineRow}
+            disabled={deciding}
+            className="inline-flex items-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-700 hover:border-blue-400 hover:bg-blue-50 disabled:opacity-50"
+          >
+            <Plus className="h-4 w-4" />
+            Tambah baris item
+          </button>
         </div>
       </section>
 
@@ -390,7 +514,7 @@ export function SheetOcrReviewPanel({
         <button
           type="button"
           disabled={deciding}
-          onClick={() => void submitDecision("approve")}
+          onClick={requestApprove}
           className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
         >
           {deciding ? "Menyimpan & memproses…" : "Setujui (barang sesuai)"}
@@ -404,6 +528,43 @@ export function SheetOcrReviewPanel({
           {deciding ? "Menyimpan & memproses…" : "Tidak sesuai → [REVISI]"}
         </button>
       </div>
+
+      {confirmApproveOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-approve-title"
+        >
+          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-lg">
+            <h3 id="confirm-approve-title" className="text-lg font-medium text-slate-900">
+              Konfirmasi setujui
+            </h3>
+            <p className="mt-2 text-sm text-slate-600">
+              Data form (termasuk tipe <strong>{sampleType}</strong>) akan disimpan dan status menjadi{" "}
+              <strong>Terverifikasi &amp; Disetujui</strong>. Lanjutkan?
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                onClick={() => setConfirmApproveOpen(false)}
+                disabled={deciding}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                onClick={() => void submitDecision("approve")}
+                disabled={deciding}
+              >
+                {deciding ? "Memproses…" : "Ya, setujui"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {confirmRejectOpen && (
         <div

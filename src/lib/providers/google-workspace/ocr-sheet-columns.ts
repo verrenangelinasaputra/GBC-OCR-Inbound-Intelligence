@@ -1,4 +1,9 @@
 import { DEFAULT_OCR_REVIEW_STATUS, normalizeOcrReviewStatus } from "@/lib/ocr-review/workflow-status";
+import {
+  DEFAULT_SAMPLE_ITEM_TAG,
+  inferSampleItemTag,
+  normalizeSampleItemTag,
+} from "@/lib/surat-jalan/sample-item-tag";
 import { OCR_SHEET_HEADERS } from "./google-sj-export-rows";
 
 /** Indeks kolom (0-based) — layout v3 (Data Compilation). */
@@ -24,11 +29,12 @@ export const OCR_COL = {
   STATUS: 18,
   STATUS_REVIEW: 19,
   LINK_REVISI: 20,
+  SAMPLE_TYPE: 21,
 } as const;
 
 export const OCR_SHEET_COLUMN_COUNT = OCR_SHEET_HEADERS.length;
 
-export const OCR_SHEET_RANGE_COL = "U";
+export const OCR_SHEET_RANGE_COL = "V";
 
 export function ocrSheetRowRange(sheetTab: string, startRow: number, endRow?: number): string {
   const end = endRow ?? startRow;
@@ -80,6 +86,7 @@ export type OcrSheetRowFields = {
   status: string;
   statusReview: string;
   linkRevisi: string;
+  sampleType: string;
 };
 
 export function mapOcrSheetRow(row: string[] | undefined): OcrSheetRowFields {
@@ -107,6 +114,7 @@ export function mapOcrSheetRow(row: string[] | undefined): OcrSheetRowFields {
       status: String(r[14] ?? "").trim() || "OK",
       statusReview: DEFAULT_OCR_REVIEW_STATUS,
       linkRevisi: "",
+      sampleType: DEFAULT_SAMPLE_ITEM_TAG,
     };
   }
   if (isLegacyOcrGudangOnlyRow(r)) {
@@ -132,6 +140,7 @@ export function mapOcrSheetRow(row: string[] | undefined): OcrSheetRowFields {
       status: String(r[17] ?? "").trim() || "OK",
       statusReview: DEFAULT_OCR_REVIEW_STATUS,
       linkRevisi: "",
+      sampleType: DEFAULT_SAMPLE_ITEM_TAG,
     };
   }
   return {
@@ -156,6 +165,14 @@ export function mapOcrSheetRow(row: string[] | undefined): OcrSheetRowFields {
     status: String(r[OCR_COL.STATUS] ?? "").trim() || "OK",
     statusReview: normalizeOcrReviewStatus(r[OCR_COL.STATUS_REVIEW]),
     linkRevisi: String(r[OCR_COL.LINK_REVISI] ?? "").trim(),
+    sampleType: normalizeSampleItemTag(
+      String(r[OCR_COL.SAMPLE_TYPE] ?? "").trim() ||
+        inferSampleItemTag(
+          String(r[OCR_COL.KETERANGAN] ?? ""),
+          String(r[OCR_COL.CATATAN] ?? ""),
+          String(r[OCR_COL.NAMA_BARANG] ?? "")
+        )
+    ),
   };
 }
 
@@ -182,5 +199,6 @@ export function ocrSheetRowToValues(fields: OcrSheetRowFields): string[] {
     fields.status,
     fields.statusReview,
     fields.linkRevisi,
+    fields.sampleType,
   ];
 }

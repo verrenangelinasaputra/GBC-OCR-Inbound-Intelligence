@@ -2,6 +2,9 @@
 
 import { useCallback, useMemo, useState } from "react";
 import type { SubmissionHistoryRow } from "@/lib/services/ocr-sheet-submissions";
+import {
+  supplierCanConfirmReceipt,
+} from "@/lib/services/ocr-sheet-submissions";
 import { ReviewStatusBadge } from "@/components/ocr-review/review-status-badge";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { downloadSubmissionsWord } from "@/lib/utils/export-submissions-table";
@@ -21,6 +24,7 @@ const COLUMNS: { key: SortKey; label: string; className?: string }[] = [
   { key: "jumlah", label: "Jumlah" },
   { key: "status", label: "Status OCR" },
   { key: "statusReview", label: "Status gudang" },
+  { key: "sampleType", label: "Tipe Sample" },
 ];
 
 function compareValues(a: string, b: string, dir: SortDir): number {
@@ -71,6 +75,10 @@ export function SupplierSubmissionsHistory({
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{ docKey: string; index: number; label: string } | null>(
+    null
+  );
+  const [confirmingDoc, setConfirmingDoc] = useState<string | null>(null);
 
   const gudangOptions = useMemo(() => {
     const set = new Set<string>();
@@ -113,6 +121,18 @@ export function SupplierSubmissionsHistory({
     return list;
   }, [rows, search, gudang, status, dateFrom, dateTo, sortKey, sortDir]);
 
+  const isFirstRowForDoc = useMemo(() => {
+    const seen = new Set<string>();
+    const out = new Set<string>();
+    for (const r of filtered) {
+      if (!seen.has(r.docKey)) {
+        seen.add(r.docKey);
+        out.add(r.rowKey);
+      }
+    }
+    return out;
+  }, [filtered]);
+
   const stats = useMemo(() => {
     let totalUnits = 0;
     const sj = new Set<string>();
@@ -146,6 +166,29 @@ export function SupplierSubmissionsHistory({
       setLoading(false);
     }
   }, []);
+
+  const confirmReceipt = useCallback(async (docKey: string, noSj: string) => {
+    const ok = window.confirm(
+      `Konfirmasi Anda sudah menerima data revisi / hasil gudang untuk SJ ${noSj || "?"}?\n\nStatus akan menjadi Selesai di spreadsheet GBC.`
+    );
+    if (!ok) return;
+    setConfirmingDoc(docKey);
+    setError(null);
+    try {
+      const res = await fetch("/api/supplier/submissions/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ docKey }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Gagal konfirmasi");
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Gagal konfirmasi");
+    } finally {
+      setConfirmingDoc(null);
+    }
+  }, [refresh]);
 
   const exportMeta = `Diekspor ${new Date().toLocaleString("id-ID")} · ${filtered.length} baris · ${
     isMaster ? "Semua supplier" : companyLabel
@@ -335,7 +378,9 @@ export function SupplierSubmissionsHistory({
                     </button>
                   </th>
                 ))}
-                <th className="px-3 py-3 print:hidden">Drive</th>
+                <th className="px-3 py-3 print:hidden">Foto</th>
+                <th className="px-3 py-3 print:hidden">Revisi</th>
+                <th className="px-3 py-3 print:hidden">Konfirmasi</th>
               </tr>
             </thead>
             <tbody>
@@ -363,8 +408,48 @@ export function SupplierSubmissionsHistory({
                         rel="noreferrer"
                         className="font-medium text-blue-600 hover:underline"
                       >
-                        Foto
+                        Drive
                       </a>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2.5 print:hidden">
+                    {r.revisionLinks.length === 0 ? (
+                      <span className="text-slate-400">—</span>
+                    ) : (
+                      <div className="flex flex-wrap gap-1">
+                        {r.revisionLinks.map((_, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() =>
+                              setPreview({
+                                docKey: r.docKey,
+                                index: i,
+                                label: `Revisi ${i + 1} · ${r.noSuratJalan}`,
+                              })
+                            }
+                            className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 hover:bg-amber-200"
+                          >
+                            R{i + 1}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-3 py-2.5 print:hidden">
+                    {isFirstRowForDoc.has(r.rowKey) && supplierCanConfirmReceipt(r.statusReview) ? (
+                      <button
+                        type="button"
+                        disabled={confirmingDoc === r.docKey}
+                        onClick={() => void confirmReceipt(r.docKey, r.noSuratJalan)}
+                        className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                      >
+                        {confirmingDoc === r.docKey ? "…" : "Terima data"}
+                      </button>
+                    ) : r.statusReview === "SELESAI" ? (
+                      <span className="text-xs text-emerald-700">Selesai</span>
                     ) : (
                       <span className="text-slate-400">—</span>
                     )}
@@ -373,7 +458,7 @@ export function SupplierSubmissionsHistory({
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={COLUMNS.length + 1} className="px-4 py-12 text-center text-slate-500">
+                  <td colSpan={COLUMNS.length + 3} className="px-4 py-12 text-center text-slate-500">
                     Tidak ada data yang cocok dengan filter.
                   </td>
                 </tr>
@@ -382,6 +467,33 @@ export function SupplierSubmissionsHistory({
           </table>
         </div>
       </div>
+
+      {preview && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-auto rounded-xl bg-white p-4 shadow-xl">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h3 className="font-medium text-slate-900">{preview.label}</h3>
+              <button
+                type="button"
+                className="rounded-lg border border-slate-200 px-3 py-1 text-sm"
+                onClick={() => setPreview(null)}
+              >
+                Tutup
+              </button>
+            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`/api/supplier/submissions/revision?docKey=${encodeURIComponent(preview.docKey)}&index=${preview.index}`}
+              alt={preview.label}
+              className="mx-auto max-h-[75vh] w-full object-contain"
+            />
+          </div>
+        </div>
+      )}
 
     </div>
   );

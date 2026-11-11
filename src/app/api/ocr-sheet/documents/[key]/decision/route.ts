@@ -12,6 +12,7 @@ import {
   saveOcrSheetDocumentEdits,
   type OcrSheetHeaderPatch,
   type OcrSheetLinePatch,
+  type OcrSheetNewLineInput,
 } from "@/lib/services/ocr-sheet-detail";
 import { setOcrDocumentReviewStatus } from "@/lib/services/ocr-sheet-review";
 import { appendRevisionLink, parseRevisionLinks, revisionLinkCount } from "@/lib/surat-jalan/revision-links";
@@ -38,7 +39,11 @@ export async function POST(request: Request, context: { params: Promise<{ key: s
 
     const header = body.header as OcrSheetHeaderPatch | undefined;
     const lines = Array.isArray(body.lines) ? (body.lines as OcrSheetLinePatch[]) : undefined;
-    await saveOcrSheetDocumentEdits({ docKey: key, header, lines });
+    const newLines = Array.isArray(body.newLines) ? (body.newLines as OcrSheetNewLineInput[]) : undefined;
+    const deleteSheetRows = Array.isArray(body.deleteSheetRows)
+      ? (body.deleteSheetRows as number[])
+      : undefined;
+    await saveOcrSheetDocumentEdits({ docKey: key, header, lines, newLines, deleteSheetRows });
 
     const docBefore = await getOcrSheetDocumentDetail(key);
     const config = getGoogleExportConfigOptional();

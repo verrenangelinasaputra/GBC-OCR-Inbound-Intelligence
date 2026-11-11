@@ -1,4 +1,4 @@
-/** Tambah header kolom T–U (Status Review, Link Revisi) di sheet OCR. */
+/** Sinkronkan header OCR (kolom A–V) pada tab utama Data Compilation / Sheet1. */
 import { google } from "googleapis";
 import { OCR_SHEET_HEADERS } from "../src/lib/providers/google-workspace/google-sj-export-rows";
 import { getGoogleExportConfigOptional } from "../src/lib/providers/google-workspace";
@@ -15,11 +15,12 @@ async function main() {
   const tab = await resolveSheetTabName(config);
   await sheets.spreadsheets.values.update({
     spreadsheetId: config.sheetId,
-    range: `'${tab.replace(/'/g, "''")}'!A1:U1`,
+    range: `'${tab.replace(/'/g, "''")}'!A1:V1`,
     valueInputOption: "RAW",
     requestBody: { values: [Array.from(OCR_SHEET_HEADERS)] },
   });
-  console.log(`Header OCR diperbarui (21 kolom) pada tab "${tab}".`);
+  console.log(`Header OCR diperbarui (${OCR_SHEET_HEADERS.length} kolom) pada tab "${tab}".`);
+  console.log("Jalankan juga: npm run sheet:monitoring  (tab gudang + Sample Only).");
 }
 
 main().catch((e) => {
