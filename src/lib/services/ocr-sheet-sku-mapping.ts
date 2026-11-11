@@ -94,6 +94,7 @@ export async function listSelesaiSkuMappingLines(
         jumlah: line.jumlah,
         keterangan: line.keterangan,
         sampleType: line.sampleType,
+        fileUrl: line.fileUrl?.startsWith("http") ? line.fileUrl : "",
       });
     });
   }

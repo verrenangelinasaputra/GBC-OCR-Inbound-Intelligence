@@ -70,6 +70,7 @@ export async function POST(request: Request) {
       catalog: catalogEntry,
       matchScore: pick.score,
       confirmedBy: profile?.fullName || session.username,
+      linkSjDrive: line.fileUrl,
     });
 
     return Response.json({ ok: true, rowKey, catalogRowNo: catalogEntry.rowNo });

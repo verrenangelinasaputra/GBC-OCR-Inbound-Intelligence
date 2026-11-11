@@ -11,4 +11,5 @@ export type SkuMappingLineRow = {
   jumlah: string;
   keterangan: string;
   sampleType: string;
+  fileUrl: string;
 };

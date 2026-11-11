@@ -30,6 +30,7 @@ export const DBM_INBOUND_HEADERS = [
   "SKUS",
   "Barcode (Code 128)",
   "Sumber Lembar",
+  "Link SJ (Drive)",
 ] as const;
 
 function quoteTab(tab: string): string {
@@ -107,6 +108,7 @@ export async function appendDbmInboundRow(params: {
   catalog: SkuRekapEntry;
   matchScore: number;
   confirmedBy: string;
+  linkSjDrive?: string;
 }): Promise<void> {
   const cfg = googleConfigForSpreadsheet(getDbmInboundSheetId());
   if (!cfg) throw new Error("Google export tidak dikonfigurasi");
@@ -150,6 +152,7 @@ export async function appendDbmInboundRow(params: {
     params.catalog.skus,
     params.catalog.barcode,
     params.catalog.sumberLembar,
+    params.linkSjDrive || params.line.fileUrl || "",
   ];
 
   await sheets.spreadsheets.values.update({
@@ -162,4 +165,64 @@ export async function appendDbmInboundRow(params: {
 
 function matchScoreFormatted(score: number): string {
   return String(Math.round(score * 1000) / 1000);
+}
+
+function rowToRecord(row: string[]): import("@/lib/dbm/dbm-inbound-types").DbmInboundRecord | null {
+  if (!row.length) return null;
+  const rowKey = String(row[12] ?? "").trim();
+  if (!rowKey) return null;
+  const score = Number(String(row[14] ?? "0").replace(",", "."));
+  return {
+    exportedAt: String(row[0] ?? ""),
+    confirmedBy: String(row[1] ?? ""),
+    gudang: String(row[2] ?? ""),
+    supplier: String(row[3] ?? ""),
+    tanggalSj: String(row[4] ?? ""),
+    noSj: String(row[5] ?? ""),
+    namaBarangOcr: String(row[6] ?? ""),
+    banyaknya: String(row[7] ?? ""),
+    isi: String(row[8] ?? ""),
+    jumlah: String(row[9] ?? ""),
+    keterangan: String(row[10] ?? ""),
+    sampleType: String(row[11] ?? ""),
+    rowKey,
+    docKey: String(row[13] ?? ""),
+    matchScore: Number.isFinite(score) ? score : 0,
+    skuLengkap: String(row[15] ?? ""),
+    namaInternalAccurate: String(row[16] ?? ""),
+    namaProdukAcuan: String(row[17] ?? ""),
+    kategoriUtama: String(row[18] ?? ""),
+    skus: String(row[19] ?? ""),
+    barcode: String(row[20] ?? ""),
+    sumberLembar: String(row[21] ?? ""),
+    linkSjDrive: String(row[22] ?? ""),
+  };
+}
+
+export async function listDbmInboundRecords(): Promise<import("@/lib/dbm/dbm-inbound-types").DbmInboundRecord[]> {
+  const cfg = googleConfigForSpreadsheet(getDbmInboundSheetId());
+  if (!cfg) return [];
+
+  const auth = createGoogleAuthClient(cfg);
+  const sheets = google.sheets({ version: "v4", auth });
+  const spreadsheetId = getDbmInboundSheetId();
+  const tab = getDbmInboundTabName();
+
+  try {
+    await ensureDbmInboundTab(sheets, spreadsheetId, tab);
+  } catch {
+    return [];
+  }
+
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${quoteTab(tab)}!A:W`,
+  });
+
+  const out: import("@/lib/dbm/dbm-inbound-types").DbmInboundRecord[] = [];
+  for (let i = 1; i < (res.data.values ?? []).length; i += 1) {
+    const rec = rowToRecord(res.data.values?.[i] ?? []);
+    if (rec) out.push(rec);
+  }
+  return out;
 }
