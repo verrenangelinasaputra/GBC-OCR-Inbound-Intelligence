@@ -13,6 +13,7 @@ import {
   pickDominantReviewStatus,
   normalizeOcrReviewStatus,
 } from "@/lib/ocr-review/workflow-status";
+import { parseRevisionLinks } from "@/lib/surat-jalan/revision-links";
 import {
   decodeOcrSheetDocKey,
   firstRowIsOcrHeader,
@@ -39,6 +40,7 @@ export type OcrSheetDocumentDetail = {
   lineStatus: string;
   statusReview: string;
   linkRevisi: string;
+  revisionLinks: string[];
   lines: OcrSheetLine[];
 };
 
@@ -110,7 +112,8 @@ export async function getOcrSheetDocumentDetail(docKey: string): Promise<OcrShee
     catatan: head.catatan,
     lineStatus: statuses.has("CEK") ? "CEK" : head.status || "OK",
     statusReview: dominantReview,
-    linkRevisi: head.linkRevisi?.startsWith("http") ? head.linkRevisi : "",
+    linkRevisi: head.linkRevisi?.trim() ?? "",
+    revisionLinks: parseRevisionLinks(head.linkRevisi),
     lines,
   };
 }

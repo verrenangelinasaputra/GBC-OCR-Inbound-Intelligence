@@ -26,7 +26,12 @@ export function SheetOcrReviewPanel({
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [imageError, setImageError] = useState("");
+  const [revisionImageError, setRevisionImageError] = useState("");
   const [deciding, setDeciding] = useState(false);
+  const [photoView, setPhotoView] = useState<"original" | number>("original");
+  const [confirmRejectOpen, setConfirmRejectOpen] = useState(false);
+
+  const revisionCount = doc.revisionLinks?.length ?? 0;
 
   const syncStateFromDoc = useCallback((updated: OcrSheetDocumentDetail) => {
     setDoc(updated);
@@ -50,10 +55,11 @@ export function SheetOcrReviewPanel({
       .catch(() => null);
   }, [docKey, syncStateFromDoc]);
 
-  async function decide(decision: "approve" | "reject") {
+  async function submitDecision(decision: "approve" | "reject") {
     setDeciding(true);
     setError("");
     setMessage("");
+    setConfirmRejectOpen(false);
     try {
       const res = await fetch(`/api/ocr-sheet/documents/${docKey}/decision`, {
         method: "POST",
@@ -82,11 +88,18 @@ export function SheetOcrReviewPanel({
       if (detailJson.doc) {
         syncStateFromDoc(detailJson.doc);
       }
-      setMessage(
-        decision === "approve"
-          ? "Disetujui — data tersimpan di spreadsheet, status Terverifikasi & Disetujui."
-          : `Tidak sesuai — data + gambar [REVISI] tersimpan. ${data.revisionUrl ?? ""}`
-      );
+      if (decision === "approve") {
+        setMessage("Disetujui — data tersimpan di spreadsheet, status Terverifikasi & Disetujui.");
+      } else {
+        const seq = typeof data.revisionSequence === "number" ? data.revisionSequence : revisionCount + 1;
+        setPhotoView(seq - 1);
+        setRevisionImageError("");
+        const mirrorWarn =
+          typeof data.supplierMirrorWarning === "string" && data.supplierMirrorWarning
+            ? ` Peringatan mirror supplier: ${data.supplierMirrorWarning}`
+            : "";
+        setMessage(`Revisi ${seq} tersimpan — lihat tab Revisi.${mirrorWarn}`);
+      }
     } catch {
       setError("Gagal verifikasi — cek koneksi.");
     } finally {
@@ -94,13 +107,22 @@ export function SheetOcrReviewPanel({
     }
   }
 
+  function requestReject() {
+    setConfirmRejectOpen(true);
+  }
+
   function patchLine(sheetRow: number, patch: Partial<OcrSheetLine>) {
     setLines((prev) => prev.map((l) => (l.sheetRow === sheetRow ? { ...l, ...patch } : l)));
   }
 
   const imageSrc = `/api/ocr-sheet/documents/${docKey}/image`;
+  const revisionSrc =
+    typeof photoView === "number"
+      ? `/api/ocr-sheet/documents/${docKey}/revision?index=${photoView}`
+      : "";
   const isPdf = (doc.fileName || "").toLowerCase().endsWith(".pdf");
-  const canShowMedia = (doc.fileUrl || doc.fileName) && !imageError;
+  const canShowOriginal = (doc.fileUrl || doc.fileName) && !imageError;
+  const canShowRevision = revisionCount > 0 && typeof photoView === "number";
 
   const reportImageLoadError = useCallback(async () => {
     try {
@@ -136,10 +158,10 @@ export function SheetOcrReviewPanel({
           tone={doc.lineStatus === "CEK" ? "warning" : "success"}
         />
         <ReviewStatusBadge status={doc.statusReview} />
-        {doc.linkRevisi && (
-          <a href={doc.linkRevisi} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline">
-            Lihat [REVISI]
-          </a>
+        {revisionCount > 0 && (
+          <span className="text-sm text-slate-600">
+            {revisionCount} revisi
+          </span>
         )}
         <span className="text-sm text-slate-500">
           {lines.length} baris item · diekspor {doc.exportTimestamp || "—"}
@@ -156,38 +178,105 @@ export function SheetOcrReviewPanel({
         <section className="rounded-xl border border-slate-200 bg-white p-4">
           <h2 className="font-medium">Foto Surat Jalan</h2>
           <p className="mt-1 text-xs text-slate-500">{doc.fileName || "—"}</p>
-          {canShowMedia ? (
+          <div className="mt-3 flex flex-wrap gap-2 border-b border-slate-100 pb-2">
+            <button
+              type="button"
+              onClick={() => setPhotoView("original")}
+              className={`rounded-md px-3 py-1.5 text-sm ${
+                photoView === "original"
+                  ? "bg-slate-900 text-white"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              }`}
+            >
+              Foto asli
+            </button>
+            {revisionCount === 0 ? (
+              <button
+                type="button"
+                disabled
+                className="cursor-not-allowed rounded-md bg-slate-50 px-3 py-1.5 text-sm text-slate-400"
+              >
+                Revisi
+              </button>
+            ) : (
+              Array.from({ length: revisionCount }, (_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => {
+                    setPhotoView(i);
+                    setRevisionImageError("");
+                  }}
+                  className={`rounded-md px-3 py-1.5 text-sm ${
+                    photoView === i
+                      ? "bg-amber-600 text-white"
+                      : "bg-amber-50 text-amber-900 hover:bg-amber-100"
+                  }`}
+                >
+                  Revisi {i + 1}
+                </button>
+              ))
+            )}
+          </div>
+          {photoView === "original" ? (
+            canShowOriginal ? (
+              <>
+                {isPdf ? (
+                  <iframe
+                    title={doc.fileName || "Surat Jalan PDF"}
+                    src={imageSrc}
+                    className="mt-3 h-[70vh] w-full rounded-lg border border-slate-200 bg-slate-100"
+                  />
+                ) : (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={imageSrc}
+                    alt={doc.fileName || "Surat Jalan"}
+                    className="mt-3 max-h-[70vh] w-full rounded-lg border border-slate-200 bg-slate-100 object-contain"
+                    onError={() => void reportImageLoadError()}
+                  />
+                )}
+                {doc.fileUrl && (
+                  <a
+                    href={doc.fileUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-2 inline-block text-sm text-blue-600 hover:underline"
+                  >
+                    Buka asli di Drive
+                  </a>
+                )}
+              </>
+            ) : (
+              <p className="mt-3 text-sm text-amber-800">
+                {imageError ||
+                  "Belum ada nama file di sheet — upload ulang atau isi kolom Nama File."}
+              </p>
+            )
+          ) : canShowRevision && !revisionImageError ? (
             <>
-              {isPdf ? (
-                <iframe
-                  title={doc.fileName || "Surat Jalan PDF"}
-                  src={imageSrc}
-                  className="mt-3 h-[70vh] w-full rounded-lg border border-slate-200 bg-slate-100"
-                />
-              ) : (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img
-                  src={imageSrc}
-                  alt={doc.fileName || "Surat Jalan"}
-                  className="mt-3 max-h-[70vh] w-full rounded-lg border border-slate-200 bg-slate-100 object-contain"
-                  onError={() => void reportImageLoadError()}
-                />
-              )}
-              {doc.fileUrl && (
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                key={revisionSrc}
+                src={revisionSrc}
+                alt={`Revisi ${photoView + 1}`}
+                className="mt-3 max-h-[70vh] w-full rounded-lg border border-amber-200 bg-amber-50/30 object-contain"
+                onError={() => setRevisionImageError("Gambar revisi tidak bisa dimuat dari Drive.")}
+              />
+              {doc.revisionLinks[photoView] && (
                 <a
-                  href={doc.fileUrl}
+                  href={doc.revisionLinks[photoView]}
                   target="_blank"
                   rel="noreferrer"
                   className="mt-2 inline-block text-sm text-blue-600 hover:underline"
                 >
-                  Buka di Google Drive
+                  Buka revisi {photoView + 1} di Drive
                 </a>
               )}
             </>
           ) : (
             <p className="mt-3 text-sm text-amber-800">
-              {imageError ||
-                "Belum ada nama file di sheet — upload ulang atau isi kolom Nama File."}
+              {revisionImageError || "Pilih tab Revisi untuk melihat gambar."}
             </p>
           )}
         </section>
@@ -301,7 +390,7 @@ export function SheetOcrReviewPanel({
         <button
           type="button"
           disabled={deciding}
-          onClick={() => void decide("approve")}
+          onClick={() => void submitDecision("approve")}
           className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
         >
           {deciding ? "Menyimpan & memproses…" : "Setujui (barang sesuai)"}
@@ -309,12 +398,50 @@ export function SheetOcrReviewPanel({
         <button
           type="button"
           disabled={deciding}
-          onClick={() => void decide("reject")}
+          onClick={requestReject}
           className="rounded-lg border border-amber-400 bg-amber-50 px-5 py-2 text-sm font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
         >
           {deciding ? "Menyimpan & memproses…" : "Tidak sesuai → [REVISI]"}
         </button>
       </div>
+
+      {confirmRejectOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-revisi-title"
+        >
+          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-lg">
+            <h3 id="confirm-revisi-title" className="text-lg font-medium text-slate-900">
+              Konfirmasi revisi
+            </h3>
+            <p className="mt-2 text-sm text-slate-600">
+              Data di form akan disimpan ke spreadsheet dan gambar{" "}
+              <strong>Revisi {revisionCount + 1}</strong> akan dibuat serta diunggah ke Drive gudang
+              {revisionCount > 0 ? " (dan mirror supplier jika diaktifkan)" : ""}. Lanjutkan?
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                onClick={() => setConfirmRejectOpen(false)}
+                disabled={deciding}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+                onClick={() => void submitDecision("reject")}
+                disabled={deciding}
+              >
+                {deciding ? "Memproses…" : "Ya, buat revisi"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

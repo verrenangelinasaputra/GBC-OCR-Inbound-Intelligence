@@ -14,6 +14,8 @@ import {
   type OcrSheetLinePatch,
 } from "@/lib/services/ocr-sheet-detail";
 import { setOcrDocumentReviewStatus } from "@/lib/services/ocr-sheet-review";
+import { appendRevisionLink, parseRevisionLinks, revisionLinkCount } from "@/lib/surat-jalan/revision-links";
+import { mirrorRevisionToSupplierDrive } from "@/lib/surat-jalan/mirror-revision-drive";
 import { renderSuratJalanRevisionPng, revisionFileName } from "@/lib/surat-jalan/revision-image";
 
 function sheetReviewEnabled(): boolean {
@@ -38,7 +40,7 @@ export async function POST(request: Request, context: { params: Promise<{ key: s
     const lines = Array.isArray(body.lines) ? (body.lines as OcrSheetLinePatch[]) : undefined;
     await saveOcrSheetDocumentEdits({ docKey: key, header, lines });
 
-    const doc = await getOcrSheetDocumentDetail(key);
+    const docBefore = await getOcrSheetDocumentDetail(key);
     const config = getGoogleExportConfigOptional();
     if (!config) return jsonError(new Error("Google export tidak dikonfigurasi"), 503);
 
@@ -47,12 +49,13 @@ export async function POST(request: Request, context: { params: Promise<{ key: s
       return Response.json({ ok: true, status: "TERVERIFIKASI_DISETUJUI" });
     }
 
-    const png = await renderSuratJalanRevisionPng(doc);
-    const fileName = revisionFileName(doc.fileName || `SuratJalan_${doc.noSuratJalan}.png`);
+    const nextSeq = revisionLinkCount(docBefore.linkRevisi) + 1;
+    const png = await renderSuratJalanRevisionPng(docBefore, nextSeq);
+    const fileName = revisionFileName(docBefore.fileName || `SuratJalan_${docBefore.noSuratJalan}.png`, nextSeq);
     const subfolder = buildSuratJalanDriveSubfolderName({
-      tanggal: doc.tanggal,
-      noSuratJalan: doc.noSuratJalan,
-      supplierName: doc.supplier || "Supplier",
+      tanggal: docBefore.tanggal,
+      noSuratJalan: docBefore.noSuratJalan,
+      supplierName: docBefore.supplier || "Supplier",
     });
 
     const uploaded = await uploadSuratJalanToGudangDrive({
@@ -60,20 +63,38 @@ export async function POST(request: Request, context: { params: Promise<{ key: s
       buffer: png,
       fileName,
       mimeType: "image/png",
-      gudang: doc.gudang,
+      gudang: docBefore.gudang,
       subfolderName: subfolder,
     });
+
+    let supplierMirrorWarning: string | undefined;
+    try {
+      await mirrorRevisionToSupplierDrive({
+        config,
+        doc: docBefore,
+        buffer: png,
+        fileName,
+      });
+    } catch (mirrorErr) {
+      supplierMirrorWarning =
+        mirrorErr instanceof Error ? mirrorErr.message : "Mirror revisi ke Drive supplier gagal";
+    }
+
+    const mergedLinks = appendRevisionLink(docBefore.linkRevisi, uploaded.fileUrl);
 
     await setOcrDocumentReviewStatus({
       docKey: key,
       status: "TIDAK_SESUAI_KONFIRMASI",
-      linkRevisi: uploaded.fileUrl,
+      linkRevisi: mergedLinks,
     });
 
     return Response.json({
       ok: true,
       status: "TIDAK_SESUAI_KONFIRMASI",
       revisionUrl: uploaded.fileUrl,
+      revisionSequence: nextSeq,
+      revisionLinks: parseRevisionLinks(mergedLinks),
+      supplierMirrorWarning,
     });
   } catch (e) {
     return jsonError(e);
