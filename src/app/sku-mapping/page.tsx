@@ -1,10 +1,49 @@
 import { ModuleListPage } from "@/components/layout/module-list-page";
 import { SpreadsheetModePage, spreadsheetModeActive } from "@/components/layout/spreadsheet-mode-page";
+import { SkuMappingSelesaiTable } from "@/components/sku-mapping/sku-mapping-selesai-table";
+import { getSession } from "@/lib/auth/session";
+import { getInternalUserProfile } from "@/lib/internal-auth/profile";
 import { prisma } from "@/lib/db";
+import { listSelesaiSkuMappingLines } from "@/lib/services/ocr-sheet-sku-mapping";
+import { getGoogleExportConfigOptional } from "@/lib/providers/google-workspace/config";
 import Link from "next/link";
 
 export default async function SkuMappingPage() {
-  if (spreadsheetModeActive()) return <SpreadsheetModePage title="Product SKU Mapping" />;
+  if (spreadsheetModeActive()) {
+    if (!getGoogleExportConfigOptional()) {
+      return <SpreadsheetModePage title="Product SKU Mapping" />;
+    }
+
+    let rows: Awaited<ReturnType<typeof listSelesaiSkuMappingLines>> = [];
+    try {
+      const session = await getSession();
+      const profile = session ? await getInternalUserProfile(session.username) : null;
+      const gudangFilter = profile?.gudangList.length ? profile.gudangList : undefined;
+      rows = await listSelesaiSkuMappingLines(gudangFilter);
+    } catch {
+      return <SpreadsheetModePage title="Product SKU Mapping" />;
+    }
+
+    const docCount = new Set(rows.map((r) => r.docKey)).size;
+
+    return (
+      <ModuleListPage
+        title="Product SKU Mapping"
+        description="Baris item dari Surat Jalan yang sudah selesai ditinjau & dikonfirmasi supplier — siap dipetakan ke SKU internal GBC."
+      >
+        <p className="mb-4 text-sm text-slate-600">
+          Menampilkan <strong>{rows.length}</strong> baris item dari{" "}
+          <strong>{docCount}</strong> Surat Jalan (status tinjauan{" "}
+          <strong>Selesai</strong>). Sumber data: spreadsheet OCR — sama dengan alur di{" "}
+          <Link href="/ocr-review?status=SELESAI" className="text-blue-600 hover:underline">
+            Tinjauan Surat Jalan
+          </Link>
+          .
+        </p>
+        <SkuMappingSelesaiTable rows={rows} />
+      </ModuleListPage>
+    );
+  }
 
   const [pendingLines, mappings] = await Promise.all([
     prisma.ocrLineItem.findMany({
