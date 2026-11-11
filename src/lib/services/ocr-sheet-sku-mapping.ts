@@ -14,21 +14,11 @@ import {
   type OcrReviewStatus,
 } from "@/lib/ocr-review/workflow-status";
 import { encodeOcrSheetDocKey, isMeaningfulOcrDataRow } from "@/lib/services/ocr-sheet-keys";
-
-export type SkuMappingLineRow = {
-  rowKey: string;
-  docKey: string;
-  gudang: string;
-  supplier: string;
-  tanggal: string;
-  noSuratJalan: string;
-  namaBarang: string;
-  banyaknya: string;
-  isi: string;
-  jumlah: string;
-  keterangan: string;
-  sampleType: string;
-};
+import type { SkuMappingLineRow } from "@/lib/sku-matching/sku-mapping-line";
+import { findTopRekapSkuMatches } from "@/lib/sku-matching/match-rekap-sku";
+import type { SkuMappingWorkbenchRow } from "@/lib/sku-matching/sku-rekap-types";
+import { loadSkuRekapCatalog } from "@/lib/services/sku-rekap-catalog";
+import { listDbmFinalizedRowKeys } from "@/lib/services/dbm-inbound-sheet";
 
 type DocGroup = {
   docKey: string;
@@ -39,6 +29,8 @@ type DocGroup = {
   reviewStatuses: Set<OcrReviewStatus>;
   lines: OcrSheetRowFields[];
 };
+
+export type { SkuMappingLineRow };
 
 export async function listSelesaiSkuMappingLines(
   gudangFilter?: string[]
@@ -113,4 +105,29 @@ export async function listSelesaiSkuMappingLines(
   });
 
   return out;
+}
+
+export async function buildSkuMappingWorkbench(
+  gudangFilter?: string[]
+): Promise<SkuMappingWorkbenchRow[]> {
+  const [lines, catalog, finalized] = await Promise.all([
+    listSelesaiSkuMappingLines(gudangFilter),
+    loadSkuRekapCatalog(),
+    listDbmFinalizedRowKeys(),
+  ]);
+
+  const pending = lines.filter((l) => !finalized.has(l.rowKey));
+
+  return pending.map((line) => ({
+    line,
+    suggestions: findTopRekapSkuMatches(line.namaBarang, catalog, 3),
+  }));
+}
+
+export async function getSelesaiLineByRowKey(
+  rowKey: string,
+  gudangFilter?: string[]
+): Promise<SkuMappingLineRow | null> {
+  const lines = await listSelesaiSkuMappingLines(gudangFilter);
+  return lines.find((l) => l.rowKey === rowKey) ?? null;
 }

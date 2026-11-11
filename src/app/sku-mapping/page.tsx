@@ -1,11 +1,18 @@
 import { ModuleListPage } from "@/components/layout/module-list-page";
 import { SpreadsheetModePage, spreadsheetModeActive } from "@/components/layout/spreadsheet-mode-page";
-import { SkuMappingSelesaiTable } from "@/components/sku-mapping/sku-mapping-selesai-table";
+import { SkuMappingWorkbench } from "@/components/sku-mapping/sku-mapping-workbench";
 import { getSession } from "@/lib/auth/session";
 import { getInternalUserProfile } from "@/lib/internal-auth/profile";
+import { hasPermission } from "@/lib/rbac/permissions";
 import { prisma } from "@/lib/db";
-import { listSelesaiSkuMappingLines } from "@/lib/services/ocr-sheet-sku-mapping";
+import { buildSkuMappingWorkbench } from "@/lib/services/ocr-sheet-sku-mapping";
 import { getGoogleExportConfigOptional } from "@/lib/providers/google-workspace/config";
+import {
+  DBM_INBOUND_SHEET_ID,
+  getDbmInboundTabName,
+  getSkuRekapSheetId,
+  getSkuRekapTabName,
+} from "@/lib/config/sku-mapping-sheets";
 import Link from "next/link";
 
 export default async function SkuMappingPage() {
@@ -14,33 +21,67 @@ export default async function SkuMappingPage() {
       return <SpreadsheetModePage title="Product SKU Mapping" />;
     }
 
-    let rows: Awaited<ReturnType<typeof listSelesaiSkuMappingLines>> = [];
+    let workbench: Awaited<ReturnType<typeof buildSkuMappingWorkbench>> = [];
+    let catalogSize = 0;
     try {
       const session = await getSession();
       const profile = session ? await getInternalUserProfile(session.username) : null;
       const gudangFilter = profile?.gudangList.length ? profile.gudangList : undefined;
-      rows = await listSelesaiSkuMappingLines(gudangFilter);
+      workbench = await buildSkuMappingWorkbench(gudangFilter);
+      const { loadSkuRekapCatalog } = await import("@/lib/services/sku-rekap-catalog");
+      catalogSize = (await loadSkuRekapCatalog()).length;
     } catch {
       return <SpreadsheetModePage title="Product SKU Mapping" />;
     }
 
-    const docCount = new Set(rows.map((r) => r.docKey)).size;
+    const session = await getSession();
+    const canFinalize = session
+      ? hasPermission(session.roles, "sku_mapping", "APPROVE")
+      : false;
+
+    const lineCount = workbench.length;
 
     return (
       <ModuleListPage
         title="Product SKU Mapping"
-        description="Baris item dari Surat Jalan yang sudah selesai ditinjau & dikonfirmasi supplier — siap dipetakan ke SKU internal GBC."
+        description="Pemetaan nama barang OCR (SJ Selesai) ke master REKAP SKUL — konfirmasi menjadi Data Barang Masuk."
       >
         <p className="mb-4 text-sm text-slate-600">
-          Menampilkan <strong>{rows.length}</strong> baris item dari{" "}
-          <strong>{docCount}</strong> Surat Jalan (status tinjauan{" "}
-          <strong>Selesai</strong>). Sumber data: spreadsheet OCR — sama dengan alur di{" "}
+          Sumber SJ:{" "}
+          <a
+            href="https://docs.google.com/spreadsheets/d/1o2No4lV_r1Hrfi3qiyKI0ZX-VUaQaZdcxCbo4qJ1LDc/edit"
+            target="_blank"
+            rel="noreferrer"
+            className="text-blue-600 hover:underline"
+          >
+            spreadsheet OCR
+          </a>{" "}
+          (status <strong>Selesai</strong>). Master acuan:{" "}
+          <a
+            href={`https://docs.google.com/spreadsheets/d/${getSkuRekapSheetId()}/edit`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-blue-600 hover:underline"
+          >
+            REKAP SKUL
+          </a>{" "}
+          ({catalogSize.toLocaleString("id-ID")} produk, kolom <em>Nama Produk Acuan</em>). Final DBM → tab{" "}
+          <strong>{getDbmInboundTabName()}</strong> pada{" "}
+          <a
+            href={`https://docs.google.com/spreadsheets/d/${DBM_INBOUND_SHEET_ID}/edit`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-blue-600 hover:underline"
+          >
+            spreadsheet DBM
+          </a>
+          . Antrean: <strong>{lineCount}</strong> baris. Lihat juga{" "}
           <Link href="/ocr-review?status=SELESAI" className="text-blue-600 hover:underline">
-            Tinjauan Surat Jalan
+            SJ Selesai
           </Link>
           .
         </p>
-        <SkuMappingSelesaiTable rows={rows} />
+        <SkuMappingWorkbench rows={workbench} canFinalize={canFinalize} />
       </ModuleListPage>
     );
   }
