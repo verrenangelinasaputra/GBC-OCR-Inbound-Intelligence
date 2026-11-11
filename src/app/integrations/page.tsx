@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { getOCRProvider } from "@/lib/providers/ocr";
 import { getTelegramProvider } from "@/lib/providers/notifications";
 import { getStorageProvider } from "@/lib/providers/storage/local-storage";
-import { getGoogleWorkspaceHealth } from "@/lib/providers/google-workspace";
+import { getGoogleWorkspaceHealth } from "@/lib/providers/google-workspace/health";
 import { StatusBadge } from "@/components/ui/status-badge";
 
 export default async function IntegrationsPage() {

@@ -1,6 +1,6 @@
 import { loadEnvFile } from "./load-env";
 import { getGoogleExportConfigOptional } from "../src/lib/providers/google-workspace/config";
-import { testGoogleWorkspaceConnection } from "../src/lib/providers/google-workspace";
+import { testGoogleWorkspaceConnection } from "../src/lib/providers/google-workspace/health";
 
 loadEnvFile();
 

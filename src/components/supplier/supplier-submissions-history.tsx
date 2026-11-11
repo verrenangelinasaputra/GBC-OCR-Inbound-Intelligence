@@ -1,10 +1,8 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import type { SubmissionHistoryRow } from "@/lib/services/ocr-sheet-submissions";
-import {
-  supplierCanConfirmReceipt,
-} from "@/lib/services/ocr-sheet-submissions";
+import type { SubmissionHistoryRow } from "@/lib/services/ocr-sheet-submissions-shared";
+import { supplierCanConfirmReceipt } from "@/lib/services/ocr-sheet-submissions-shared";
 import { ReviewStatusBadge } from "@/components/ocr-review/review-status-badge";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { downloadSubmissionsWord } from "@/lib/utils/export-submissions-table";

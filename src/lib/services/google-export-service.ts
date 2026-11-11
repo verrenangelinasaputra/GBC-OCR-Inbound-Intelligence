@@ -2,14 +2,13 @@ import { prisma } from "@/lib/db";
 import type { OcrDocumentResult } from "@/lib/providers/types";
 import { getStorageProvider } from "@/lib/providers/storage/local-storage";
 import {
-  appendRowsToSheet,
   buildGoogleSheetRows,
   buildSuratJalanFileName,
   getGoogleExportConfigOptional,
   isGoogleExportConfigured,
   parseGeminiPayloadFromStructured,
-  uploadFileToDrive,
 } from "@/lib/providers/google-workspace";
+import { appendRowsToSheet, uploadFileToDrive } from "@/lib/providers/google-workspace/client";
 import type { GeminiSJPayload } from "@/lib/providers/ocr/gemini-surat-jalan";
 import { writeAuditLog } from "@/lib/services/audit";
 

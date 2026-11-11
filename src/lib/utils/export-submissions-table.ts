@@ -1,4 +1,4 @@
-import type { SubmissionHistoryRow } from "@/lib/services/ocr-sheet-submissions";
+import type { SubmissionHistoryRow } from "@/lib/services/ocr-sheet-submissions-shared";
 
 const EXPORT_COLUMNS: { key: keyof SubmissionHistoryRow; label: string }[] = [
   { key: "gudang", label: "Gudang tujuan" },

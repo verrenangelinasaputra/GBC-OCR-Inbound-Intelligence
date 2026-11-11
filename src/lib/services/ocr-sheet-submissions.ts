@@ -1,30 +1,23 @@
+import "server-only";
+
 import { google } from "googleapis";
 import { createGoogleAuthClient, resolveSheetTabName } from "@/lib/providers/google-workspace/client";
-import { getGoogleExportConfigOptional } from "@/lib/providers/google-workspace";
-import {
-  mapOcrSheetRow,
-  ocrSheetFullColumnsRange,
-  type OcrSheetRowFields,
-} from "@/lib/providers/google-workspace/ocr-sheet-columns";
+import { getGoogleExportConfigOptional } from "@/lib/providers/google-workspace/config";
+import { mapOcrSheetRow, ocrSheetFullColumnsRange } from "@/lib/providers/google-workspace/ocr-sheet-columns";
 import { encodeOcrSheetDocKey, firstRowIsOcrHeader, isMeaningfulOcrDataRow } from "@/lib/services/ocr-sheet-keys";
 import { parseRevisionLinks } from "@/lib/surat-jalan/revision-links";
-import type { OcrReviewStatus } from "@/lib/ocr-review/workflow-status";
 import { normalizeOcrReviewStatus } from "@/lib/ocr-review/workflow-status";
+import {
+  submissionDocRawKey,
+  type SubmissionHistoryRow,
+} from "@/lib/services/ocr-sheet-submissions-shared";
 
-export type SubmissionHistoryRow = OcrSheetRowFields & {
-  rowKey: string;
-  docKey: string;
-  revisionLinks: string[];
-  statusReview: OcrReviewStatus;
-};
-
-export function submissionDocRawKey(fields: Pick<OcrSheetRowFields, "fileName" | "noSuratJalan" | "tanggal">): string {
-  return fields.fileName?.trim() || `${fields.noSuratJalan}|${fields.tanggal}`;
-}
-
-export function supplierCanConfirmReceipt(status: OcrReviewStatus): boolean {
-  return status === "TIDAK_SESUAI_KONFIRMASI" || status === "TERVERIFIKASI_DISETUJUI";
-}
+export type { SubmissionHistoryRow } from "@/lib/services/ocr-sheet-submissions-shared";
+export {
+  filterRowsForSupplier,
+  submissionDocRawKey,
+  supplierCanConfirmReceipt,
+} from "@/lib/services/ocr-sheet-submissions-shared";
 
 export async function listOcrSheetSubmissionRows(): Promise<SubmissionHistoryRow[]> {
   const config = getGoogleExportConfigOptional();
@@ -63,18 +56,4 @@ export async function listOcrSheetSubmissionRows(): Promise<SubmissionHistoryRow
   }
 
   return out.reverse();
-}
-
-export function filterRowsForSupplier(
-  rows: SubmissionHistoryRow[],
-  companyName: string,
-  username: string
-): SubmissionHistoryRow[] {
-  const company = companyName.trim().toLowerCase();
-  const user = username.trim().toLowerCase();
-  if (!company && !user) return rows;
-  return rows.filter((r) => {
-    const s = r.supplier.trim().toLowerCase();
-    return s === company || s === user || (company.length >= 2 && s.includes(company));
-  });
 }
