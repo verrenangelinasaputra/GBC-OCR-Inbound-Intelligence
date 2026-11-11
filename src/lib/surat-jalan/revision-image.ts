@@ -1,52 +1,131 @@
+import { readFileSync } from "fs";
+import path from "path";
+import * as opentype from "opentype.js";
 import sharp from "sharp";
 import type { OcrSheetDocumentDetail } from "@/lib/services/ocr-sheet-detail";
 
-function esc(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+const GREEN = "#007a3d";
+
+let revisionFont: opentype.Font | null = null;
+
+function getRevisionFont(): opentype.Font {
+  if (!revisionFont) {
+    const fontPath = path.join(process.cwd(), "node_modules/dejavu-fonts-ttf/ttf/DejaVuSans.ttf");
+    const buf = readFileSync(fontPath);
+    revisionFont = opentype.parse(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+  }
+  if (!revisionFont) throw new Error("Font revisi DejaVu tidak bisa dimuat");
+  return revisionFont;
 }
 
-/** Gambar revisi SJ — layout hijau mirip contoh fisik (dot matrix). */
+function glyphAdvance(glyph: opentype.Glyph, scale: number): number {
+  return (glyph.advanceWidth ?? 0) * scale;
+}
+
+function escPath(d: string): string {
+  return d.replace(/"/g, "'");
+}
+
+type TextOpts = { anchor?: "start" | "middle" };
+
+/** Glyph-by-glyph — hindari GSUB/Bidi opentype.js yang gagal di beberapa font. */
+function textWidth(text: string, fontSize: number): number {
+  const font = getRevisionFont();
+  const scale = fontSize / font.unitsPerEm;
+  let w = 0;
+  for (const ch of text || " ") {
+    w += glyphAdvance(font.charToGlyph(ch), scale);
+  }
+  return w;
+}
+
+function svgText(x: number, y: number, text: string, fontSize: number, opts: TextOpts = {}): string {
+  const font = getRevisionFont();
+  const safe = text || " ";
+  const scale = fontSize / font.unitsPerEm;
+  let cursorX = x;
+  if (opts.anchor === "middle") {
+    cursorX = x - textWidth(safe, fontSize) / 2;
+  }
+  const parts: string[] = [];
+  for (const ch of safe) {
+    const glyph = font.charToGlyph(ch);
+    parts.push(glyph.getPath(cursorX, y, fontSize).toPathData(2));
+    cursorX += glyphAdvance(glyph, scale);
+  }
+  return `<path fill="${GREEN}" d="${escPath(parts.join(" "))}"/>`;
+}
+
+function svgTextMuted(x: number, y: number, text: string, fontSize: number): string {
+  const font = getRevisionFont();
+  const scale = fontSize / font.unitsPerEm;
+  let cursorX = x;
+  const parts: string[] = [];
+  for (const ch of text || " ") {
+    const glyph = font.charToGlyph(ch);
+    parts.push(glyph.getPath(cursorX, y, fontSize).toPathData(2));
+    cursorX += glyphAdvance(glyph, scale);
+  }
+  return `<path fill="#666666" d="${escPath(parts.join(" "))}"/>`;
+}
+
+/** Gambar revisi SJ — layout hijau mirip contoh fisik; teks sebagai path (tanpa font sistem). */
 export function buildSuratJalanRevisionSvg(doc: OcrSheetDocumentDetail): string {
   const w = 900;
   const rowH = 36;
   const headerBlock = 220;
-  const tableRows = doc.lines.length;
+  const tableRows = Math.max(doc.lines.length, 1);
   const h = headerBlock + 80 + tableRows * rowH + 140;
 
   const itemRows = doc.lines
     .map((line, i) => {
-      const no = i + 1;
-      return `<text x="40" y="${headerBlock + 55 + i * rowH}" fill="#0a5" font-size="13" font-family="Consolas,monospace">${no}</text>
-<text x="90" y="${headerBlock + 55 + i * rowH}" fill="#0a5" font-size="12" font-family="Consolas,monospace">${esc(line.banyaknya)}</text>
-<text x="200" y="${headerBlock + 55 + i * rowH}" fill="#0a5" font-size="12" font-family="Consolas,monospace">${esc(line.isi)}</text>
-<text x="320" y="${headerBlock + 55 + i * rowH}" fill="#0a5" font-size="11" font-family="Consolas,monospace">${esc(line.namaBarang)}</text>
-<text x="620" y="${headerBlock + 55 + i * rowH}" fill="#0a5" font-size="12" font-family="Consolas,monospace">${esc(line.jumlah)}</text>
-<text x="750" y="${headerBlock + 55 + i * rowH}" fill="#0a5" font-size="11" font-family="Consolas,monospace">${esc(line.keterangan)}</text>`;
+      const rowY = headerBlock + 55 + i * rowH;
+      return [
+        svgText(40, rowY, String(i + 1), 13),
+        svgText(90, rowY, line.banyaknya, 12),
+        svgText(200, rowY, line.isi, 12),
+        svgText(320, rowY, line.namaBarang, 11),
+        svgText(620, rowY, line.jumlah, 12),
+        svgText(750, rowY, line.keterangan, 11),
+      ].join("\n");
     })
     .join("\n");
+
+  const headerText = [
+    svgText(450, 48, "SURAT JALAN", 30, { anchor: "middle" }),
+    svgText(520, 78, "[REVISI GUDANG]", 14),
+    svgText(40, 95, `Tanggal: ${doc.tanggal}`, 13),
+    svgText(40, 118, `No: ${doc.noSuratJalan}`, 13),
+    svgText(40, 141, `No. Kend: ${doc.noKendaraan}`, 13),
+    svgText(40, 164, `No. PO: ${doc.noPo}`, 13),
+    svgText(40, 190, `Kepada: ${doc.namaPenerima}`, 12),
+    svgText(40, 210, doc.alamat, 11),
+  ].join("\n");
+
+  const tableHeaderY = headerBlock + 32;
+  const tableHeader = [
+    svgText(45, tableHeaderY, "NO.", 12),
+    svgText(95, tableHeaderY, "BANYAKNYA", 12),
+    svgText(205, tableHeaderY, "ISI", 12),
+    svgText(325, tableHeaderY, "NAMA BARANG", 12),
+    svgText(625, tableHeaderY, "JUMLAH", 12),
+    svgText(755, tableHeaderY, "KETERANGAN", 12),
+  ].join("\n");
+
+  const footer = [
+    svgText(40, h - 80, `Gudang: ${doc.gudang} | Supplier: ${doc.supplier}`, 12),
+    svgTextMuted(40, h - 55, "Direvisi via GBC Inbound Intelligence", 11),
+  ].join("\n");
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
   <rect width="100%" height="100%" fill="#fff"/>
-  <text x="450" y="48" text-anchor="middle" fill="#0a5" font-size="28" font-weight="bold" font-family="Arial,sans-serif">SURAT JALAN</text>
-  <text x="520" y="78" fill="#0a5" font-size="14" font-family="Arial,sans-serif">[REVISI GUDANG]</text>
-  <text x="40" y="95" fill="#0a5" font-size="13" font-family="Arial,sans-serif">Tanggal: ${esc(doc.tanggal)}</text>
-  <text x="40" y="118" fill="#0a5" font-size="13" font-family="Arial,sans-serif">No: ${esc(doc.noSuratJalan)}</text>
-  <text x="40" y="141" fill="#0a5" font-size="13" font-family="Arial,sans-serif">No. Kend: ${esc(doc.noKendaraan)}</text>
-  <text x="40" y="164" fill="#0a5" font-size="13" font-family="Arial,sans-serif">No. PO: ${esc(doc.noPo)}</text>
-  <text x="40" y="190" fill="#0a5" font-size="12" font-family="Arial,sans-serif">Kepada: ${esc(doc.namaPenerima)}</text>
-  <text x="40" y="210" fill="#0a5" font-size="11" font-family="Arial,sans-serif">${esc(doc.alamat)}</text>
-  <rect x="30" y="${headerBlock}" width="840" height="50" fill="#e8f5e9" stroke="#0a5"/>
-  <text x="45" y="${headerBlock + 32}" fill="#0a5" font-weight="bold" font-size="12">NO.</text>
-  <text x="95" y="${headerBlock + 32}" fill="#0a5" font-weight="bold" font-size="12">BANYAKNYA</text>
-  <text x="205" y="${headerBlock + 32}" fill="#0a5" font-weight="bold" font-size="12">ISI</text>
-  <text x="325" y="${headerBlock + 32}" fill="#0a5" font-weight="bold" font-size="12">NAMA BARANG</text>
-  <text x="625" y="${headerBlock + 32}" fill="#0a5" font-weight="bold" font-size="12">JUMLAH</text>
-  <text x="755" y="${headerBlock + 32}" fill="#0a5" font-weight="bold" font-size="12">KETERANGAN</text>
-  <rect x="30" y="${headerBlock + 50}" width="840" height="${tableRows * rowH + 20}" fill="none" stroke="#0a5"/>
+  ${headerText}
+  <rect x="30" y="${headerBlock}" width="840" height="50" fill="#e8f5e9" stroke="${GREEN}"/>
+  ${tableHeader}
+  <rect x="30" y="${headerBlock + 50}" width="840" height="${tableRows * rowH + 20}" fill="none" stroke="${GREEN}"/>
   ${itemRows}
-  <text x="40" y="${h - 80}" fill="#0a5" font-size="12">Gudang: ${esc(doc.gudang)} · Supplier: ${esc(doc.supplier)}</text>
-  <text x="40" y="${h - 55}" fill="#666" font-size="11">Direvisi via GBC Inbound Intelligence</text>
+  ${footer}
 </svg>`;
 }
 
@@ -55,9 +134,13 @@ export async function renderSuratJalanRevisionPng(doc: OcrSheetDocumentDetail): 
   return sharp(Buffer.from(svg)).png().toBuffer();
 }
 
+/** `[REVISI] SJ_...png` — prefix, bukan suffix. */
 export function revisionFileName(originalName: string): string {
-  const base = originalName.replace(/\.[a-z0-9]+$/i, "");
-  const ext = originalName.match(/\.[a-z0-9]+$/i)?.[0] || ".png";
-  if (base.includes("[REVISI]")) return originalName;
-  return `${base} [REVISI]${ext.replace(/\.[a-z]+$/i, ".png")}`;
+  const withoutExt = originalName.replace(/\.[a-z0-9]+$/i, "").trim();
+  const base = withoutExt
+    .replace(/^\[REVISI\]\s*/i, "")
+    .replace(/\s*\[REVISI\]$/i, "")
+    .trim();
+  if (!base) return "[REVISI] SuratJalan.png";
+  return `[REVISI] ${base}.png`;
 }
