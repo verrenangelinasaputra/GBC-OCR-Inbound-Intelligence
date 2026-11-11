@@ -30,11 +30,16 @@ export const OCR_COL = {
   STATUS_REVIEW: 19,
   LINK_REVISI: 20,
   SAMPLE_TYPE: 21,
+  TS_KIRIM_SUPPLIER: 22,
+  TS_DITINJAU_GUDANG: 23,
+  TS_REVISI_GUDANG: 24,
+  TS_APPROVE_GUDANG: 25,
+  TS_KONFIRMASI_SUPPLIER: 26,
 } as const;
 
 export const OCR_SHEET_COLUMN_COUNT = OCR_SHEET_HEADERS.length;
 
-export const OCR_SHEET_RANGE_COL = "V";
+export const OCR_SHEET_RANGE_COL = "AA";
 
 export function ocrSheetRowRange(sheetTab: string, startRow: number, endRow?: number): string {
   const end = endRow ?? startRow;
@@ -87,7 +92,29 @@ export type OcrSheetRowFields = {
   statusReview: string;
   linkRevisi: string;
   sampleType: string;
+  tsKirimSupplier: string;
+  tsDitinjauGudang: string;
+  tsRevisiGudang: string;
+  tsApproveGudang: string;
+  tsKonfirmasiSupplier: string;
 };
+
+function workflowTsFromRow(r: string[], col: number): string {
+  return String(r[col] ?? "").trim();
+}
+
+function emptyWorkflowTs(): Pick<
+  OcrSheetRowFields,
+  "tsKirimSupplier" | "tsDitinjauGudang" | "tsRevisiGudang" | "tsApproveGudang" | "tsKonfirmasiSupplier"
+> {
+  return {
+    tsKirimSupplier: "",
+    tsDitinjauGudang: "",
+    tsRevisiGudang: "",
+    tsApproveGudang: "",
+    tsKonfirmasiSupplier: "",
+  };
+}
 
 export function mapOcrSheetRow(row: string[] | undefined): OcrSheetRowFields {
   const r = row ?? [];
@@ -115,6 +142,7 @@ export function mapOcrSheetRow(row: string[] | undefined): OcrSheetRowFields {
       statusReview: DEFAULT_OCR_REVIEW_STATUS,
       linkRevisi: "",
       sampleType: DEFAULT_SAMPLE_ITEM_TAG,
+      ...emptyWorkflowTs(),
     };
   }
   if (isLegacyOcrGudangOnlyRow(r)) {
@@ -141,6 +169,7 @@ export function mapOcrSheetRow(row: string[] | undefined): OcrSheetRowFields {
       statusReview: DEFAULT_OCR_REVIEW_STATUS,
       linkRevisi: "",
       sampleType: DEFAULT_SAMPLE_ITEM_TAG,
+      ...emptyWorkflowTs(),
     };
   }
   return {
@@ -173,6 +202,11 @@ export function mapOcrSheetRow(row: string[] | undefined): OcrSheetRowFields {
           String(r[OCR_COL.NAMA_BARANG] ?? "")
         )
     ),
+    tsKirimSupplier: workflowTsFromRow(r, OCR_COL.TS_KIRIM_SUPPLIER),
+    tsDitinjauGudang: workflowTsFromRow(r, OCR_COL.TS_DITINJAU_GUDANG),
+    tsRevisiGudang: workflowTsFromRow(r, OCR_COL.TS_REVISI_GUDANG),
+    tsApproveGudang: workflowTsFromRow(r, OCR_COL.TS_APPROVE_GUDANG),
+    tsKonfirmasiSupplier: workflowTsFromRow(r, OCR_COL.TS_KONFIRMASI_SUPPLIER),
   };
 }
 
@@ -200,5 +234,10 @@ export function ocrSheetRowToValues(fields: OcrSheetRowFields): string[] {
     fields.statusReview,
     fields.linkRevisi,
     fields.sampleType,
+    fields.tsKirimSupplier,
+    fields.tsDitinjauGudang,
+    fields.tsRevisiGudang,
+    fields.tsApproveGudang,
+    fields.tsKonfirmasiSupplier,
   ];
 }

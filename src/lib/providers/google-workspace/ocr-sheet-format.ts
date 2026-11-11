@@ -2,7 +2,10 @@ import type { sheets_v4 } from "googleapis";
 import { OCR_COL, OCR_SHEET_COLUMN_COUNT } from "./ocr-sheet-columns";
 
 function columnWidthRequests(sheetId: number) {
-  const widths = [120, 140, 105, 95, 115, 100, 90, 140, 160, 90, 90, 200, 90, 160, 200, 220, 120, 160, 70, 140, 160, 130];
+  const widths = [
+    120, 140, 105, 95, 115, 100, 90, 140, 160, 90, 90, 200, 90, 160, 200, 220, 120, 160, 70, 140, 160, 130, 155, 155,
+    155, 155, 165,
+  ];
   return widths.map((pixelSize, startIndex) => ({
     updateDimensionProperties: {
       range: {

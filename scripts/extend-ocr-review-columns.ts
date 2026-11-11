@@ -1,6 +1,7 @@
-/** Sinkronkan header OCR (kolom A–V) pada tab utama Data Compilation / Sheet1. */
+/** Sinkronkan header OCR (kolom A–AA) pada tab utama Data Compilation / Sheet1. */
 import { google } from "googleapis";
 import { OCR_SHEET_HEADERS } from "../src/lib/providers/google-workspace/google-sj-export-rows";
+import { OCR_SHEET_RANGE_COL } from "../src/lib/providers/google-workspace/ocr-sheet-columns";
 import { getGoogleExportConfigOptional } from "../src/lib/providers/google-workspace";
 import { createGoogleAuthClient, resolveSheetTabName } from "../src/lib/providers/google-workspace/client";
 import { loadEnvFile } from "./load-env";
@@ -15,7 +16,7 @@ async function main() {
   const tab = await resolveSheetTabName(config);
   await sheets.spreadsheets.values.update({
     spreadsheetId: config.sheetId,
-    range: `'${tab.replace(/'/g, "''")}'!A1:V1`,
+    range: `'${tab.replace(/'/g, "''")}'!A1:${OCR_SHEET_RANGE_COL}1`,
     valueInputOption: "RAW",
     requestBody: { values: [Array.from(OCR_SHEET_HEADERS)] },
   });

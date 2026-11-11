@@ -1,5 +1,6 @@
 import type { GeminiSJItem, GeminiSJPayload } from "@/lib/providers/ocr/gemini-surat-jalan";
 import { DEFAULT_OCR_REVIEW_STATUS } from "@/lib/ocr-review/workflow-status";
+import { ocrWorkflowTimestamp } from "@/lib/ocr-review/workflow-timestamp";
 import { inferSampleItemTag } from "@/lib/surat-jalan/sample-item-tag";
 
 /** Kolom A–R — selaras `buildGoogleSheetRows`, `ocr-sheet-columns`, dan review. */
@@ -26,6 +27,11 @@ export const OCR_SHEET_HEADERS = [
   "Status Review",
   "Link Revisi",
   "Tipe Sample",
+  "TS Kirim Supplier",
+  "TS Ditinjau Gudang",
+  "TS Revisi Gudang",
+  "TS Approve Gudang",
+  "TS Konfirmasi Supplier",
 ] as const;
 
 export const OCR_SHEET_LEGACY_HEADER = "Tanggal Ekspor";
@@ -158,6 +164,7 @@ export function buildGoogleSheetRows(params: {
 }): string[][] {
   const { payload, fileName, fileUrl, exportedAt = new Date(), fallback } = params;
   const timestamp = exportTimestamp(exportedAt);
+  const tsKirimSupplier = ocrWorkflowTimestamp(exportedAt);
   const tanggal =
     formatDateDdMmYyyy(payload.tanggal) ||
     (fallback?.documentDate ? formatDateDdMmYyyy(fallback.documentDate.toISOString().slice(0, 10)) : "");
@@ -208,6 +215,11 @@ export function buildGoogleSheetRows(params: {
         DEFAULT_OCR_REVIEW_STATUS,
         "",
         inferSampleItemTag("Tidak ada baris terdeteksi", catatan),
+        tsKirimSupplier,
+        "",
+        "",
+        "",
+        "",
       ],
     ];
   }
@@ -240,6 +252,11 @@ export function buildGoogleSheetRows(params: {
       DEFAULT_OCR_REVIEW_STATUS,
       "",
       inferSampleItemTag(item.keterangan, catatan, item.nama_barang),
+      tsKirimSupplier,
+      "",
+      "",
+      "",
+      "",
     ];
   });
 }

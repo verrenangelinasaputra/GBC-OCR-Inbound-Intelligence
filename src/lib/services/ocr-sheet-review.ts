@@ -4,6 +4,8 @@ import {
   DEFAULT_OCR_REVIEW_STATUS,
   normalizeOcrReviewStatus,
 } from "@/lib/ocr-review/workflow-status";
+import { ocrWorkflowTimestamp } from "@/lib/ocr-review/workflow-timestamp";
+import type { OcrSheetRowFields } from "@/lib/providers/google-workspace/ocr-sheet-columns";
 import { createGoogleAuthClient, resolveSheetTabName } from "@/lib/providers/google-workspace/client";
 import { getGoogleExportConfigOptional } from "@/lib/providers/google-workspace";
 import {
@@ -31,6 +33,26 @@ async function readMatrix() {
   return { config, sheets, sheetTab, rows: res.data.values ?? [] };
 }
 
+function stampWorkflowTimestamp(fields: OcrSheetRowFields, status: OcrReviewStatus): void {
+  const now = ocrWorkflowTimestamp();
+  switch (status) {
+    case "SUDAH_DITINJAU":
+      if (!fields.tsDitinjauGudang) fields.tsDitinjauGudang = now;
+      break;
+    case "MENUNGGU_REVISI_SUPPLIER":
+      fields.tsRevisiGudang = now;
+      break;
+    case "TERVERIFIKASI_DISETUJUI":
+      fields.tsApproveGudang = now;
+      break;
+    case "SELESAI":
+      fields.tsKonfirmasiSupplier = now;
+      break;
+    default:
+      break;
+  }
+}
+
 export async function setOcrDocumentReviewStatus(params: {
   docKey: string;
   status: OcrReviewStatus;
@@ -47,6 +69,7 @@ export async function setOcrDocumentReviewStatus(params: {
     const fields = mapOcrSheetRow(row);
     fields.statusReview = params.status;
     if (params.linkRevisi !== undefined) fields.linkRevisi = params.linkRevisi;
+    stampWorkflowTimestamp(fields, params.status);
     updates.push({
       range: `'${sheetTab.replace(/'/g, "''")}'!A${i + 1}:${OCR_SHEET_RANGE_COL}${i + 1}`,
       values: [ocrSheetRowToValues(fields)],

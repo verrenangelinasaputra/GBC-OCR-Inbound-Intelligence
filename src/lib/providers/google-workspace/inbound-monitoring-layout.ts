@@ -3,6 +3,7 @@ import { DATA_COMPILATION_TAB_NAME } from "@/lib/config/ocr-export-target";
 import { SUPPLIER_GUDANG_OPTIONS } from "@/lib/config/supplier-gudang";
 import type { GoogleExportConfig } from "./config";
 import { OCR_SHEET_HEADERS } from "./google-sj-export-rows";
+import { OCR_SHEET_RANGE_COL } from "./ocr-sheet-columns";
 import { applyOcrSheetFormatting } from "./ocr-sheet-format";
 import { applySummaryDashboardFormatting } from "./summary-sheet-format";
 import {
@@ -231,7 +232,7 @@ export async function ensureInboundMonitoringWorkbook(
     const tabName = `'${g.replace(/'/g, "''")}'`;
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `${tabName}!A1:V1`,
+      range: `${tabName}!A1:${OCR_SHEET_RANGE_COL}1`,
       valueInputOption: "RAW",
       requestBody: { values: [Array.from(OCR_SHEET_HEADERS)] },
     });
@@ -250,7 +251,7 @@ export async function ensureInboundMonitoringWorkbook(
   const sampleTabName = `'${SAMPLE_ONLY_TAB_NAME.replace(/'/g, "''")}'`;
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `${sampleTabName}!A1:V1`,
+    range: `${sampleTabName}!A1:${OCR_SHEET_RANGE_COL}1`,
     valueInputOption: "RAW",
     requestBody: { values: [Array.from(OCR_SHEET_HEADERS)] },
   });
