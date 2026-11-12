@@ -99,22 +99,25 @@ export async function loadMasterMappingEntries(force = false): Promise<MasterMap
   const auth = createGoogleSheetsAuthClient(googleConfigForSpreadsheet(spreadsheetId) ?? base);
   const sheets = google.sheets({ version: "v4", auth });
 
-  await ensureMasterMappingTab(sheets, spreadsheetId, tab);
+  try {
+    await ensureMasterMappingTab(sheets, spreadsheetId, tab);
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `${quoteTab(tab)}!A:J`,
+    });
 
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: `${quoteTab(tab)}!A:J`,
-  });
+    const rows = res.data.values ?? [];
+    const entries: MasterMappingEntry[] = [];
+    for (let i = 1; i < rows.length; i += 1) {
+      const parsed = rowToEntry(rows[i] ?? [], i + 1);
+      if (parsed) entries.push(parsed);
+    }
 
-  const rows = res.data.values ?? [];
-  const entries: MasterMappingEntry[] = [];
-  for (let i = 1; i < rows.length; i += 1) {
-    const parsed = rowToEntry(rows[i] ?? [], i + 1);
-    if (parsed) entries.push(parsed);
+    cache = { at: now, entries };
+    return entries;
+  } catch {
+    return [];
   }
-
-  cache = { at: now, entries };
-  return entries;
 }
 
 export async function appendMasterMappingEntry(

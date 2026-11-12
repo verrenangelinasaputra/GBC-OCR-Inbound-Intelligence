@@ -1,5 +1,5 @@
 import { ModuleListPage } from "@/components/layout/module-list-page";
-import { SpreadsheetModePage, spreadsheetModeActive } from "@/components/layout/spreadsheet-mode-page";
+import { spreadsheetModeActive } from "@/components/layout/spreadsheet-mode-page";
 import { SkuMappingWorkbench } from "@/components/sku-mapping/sku-mapping-workbench";
 import { getSession } from "@/lib/auth/session";
 import { getInternalUserProfile } from "@/lib/internal-auth/profile";
@@ -18,11 +18,23 @@ import Link from "next/link";
 export default async function SkuMappingPage() {
   if (spreadsheetModeActive()) {
     if (!getGoogleExportConfigOptional()) {
-      return <SpreadsheetModePage title="Product SKU Mapping" />;
+      return (
+        <ModuleListPage
+          title="Product SKU Mapping"
+          description="Mode spreadsheet — butuh konfigurasi Google export."
+        >
+          <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            Google export belum aktif. Pastikan di Vercel: <code>SHEET_ONLY_MODE=true</code>,{" "}
+            <code>GOOGLE_SHEET_ID</code>, <code>GOOGLE_DRIVE_FOLDER_ID</code>, dan{" "}
+            <code>GOOGLE_SERVICE_ACCOUNT_JSON</code> (atau file kredensial).
+          </p>
+        </ModuleListPage>
+      );
     }
 
     let workbench: Awaited<ReturnType<typeof buildSkuMappingWorkbench>> = [];
     let catalogSize = 0;
+    let loadError: string | null = null;
     try {
       const session = await getSession();
       const profile = session ? await getInternalUserProfile(session.username) : null;
@@ -30,8 +42,31 @@ export default async function SkuMappingPage() {
       workbench = await buildSkuMappingWorkbench(gudangFilter);
       const { loadSkuRekapCatalog } = await import("@/lib/services/sku-rekap-catalog");
       catalogSize = (await loadSkuRekapCatalog()).length;
-    } catch {
-      return <SpreadsheetModePage title="Product SKU Mapping" />;
+    } catch (e) {
+      loadError =
+        e instanceof Error
+          ? e.message
+          : "Gagal membaca spreadsheet OCR / REKAP SKUL. Cek share Editor ke service account.";
+    }
+
+    if (loadError) {
+      return (
+        <ModuleListPage title="Product SKU Mapping" description="Gagal memuat data mapping.">
+          <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+            {loadError}
+          </p>
+          <p className="mt-3 text-sm text-slate-600">
+            Share spreadsheet{" "}
+            <a
+              href={`https://docs.google.com/spreadsheets/d/${getSkuRekapSheetId()}/edit`}
+              className="text-blue-600 hover:underline"
+            >
+              REKAP SKUL
+            </a>{" "}
+            dan sheet OCR ke email service account (Editor), lalu muat ulang halaman ini.
+          </p>
+        </ModuleListPage>
+      );
     }
 
     const session = await getSession();
