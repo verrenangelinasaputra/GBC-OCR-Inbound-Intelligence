@@ -115,7 +115,15 @@ export function SkuMappingWorkbench({
                   <td className="px-3 py-3">{row.line.jumlah || "—"}</td>
                   <td className="px-3 py-3">
                     {row.suggestions.length === 0 ? (
-                      <StatusBadge label="Tidak ada match" tone="danger" />
+                      <div className="space-y-2">
+                        <StatusBadge label="Tidak ada match" tone="danger" />
+                        <Link
+                          href={`/master-mapping?ocr=${encodeURIComponent(row.line.namaBarang)}`}
+                          className="inline-block rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-800 hover:bg-blue-100"
+                        >
+                          Tambah SKU baru
+                        </Link>
+                      </div>
                     ) : (
                       <div className="space-y-2">
                         {row.suggestions.map((s) => (

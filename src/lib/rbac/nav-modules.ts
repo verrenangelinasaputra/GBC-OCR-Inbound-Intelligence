@@ -9,6 +9,7 @@ export const PORTAL_NAV_MODULES: {
   { module: "dashboard", label: "Dashboard", href: "/dashboard" },
   { module: "ocr_review", label: "OCR Review Queue", href: "/ocr-review" },
   { module: "sku_mapping", label: "Product SKU Mapping", href: "/sku-mapping" },
+  { module: "master_mapping", label: "Master Mapping", href: "/master-mapping" },
   { module: "data_barang_masuk", label: "Data Barang Masuk", href: "/data-barang-masuk" },
   { module: "users", label: "User & Role Management", href: "/users" },
 ];

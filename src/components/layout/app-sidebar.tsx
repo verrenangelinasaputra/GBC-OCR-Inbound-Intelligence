@@ -9,6 +9,7 @@ import {
   ScanLine,
   Link2,
   Package,
+  Tags,
   Users,
   ChevronLeft,
   ChevronRight,
@@ -22,6 +23,7 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   "/dashboard": LayoutDashboard,
   "/ocr-review": ScanLine,
   "/sku-mapping": Link2,
+  "/master-mapping": Tags,
   "/data-barang-masuk": Package,
   "/users": Users,
 };

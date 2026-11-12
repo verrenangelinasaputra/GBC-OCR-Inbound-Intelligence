@@ -8,6 +8,7 @@ import type { SkuRekapEntry } from "@/lib/sku-matching/sku-rekap-types";
 import { appendDbmInboundRow, listDbmFinalizedRowKeys } from "@/lib/services/dbm-inbound-sheet";
 import { getSelesaiLineByRowKey } from "@/lib/services/ocr-sheet-sku-mapping";
 import { getCatalogEntryByRowNo, loadSkuRekapCatalog } from "@/lib/services/sku-rekap-catalog";
+import { loadMasterMappingEntries } from "@/lib/services/master-mapping-sheet";
 
 function sheetSkuMappingEnabled(): boolean {
   return isSheetOnlyMode() || !hasDatabase();
@@ -51,13 +52,19 @@ export async function POST(request: Request) {
       return jsonError(new Error("FORBIDDEN"), 403);
     }
 
-    const catalog = await loadSkuRekapCatalog();
+    const [catalog, masterMappings] = await Promise.all([
+      loadSkuRekapCatalog(),
+      loadMasterMappingEntries(),
+    ]);
     let catalogEntry: SkuRekapEntry | null = getCatalogEntryByRowNo(catalog, catalogRowNo);
+    if (!catalogEntry && catalogRowNo.startsWith("MM-")) {
+      catalogEntry = masterMappings.find((m) => m.rowNo === catalogRowNo) ?? null;
+    }
     if (!catalogEntry) {
       return jsonError(new Error("SKU rekap tidak ditemukan"), 400);
     }
 
-    const suggestions = findTopRekapSkuMatches(line.namaBarang, catalog, 3);
+    const suggestions = findTopRekapSkuMatches(line.namaBarang, catalog, 3, masterMappings);
     const allowed = suggestions.some((s) => s.rowNo === catalogEntry!.rowNo);
     if (!allowed) {
       return jsonError(new Error("Pilihan SKU harus dari rekomendasi (top match)"), 400);

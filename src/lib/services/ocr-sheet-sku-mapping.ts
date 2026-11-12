@@ -18,6 +18,7 @@ import type { SkuMappingLineRow } from "@/lib/sku-matching/sku-mapping-line";
 import { findTopRekapSkuMatches } from "@/lib/sku-matching/match-rekap-sku";
 import type { SkuMappingWorkbenchRow } from "@/lib/sku-matching/sku-rekap-types";
 import { loadSkuRekapCatalog } from "@/lib/services/sku-rekap-catalog";
+import { loadMasterMappingEntries } from "@/lib/services/master-mapping-sheet";
 import { listDbmFinalizedRowKeys } from "@/lib/services/dbm-inbound-sheet";
 
 type DocGroup = {
@@ -111,9 +112,10 @@ export async function listSelesaiSkuMappingLines(
 export async function buildSkuMappingWorkbench(
   gudangFilter?: string[]
 ): Promise<SkuMappingWorkbenchRow[]> {
-  const [lines, catalog, finalized] = await Promise.all([
+  const [lines, catalog, masterMappings, finalized] = await Promise.all([
     listSelesaiSkuMappingLines(gudangFilter),
     loadSkuRekapCatalog(),
+    loadMasterMappingEntries(),
     listDbmFinalizedRowKeys(),
   ]);
 
@@ -121,7 +123,7 @@ export async function buildSkuMappingWorkbench(
 
   return pending.map((line) => ({
     line,
-    suggestions: findTopRekapSkuMatches(line.namaBarang, catalog, 3),
+    suggestions: findTopRekapSkuMatches(line.namaBarang, catalog, 3, masterMappings),
   }));
 }
 
