@@ -11,5 +11,6 @@ export function ocrWorkflowTimestamp(date = new Date()): string {
     hourCycle: "h23",
   }).formatToParts(date);
   const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? "";
-  return `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get("minute")}:${get("second")}`;
+  const pad2 = (v: string) => v.padStart(2, "0");
+  return `${get("year")}-${get("month")}-${get("day")} ${pad2(get("hour"))}:${pad2(get("minute"))}:${pad2(get("second"))}`;
 }

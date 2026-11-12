@@ -11,7 +11,8 @@ export type WorkflowStampFields = {
   statusReview?: OcrReviewStatus | string;
 };
 
-const ISO_TS = /^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})$/;
+/** `YYYY-MM-DD H:mm:ss` — jam/menit/detik boleh 1 atau 2 digit (Google Sheets sering menampilkan `7:13` bukan `07:13`). */
+const ISO_TS = /^(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/;
 
 /** Konversi jam dinding WIB → `Date` (instant UTC). */
 function jakartaWallToDate(y: number, mo: number, d: number, h: number, mi: number, s: number): Date {
@@ -30,7 +31,7 @@ export function parseWorkflowInstant(raw: string | undefined | null): Date | nul
       Number(iso[3]),
       Number(iso[4]),
       Number(iso[5]),
-      Number(iso[6])
+      Number(iso[6] ?? 0)
     );
   }
   const slash = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(text);
