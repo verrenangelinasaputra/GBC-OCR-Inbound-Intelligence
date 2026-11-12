@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { getSkuRekapSpreadsheetEditUrl } from "@/lib/config/sku-mapping-sheets";
 import type { SkuMappingWorkbenchRow } from "@/lib/sku-matching/sku-rekap-types";
 import { StatusBadge } from "@/components/ui/status-badge";
 
@@ -117,12 +118,14 @@ export function SkuMappingWorkbench({
                     {row.suggestions.length === 0 ? (
                       <div className="space-y-2">
                         <StatusBadge label="Tidak ada match" tone="danger" />
-                        <Link
-                          href={`/master-mapping?ocr=${encodeURIComponent(row.line.namaBarang)}`}
+                        <a
+                          href={getSkuRekapSpreadsheetEditUrl()}
+                          target="_blank"
+                          rel="noreferrer"
                           className="inline-block rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-800 hover:bg-blue-100"
                         >
                           Tambah SKU baru
-                        </Link>
+                        </a>
                       </div>
                     ) : (
                       <div className="space-y-2">
