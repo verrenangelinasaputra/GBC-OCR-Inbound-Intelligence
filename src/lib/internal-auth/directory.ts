@@ -61,6 +61,23 @@ function a1(tab: string, cells: string): string {
   return `'${tab.replace(/'/g, "''")}'!${cells}`;
 }
 
+async function resolveUsersTabGridId(
+  sheets: ReturnType<typeof google.sheets>,
+  spreadsheetId: string,
+  tabTitle: string
+): Promise<number> {
+  const meta = await sheets.spreadsheets.get({
+    spreadsheetId,
+    fields: "sheets.properties",
+  });
+  const sheet = meta.data.sheets?.find((s) => s.properties?.title === tabTitle);
+  const gridId = sheet?.properties?.sheetId;
+  if (gridId == null) {
+    throw new SupplierAuthError(`Tab "${tabTitle}" tidak ditemukan di spreadsheet internal.`, 500);
+  }
+  return gridId;
+}
+
 function timestampJakarta(date = new Date()): string {
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Asia/Jakarta",
@@ -298,6 +315,98 @@ export async function updateInternalUserAdmin(
   const updated = await findInternalUserByUsername(username);
   if (!updated) throw new SupplierAuthError("Gagal membaca user setelah update.", 500);
   return updated;
+}
+
+/** Username bisa dipakai register baru jika belum ada atau status ditolak (daftar ulang). */
+export function internalUsernameOpenForRegistration(account: InternalAccount | null): boolean {
+  if (!account) return true;
+  return account.status === "REJECTED";
+}
+
+export async function replaceRejectedInternalRegistration(params: {
+  username: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  gudang: string;
+  passwordHash: string;
+}): Promise<void> {
+  const account = await findInternalUserByUsername(params.username);
+  if (!account || account.status !== "REJECTED") {
+    throw new SupplierAuthError("Username tidak bisa didaftarkan ulang.", 409);
+  }
+
+  const { sheets, sheetId, tab } = sheetTarget();
+  const row = [
+    account.userId,
+    params.fullName.trim(),
+    account.username,
+    params.email.trim().toLowerCase(),
+    params.phone.trim(),
+    params.gudang,
+    params.passwordHash,
+    "WAREHOUSE_OPERATOR",
+    "PENDING_APPROVAL",
+    timestampJakarta(),
+    "",
+    "",
+  ];
+
+  try {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: sheetId,
+      range: a1(tab, `A${account.rowNumber}:L${account.rowNumber}`),
+      valueInputOption: "RAW",
+      requestBody: { values: [row] },
+    });
+  } catch (error) {
+    wrapSheetError(error);
+  }
+}
+
+export async function deleteInternalUser(username: string, actorUsername?: string): Promise<void> {
+  const key = username.trim().toLowerCase();
+  const account = await findInternalUserByUsername(key);
+  if (!account) throw new SupplierAuthError("User tidak ditemukan.", 404);
+
+  const actor = actorUsername?.trim().toLowerCase();
+  if (actor && actor === account.username) {
+    throw new SupplierAuthError("Anda tidak bisa menghapus akun yang sedang dipakai login.", 400);
+  }
+
+  if (account.roles.includes("SUPER_ADMIN")) {
+    const all = await listInternalUsers();
+    const otherSupers = all.filter(
+      (u) => u.roles.includes("SUPER_ADMIN") && u.username !== account.username
+    );
+    if (otherSupers.length === 0) {
+      throw new SupplierAuthError("Tidak bisa menghapus satu-satunya Super Admin.", 400);
+    }
+  }
+
+  const { sheets, sheetId, tab } = sheetTarget();
+  const gridId = await resolveUsersTabGridId(sheets, sheetId, tab);
+  try {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: sheetId,
+      requestBody: {
+        requests: [
+          {
+            deleteDimension: {
+              range: {
+                sheetId: gridId,
+                dimension: "ROWS",
+                startIndex: account.rowNumber - 1,
+                endIndex: account.rowNumber,
+              },
+            },
+          },
+        ],
+      },
+    });
+  } catch (error) {
+    wrapSheetError(error);
+  }
 }
 
 export async function markInternalLogin(rowNumber: number): Promise<void> {

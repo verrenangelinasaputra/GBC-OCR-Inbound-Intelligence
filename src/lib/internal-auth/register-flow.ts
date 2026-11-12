@@ -18,7 +18,12 @@ import {
   saveInternalAuthCode,
   type InternalRegisterPayload,
 } from "./codes";
-import { appendInternalUser, findInternalUserByUsername } from "./directory";
+import {
+  appendInternalUser,
+  findInternalUserByUsername,
+  internalUsernameOpenForRegistration,
+  replaceRejectedInternalRegistration,
+} from "./directory";
 
 function asError(error: unknown): SupplierAuthError {
   if (error instanceof SupplierAuthError) return error;
@@ -58,7 +63,9 @@ export async function sendInternalRegisterCode(body: {
     validatePasswordPair(password, String(body.confirmPassword ?? ""));
 
     const existing = await findInternalUserByUsername(username);
-    if (existing) throw new SupplierAuthError("Username sudah dipakai. Login atau gunakan username lain.", 409);
+    if (!internalUsernameOpenForRegistration(existing)) {
+      throw new SupplierAuthError("Username sudah dipakai. Login atau gunakan username lain.", 409);
+    }
 
     await assertInternalCodeResendAllowed(username);
 
@@ -104,18 +111,29 @@ export async function verifyInternalRegisterCode(
   }
 
   const existing = await findInternalUserByUsername(username);
-  if (existing) throw new SupplierAuthError("Username sudah terdaftar.", 409);
-
-  await appendInternalUser({
-    userId: randomUUID(),
-    fullName: payload.fullName,
-    username,
-    email: payload.email,
-    phone: payload.phone,
-    gudang: payload.gudang,
-    passwordHash: payload.passwordHash,
-    roles: ["WAREHOUSE_OPERATOR"],
-  });
+  if (existing?.status === "REJECTED") {
+    await replaceRejectedInternalRegistration({
+      username,
+      fullName: payload.fullName,
+      email: payload.email,
+      phone: payload.phone,
+      gudang: payload.gudang,
+      passwordHash: payload.passwordHash,
+    });
+  } else if (existing) {
+    throw new SupplierAuthError("Username sudah terdaftar.", 409);
+  } else {
+    await appendInternalUser({
+      userId: randomUUID(),
+      fullName: payload.fullName,
+      username,
+      email: payload.email,
+      phone: payload.phone,
+      gudang: payload.gudang,
+      passwordHash: payload.passwordHash,
+      roles: ["WAREHOUSE_OPERATOR"],
+    });
+  }
 
   try {
     await sendMail({

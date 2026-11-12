@@ -19,7 +19,10 @@ export async function loginInternalFromSheet(usernameRaw: string, password: stri
     );
   }
   if (account.status === "REJECTED") {
-    throw new SupplierAuthError("Pendaftaran ditolak. Hubungi administrator GBC.", 403);
+    throw new SupplierAuthError(
+      "Pendaftaran ditolak. Daftar ulang di halaman Register dengan username yang sama setelah memperbarui data.",
+      403
+    );
   }
   if (account.status !== "ACTIVE") {
     throw new SupplierAuthError("Akun tidak aktif. Hubungi administrator GBC.", 403);

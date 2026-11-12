@@ -11,13 +11,14 @@ import { parseDashboardBucketFilter } from "@/lib/ocr-review/dashboard-bucket";
 import {
   filterOcrReviewDocs,
   parseMonthFilter,
+  parseOcrReviewSort,
   parseYearFilter,
 } from "@/lib/ocr-review/list-filters";
 import { collectDistinctSjYears } from "@/lib/surat-jalan/tanggal-sj";
 import Link from "next/link";
 import { StatusBadge } from "@/components/ui/status-badge";
 
-type SearchParams = { gudang?: string; status?: string; year?: string; month?: string };
+type SearchParams = { gudang?: string; status?: string; year?: string; month?: string; sort?: string };
 
 export default async function OcrReviewPage({
   searchParams,
@@ -29,6 +30,7 @@ export default async function OcrReviewPage({
   const statusBucket = parseDashboardBucketFilter(query.status);
   const yearFilter = parseYearFilter(query.year);
   const monthFilter = parseMonthFilter(query.month);
+  const sortMode = parseOcrReviewSort(query.sort);
 
   if (spreadsheetModeActive()) {
     let docs: Awaited<ReturnType<typeof listOcrDocumentsFromSheet>> = [];
@@ -67,7 +69,7 @@ export default async function OcrReviewPage({
             month={monthFilter}
           />
         </Suspense>
-        <OcrReviewQueueTable docs={filtered} />
+        <OcrReviewQueueTable docs={filtered} initialSort={sortMode} />
       </ModuleListPage>
     );
   }

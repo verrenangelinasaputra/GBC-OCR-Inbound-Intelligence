@@ -1,7 +1,7 @@
 import { jsonError, requireSuperAdmin } from "@/lib/api/auth-context";
 import { isSheetOnlyMode } from "@/lib/config/app-mode";
 import { hasDatabase } from "@/lib/db";
-import { listInternalUsers, updateInternalUserAdmin } from "@/lib/internal-auth/directory";
+import { deleteInternalUser, listInternalUsers, updateInternalUserAdmin } from "@/lib/internal-auth/directory";
 import type { AppModule } from "@/lib/rbac/modules";
 import { normalizeGudangSelection } from "@/lib/config/supplier-gudang";
 
@@ -78,6 +78,23 @@ export async function PATCH(request: Request) {
         allowedModules: updated.allowedModules,
       },
     });
+  } catch (e) {
+    return jsonError(e);
+  }
+}
+
+export async function DELETE(request: Request) {
+  if (!sheetAdminEnabled()) {
+    return jsonError(new Error("Hanya mode spreadsheet"), 404);
+  }
+  try {
+    const session = await requireSuperAdmin();
+    const body = await request.json().catch(() => ({}));
+    const username = String(body.username ?? "").trim().toLowerCase();
+    if (!username) return jsonError(new Error("username wajib"), 400);
+
+    await deleteInternalUser(username, session.username);
+    return Response.json({ ok: true, deleted: username });
   } catch (e) {
     return jsonError(e);
   }

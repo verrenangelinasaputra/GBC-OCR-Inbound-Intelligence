@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { OcrSheetDocumentDetail, OcrSheetLine } from "@/lib/services/ocr-sheet-detail";
 import { ReviewStatusBadge } from "@/components/ocr-review/review-status-badge";
+import { WarehouseWaitBadge, WorkflowTimelineCompact } from "@/components/ocr-review/workflow-timeline";
 import { StatusBadge } from "@/components/ui/status-badge";
 import Link from "next/link";
 import { Plus, Trash2 } from "lucide-react";
@@ -238,6 +239,7 @@ export function SheetOcrReviewPanel({
         <span className="text-sm text-slate-500">
           {lines.length} baris item · diekspor {doc.exportTimestamp || "—"}
         </span>
+        <WarehouseWaitBadge fields={{ ...lines[0], statusReview: doc.statusReview }} />
         <Link href="/ocr-review" className="text-sm text-blue-600 hover:underline">
           ← Kembali ke queue
         </Link>
@@ -245,6 +247,13 @@ export function SheetOcrReviewPanel({
 
       {message && <p className="text-sm text-green-700">{message}</p>}
       {error && <p className="text-sm text-red-600">{error}</p>}
+
+      <section className="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+        <h2 className="text-sm font-semibold text-slate-800">Timeline alur SJ</h2>
+        <div className="mt-2">
+          <WorkflowTimelineCompact fields={{ ...lines[0], statusReview: doc.statusReview }} />
+        </div>
+      </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="rounded-xl border border-slate-200 bg-white p-4">

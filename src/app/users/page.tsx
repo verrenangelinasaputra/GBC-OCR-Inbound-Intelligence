@@ -43,7 +43,7 @@ export default async function UsersPage() {
           </a>
           . Kolom <strong>allowed_modules</strong> = daftar halaman (pisah dengan <code>;</code>).
         </p>
-        <InternalUsersAdmin />
+        <InternalUsersAdmin currentUsername={session?.username ?? ""} />
       </ModuleListPage>
     );
   }

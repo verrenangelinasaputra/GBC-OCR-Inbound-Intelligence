@@ -6,6 +6,8 @@ import { supplierCanConfirmReceipt } from "@/lib/services/ocr-sheet-submissions-
 import { ReviewStatusBadge } from "@/components/ocr-review/review-status-badge";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { downloadSubmissionsWord } from "@/lib/utils/export-submissions-table";
+import { warehouseReviewWaitSortKey } from "@/lib/ocr-review/workflow-timeline";
+import { WarehouseWaitBadge, WorkflowTimelineCompact } from "@/components/ocr-review/workflow-timeline";
 import { ArrowDownUp, FileDown, Package, Printer, RefreshCw, Search, Truck } from "lucide-react";
 
 type SortKey = keyof SubmissionHistoryRow;
@@ -71,6 +73,8 @@ export function SupplierSubmissionsHistory({
   const [dateTo, setDateTo] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("exportTimestamp");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [sortByWaitReview, setSortByWaitReview] = useState(true);
+  const [timelineDocKey, setTimelineDocKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ docKey: string; index: number; label: string } | null>(
@@ -115,9 +119,13 @@ export function SupplierSubmissionsHistory({
         COLUMNS.some((c) => String(r[c.key] ?? "").toLowerCase().includes(q))
       );
     }
-    list.sort((a, b) => compareValues(String(a[sortKey] ?? ""), String(b[sortKey] ?? ""), sortDir));
+    if (sortByWaitReview) {
+      list.sort((a, b) => warehouseReviewWaitSortKey(b) - warehouseReviewWaitSortKey(a));
+    } else {
+      list.sort((a, b) => compareValues(String(a[sortKey] ?? ""), String(b[sortKey] ?? ""), sortDir));
+    }
     return list;
-  }, [rows, search, gudang, status, dateFrom, dateTo, sortKey, sortDir]);
+  }, [rows, search, gudang, status, dateFrom, dateTo, sortKey, sortDir, sortByWaitReview]);
 
   const isFirstRowForDoc = useMemo(() => {
     const seen = new Set<string>();
@@ -317,6 +325,17 @@ export function SupplierSubmissionsHistory({
             className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
           />
         </label>
+        <label className="flex flex-col justify-end gap-1 sm:col-span-2">
+          <span className="text-xs font-medium text-slate-500">Urutan daftar SJ</span>
+          <select
+            value={sortByWaitReview ? "wait_review" : "column"}
+            onChange={(e) => setSortByWaitReview(e.target.value === "wait_review")}
+            className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+          >
+            <option value="wait_review">Terlama menunggu tinjauan gudang</option>
+            <option value="column">Urut kolom (klik header tabel)</option>
+          </select>
+        </label>
       </div>
 
       <div className="grid gap-4 print:hidden sm:grid-cols-2">
@@ -376,6 +395,8 @@ export function SupplierSubmissionsHistory({
                     </button>
                   </th>
                 ))}
+                <th className="whitespace-nowrap px-3 py-3 print:hidden">Menunggu gudang</th>
+                <th className="px-3 py-3 print:hidden">Timeline</th>
                 <th className="px-3 py-3 print:hidden">Foto</th>
                 <th className="px-3 py-3 print:hidden">Revisi</th>
                 <th className="px-3 py-3 print:hidden">Konfirmasi</th>
@@ -398,6 +419,28 @@ export function SupplierSubmissionsHistory({
                       )}
                     </td>
                   ))}
+                  <td className="px-3 py-2.5 print:hidden">
+                    {isFirstRowForDoc.has(r.rowKey) ? (
+                      <WarehouseWaitBadge fields={r} />
+                    ) : (
+                      <span className="text-slate-300">···</span>
+                    )}
+                  </td>
+                  <td className="min-w-[120px] px-3 py-2.5 print:hidden">
+                    {isFirstRowForDoc.has(r.rowKey) ? (
+                      timelineDocKey === r.docKey ? (
+                        <WorkflowTimelineCompact fields={r} />
+                      ) : (
+                        <button
+                          type="button"
+                          className="text-xs font-medium text-blue-600 hover:underline"
+                          onClick={() => setTimelineDocKey(r.docKey)}
+                        >
+                          Lihat
+                        </button>
+                      )
+                    ) : null}
+                  </td>
                   <td className="px-3 py-2.5 print:hidden">
                     {r.fileUrl?.startsWith("http") ? (
                       <a
@@ -456,7 +499,7 @@ export function SupplierSubmissionsHistory({
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={COLUMNS.length + 3} className="px-4 py-12 text-center text-slate-500">
+                  <td colSpan={COLUMNS.length + 5} className="px-4 py-12 text-center text-slate-500">
                     Tidak ada data yang cocok dengan filter.
                   </td>
                 </tr>

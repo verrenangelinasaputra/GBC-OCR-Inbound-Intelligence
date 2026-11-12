@@ -22,6 +22,11 @@ export type OcrSheetDocument = {
   gudang: string;
   supplier: string;
   statusReview: OcrReviewStatus;
+  tsKirimSupplier: string;
+  tsDitinjauGudang: string;
+  tsRevisiGudang: string;
+  tsApproveGudang: string;
+  tsKonfirmasiSupplier: string;
 };
 
 export async function listOcrDocumentsFromSheet(
@@ -73,6 +78,11 @@ export async function listOcrDocumentsFromSheet(
       gudang: fields.gudang,
       supplier: fields.supplier,
       statusReview: review,
+      tsKirimSupplier: fields.tsKirimSupplier,
+      tsDitinjauGudang: fields.tsDitinjauGudang,
+      tsRevisiGudang: fields.tsRevisiGudang,
+      tsApproveGudang: fields.tsApproveGudang,
+      tsKonfirmasiSupplier: fields.tsKonfirmasiSupplier,
       statuses: new Set(status ? [status] : []),
       reviewStatuses: new Set([review]),
     });

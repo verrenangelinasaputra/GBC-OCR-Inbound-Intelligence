@@ -25,7 +25,7 @@ function parseGudangList(gudang: string): string[] {
     .filter(Boolean);
 }
 
-export function InternalUsersAdmin() {
+export function InternalUsersAdmin({ currentUsername = "" }: { currentUsername?: string }) {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
@@ -57,6 +57,39 @@ export function InternalUsersAdmin() {
     setDraftGudang(parseGudangList(u.gudang));
     setDraftModules(u.allowedModules.length ? [...u.allowedModules] : []);
     setMessage(null);
+  }
+
+  async function deleteUser(username: string, fullName: string) {
+    const self = currentUsername.trim().toLowerCase() === username.trim().toLowerCase();
+    if (self) {
+      setMessage("Anda tidak bisa menghapus akun sendiri.");
+      return;
+    }
+    if (
+      !window.confirm(
+        `Hapus akun ${fullName} (@${username}) dari spreadsheet? Username bisa dipakai daftar ulang.`
+      )
+    ) {
+      return;
+    }
+    setSaving(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/admin/internal-users", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal menghapus");
+      if (editing === username) setEditing(null);
+      setMessage(`Akun @${username} dihapus.`);
+      await load();
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "Gagal menghapus");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function patchUser(username: string, body: Record<string, unknown>) {
@@ -131,6 +164,14 @@ export function InternalUsersAdmin() {
                     >
                       Atur gudang & halaman
                     </button>
+                    <button
+                      type="button"
+                      disabled={saving}
+                      className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+                      onClick={() => void deleteUser(u.username, u.fullName)}
+                    >
+                      Hapus
+                    </button>
                   </div>
                 </div>
               </li>
@@ -176,13 +217,23 @@ export function InternalUsersAdmin() {
                     {u.allowedModules.length ? `${u.allowedModules.length} halaman` : "Belum ada halaman"}
                   </td>
                   <td className="px-3 py-2 text-right">
-                    <button
-                      type="button"
-                      className="text-blue-600 hover:underline"
-                      onClick={() => startEdit(u)}
-                    >
-                      Edit
-                    </button>
+                    <div className="flex justify-end gap-3">
+                      <button
+                        type="button"
+                        className="text-blue-600 hover:underline"
+                        onClick={() => startEdit(u)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        disabled={saving}
+                        className="text-red-600 hover:underline disabled:opacity-50"
+                        onClick={() => void deleteUser(u.username, u.fullName)}
+                      >
+                        Hapus
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
