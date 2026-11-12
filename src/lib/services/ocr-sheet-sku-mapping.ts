@@ -9,6 +9,7 @@ import {
   type OcrSheetRowFields,
 } from "@/lib/providers/google-workspace/ocr-sheet-columns";
 import {
+  docEligibleForSkuMapping,
   normalizeOcrReviewStatus,
   pickDominantReviewStatus,
   type OcrReviewStatus,
@@ -78,7 +79,7 @@ export async function listSelesaiSkuMappingLines(
 
   for (const group of groups.values()) {
     const docStatus = pickDominantReviewStatus(group.reviewStatuses);
-    if (docStatus !== "SELESAI") continue;
+    if (!docEligibleForSkuMapping(docStatus)) continue;
     if (gudangSet && group.gudang && !gudangSet.has(group.gudang)) continue;
 
     group.lines.forEach((line, idx) => {

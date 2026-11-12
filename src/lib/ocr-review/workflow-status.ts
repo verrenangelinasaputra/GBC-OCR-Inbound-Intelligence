@@ -105,3 +105,9 @@ export function pickDominantReviewStatus(statuses: Iterable<OcrReviewStatus>): O
   }
   return best;
 }
+
+/** SJ siap dipetakan ke DBM: sudah disetujui gudang (approve) atau selesai konfirmasi supplier. */
+export function docEligibleForSkuMapping(status: OcrReviewStatus): boolean {
+  const s = normalizeOcrReviewStatus(status);
+  return s === "TERVERIFIKASI_DISETUJUI" || s === "SELESAI";
+}

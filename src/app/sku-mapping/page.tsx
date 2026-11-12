@@ -80,7 +80,7 @@ export default async function SkuMappingPage() {
     return (
       <ModuleListPage
         title="Product SKU Mapping"
-        description="Pemetaan nama barang OCR (SJ Selesai) ke master REKAP SKUL — konfirmasi menjadi Data Barang Masuk."
+        description="Pemetaan nama barang OCR (SJ terverifikasi atau selesai) ke master REKAP SKUL — konfirmasi menjadi Data Barang Masuk."
       >
         <p className="mb-4 text-sm text-slate-600">
           Sumber SJ:{" "}
@@ -92,7 +92,7 @@ export default async function SkuMappingPage() {
           >
             spreadsheet OCR
           </a>{" "}
-          (status <strong>Selesai</strong>). Master acuan:{" "}
+          (status <strong>Terverifikasi &amp; Disetujui</strong> atau <strong>Selesai</strong>). Master acuan:{" "}
           <a
             href={`https://docs.google.com/spreadsheets/d/${getSkuRekapSheetId()}/edit`}
             target="_blank"
@@ -112,8 +112,12 @@ export default async function SkuMappingPage() {
             spreadsheet DBM
           </a>
           . Antrean: <strong>{lineCount}</strong> baris. Lihat juga{" "}
+          <Link href="/ocr-review?status=TERVERIFIKASI_DISETUJUI" className="text-blue-600 hover:underline">
+            SJ terverifikasi
+          </Link>
+          {" · "}
           <Link href="/ocr-review?status=SELESAI" className="text-blue-600 hover:underline">
-            SJ Selesai
+            SJ selesai
           </Link>
           .
         </p>

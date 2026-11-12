@@ -45,7 +45,7 @@ export async function POST(request: Request) {
 
     const line = await getSelesaiLineByRowKey(rowKey, gudangFilter);
     if (!line) {
-      return jsonError(new Error("Baris tidak ditemukan atau bukan status Selesai"), 404);
+      return jsonError(new Error("Baris tidak ditemukan atau SJ belum terverifikasi / selesai"), 404);
     }
 
     if (gudangFilter?.length && !userCanAccessGudang(gudangFilter, line.gudang)) {
