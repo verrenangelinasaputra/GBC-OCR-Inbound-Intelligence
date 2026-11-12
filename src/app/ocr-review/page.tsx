@@ -8,17 +8,12 @@ import { getInternalUserProfile } from "@/lib/internal-auth/profile";
 import { prisma } from "@/lib/db";
 import { listOcrDocumentsFromSheet } from "@/lib/services/ocr-sheet-list";
 import { parseDashboardBucketFilter } from "@/lib/ocr-review/dashboard-bucket";
-import {
-  filterOcrReviewDocs,
-  parseMonthFilter,
-  parseOcrReviewSort,
-  parseYearFilter,
-} from "@/lib/ocr-review/list-filters";
+import { filterOcrReviewDocs, parseMonthFilter, parseYearFilter } from "@/lib/ocr-review/list-filters";
 import { collectDistinctSjYears } from "@/lib/surat-jalan/tanggal-sj";
 import Link from "next/link";
 import { StatusBadge } from "@/components/ui/status-badge";
 
-type SearchParams = { gudang?: string; status?: string; year?: string; month?: string; sort?: string };
+type SearchParams = { gudang?: string; status?: string; year?: string; month?: string };
 
 export default async function OcrReviewPage({
   searchParams,
@@ -30,8 +25,6 @@ export default async function OcrReviewPage({
   const statusBucket = parseDashboardBucketFilter(query.status);
   const yearFilter = parseYearFilter(query.year);
   const monthFilter = parseMonthFilter(query.month);
-  const sortMode = parseOcrReviewSort(query.sort);
-
   if (spreadsheetModeActive()) {
     let docs: Awaited<ReturnType<typeof listOcrDocumentsFromSheet>> = [];
     try {
@@ -69,7 +62,7 @@ export default async function OcrReviewPage({
             month={monthFilter}
           />
         </Suspense>
-        <OcrReviewQueueTable docs={filtered} initialSort={sortMode} />
+        <OcrReviewQueueTable docs={filtered} />
       </ModuleListPage>
     );
   }

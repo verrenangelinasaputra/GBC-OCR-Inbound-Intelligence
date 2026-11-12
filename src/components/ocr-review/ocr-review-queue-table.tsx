@@ -2,8 +2,13 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import type { OcrSheetDocument } from "@/lib/services/ocr-sheet-list";
-import { sortOcrReviewDocs, type OcrReviewSortMode } from "@/lib/ocr-review/list-filters";
+import {
+  sortOcrReviewDocsByColumn,
+  type OcrReviewColumnSortKey,
+  type SortDir,
+} from "@/lib/ocr-review/list-filters";
 import { ReviewStatusBadge } from "./review-status-badge";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
@@ -13,23 +18,64 @@ import {
   WorkflowTimelineCompact,
 } from "./workflow-timeline";
 
-const SORT_OPTIONS: { value: OcrReviewSortMode; label: string }[] = [
-  { value: "wait_review", label: "Terlama belum ditinjau" },
-  { value: "kirim_desc", label: "Kirim terbaru" },
-  { value: "tanggal_sj_desc", label: "Tanggal SJ terbaru" },
+const SORTABLE_COLUMNS: { key: OcrReviewColumnSortKey; label: string; className?: string }[] = [
+  { key: "wait_review", label: "Tunggu tinjauan" },
+  { key: "wait_verify", label: "Tunggu verifikasi" },
+  { key: "wait_supplier_confirm", label: "Tunggu konfirmasi supplier" },
+  { key: "tanggal", label: "Tanggal SJ" },
+  { key: "noSuratJalan", label: "No. SJ" },
+  { key: "supplier", label: "Supplier" },
+  { key: "gudang", label: "Gudang" },
+  { key: "lineStatus", label: "OCR" },
+  { key: "statusReview", label: "Status tinjauan" },
 ];
 
-export function OcrReviewQueueTable({
-  docs,
-  initialSort = "wait_review",
+function SortableColumnHeader({
+  label,
+  active,
+  dir,
+  onClick,
+  className = "",
 }: {
-  docs: OcrSheetDocument[];
-  initialSort?: OcrReviewSortMode;
+  label: string;
+  active: boolean;
+  dir: SortDir;
+  onClick: () => void;
+  className?: string;
 }) {
-  const [sort, setSort] = useState<OcrReviewSortMode>(initialSort);
+  const Icon = active ? (dir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
+  return (
+    <th className={`px-4 py-3 ${className}`}>
+      <button
+        type="button"
+        onClick={onClick}
+        className="inline-flex max-w-full items-center gap-1 text-left uppercase tracking-wide hover:text-slate-900"
+      >
+        <span className="min-w-0">{label}</span>
+        <Icon
+          className={`h-3.5 w-3.5 shrink-0 ${active ? "text-slate-800" : "text-slate-400"}`}
+          aria-hidden
+        />
+      </button>
+    </th>
+  );
+}
+
+export function OcrReviewQueueTable({ docs }: { docs: OcrSheetDocument[] }) {
+  const [sortKey, setSortKey] = useState<OcrReviewColumnSortKey>("wait_review");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  const sorted = useMemo(() => sortOcrReviewDocs(docs, sort), [docs, sort]);
+  const toggleSort = (key: OcrReviewColumnSortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir(key.startsWith("wait_") ? "desc" : "asc");
+    }
+  };
+
+  const sorted = useMemo(() => sortOcrReviewDocsByColumn(docs, sortKey, sortDir), [docs, sortKey, sortDir]);
 
   if (!docs.length) {
     return (
@@ -41,40 +87,25 @@ export function OcrReviewQueueTable({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
-        <p className="text-sm text-slate-600">
-          <strong className="text-slate-900">{sorted.length}</strong> Surat Jalan
-        </p>
-        <label className="flex items-center gap-2 text-xs font-medium text-slate-600">
-          Urutkan
-          <select
-            className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800"
-            value={sort}
-            onChange={(e) => setSort(e.target.value as OcrReviewSortMode)}
-          >
-            {SORT_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+      <p className="text-sm text-slate-600 print:hidden">
+        <strong className="text-slate-900">{sorted.length}</strong> Surat Jalan
+      </p>
 
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
         <table className="min-w-full text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-600">
+          <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium text-slate-600">
             <tr>
-              <th className="px-4 py-3">Tunggu tinjauan</th>
-              <th className="px-4 py-3">Tunggu verifikasi</th>
-              <th className="px-4 py-3">Tunggu konfirmasi supplier</th>
-              <th className="px-4 py-3">Tanggal SJ</th>
-              <th className="px-4 py-3">No. SJ</th>
-              <th className="px-4 py-3">Supplier</th>
-              <th className="px-4 py-3">Gudang</th>
-              <th className="px-4 py-3">OCR</th>
-              <th className="px-4 py-3">Status tinjauan</th>
-              <th className="px-4 py-3">Timeline</th>
+              {SORTABLE_COLUMNS.map((col) => (
+                <SortableColumnHeader
+                  key={col.key}
+                  label={col.label}
+                  active={sortKey === col.key}
+                  dir={sortDir}
+                  onClick={() => toggleSort(col.key)}
+                  className={col.className}
+                />
+              ))}
+              <th className="px-4 py-3 font-medium uppercase tracking-wide">Timeline</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>

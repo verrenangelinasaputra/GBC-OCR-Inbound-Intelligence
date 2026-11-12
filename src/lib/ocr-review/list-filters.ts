@@ -1,33 +1,93 @@
 import type { OcrSheetDocument } from "@/lib/services/ocr-sheet-list";
-import { warehouseReviewWaitSortKey } from "@/lib/ocr-review/workflow-timeline";
+import {
+  supplierRevisionWaitMs,
+  warehouseReviewWaitMs,
+  warehouseVerifyWaitMs,
+} from "@/lib/ocr-review/workflow-timeline";
 import { parseSjTanggalParts } from "@/lib/surat-jalan/tanggal-sj";
 import { docMatchesDashboardBucket } from "@/lib/ocr-review/dashboard-bucket";
 import type { OcrReviewDashboardBucket } from "@/lib/ocr-review/workflow-status";
+import { normalizeOcrReviewStatus, ocrReviewStatusLabel } from "@/lib/ocr-review/workflow-status";
 
-export type OcrReviewSortMode = "wait_review" | "tanggal_sj_desc" | "kirim_desc";
+export type OcrReviewColumnSortKey =
+  | "wait_review"
+  | "wait_verify"
+  | "wait_supplier_confirm"
+  | "tanggal"
+  | "noSuratJalan"
+  | "supplier"
+  | "gudang"
+  | "lineStatus"
+  | "statusReview";
 
-export function parseOcrReviewSort(raw: string | undefined): OcrReviewSortMode {
-  const v = String(raw ?? "").trim();
-  if (v === "tanggal_sj_desc" || v === "kirim_desc") return v;
-  return "wait_review";
+export type SortDir = "asc" | "desc";
+
+function tanggalSortKey(tanggal: string): number {
+  const p = parseSjTanggalParts(tanggal);
+  if (!p) return 0;
+  return p.year * 10_000 + p.month * 100 + p.day;
 }
 
-export function sortOcrReviewDocs(docs: OcrSheetDocument[], mode: OcrReviewSortMode): OcrSheetDocument[] {
+function compareWaitMs(a: number | null, b: number | null): number {
+  const va = a ?? -1;
+  const vb = b ?? -1;
+  return va - vb;
+}
+
+function compareStrings(a: string, b: string): number {
+  return a.localeCompare(b, "id", { sensitivity: "base" });
+}
+
+/** Urutkan dokumen OCR Review menurut kolom + arah. */
+export function sortOcrReviewDocsByColumn(
+  docs: OcrSheetDocument[],
+  key: OcrReviewColumnSortKey,
+  dir: SortDir
+): OcrSheetDocument[] {
   const list = [...docs];
-  if (mode === "wait_review") {
-    return list.sort((a, b) => {
-      const wa = warehouseReviewWaitSortKey(a);
-      const wb = warehouseReviewWaitSortKey(b);
-      if (wa !== wb) return wb - wa;
-      return (b.tsKirimSupplier || b.exportTimestamp).localeCompare(a.tsKirimSupplier || a.exportTimestamp);
-    });
-  }
-  if (mode === "kirim_desc") {
-    return list.sort((a, b) =>
-      (b.tsKirimSupplier || b.exportTimestamp).localeCompare(a.tsKirimSupplier || a.exportTimestamp)
-    );
-  }
-  return list.sort((a, b) => (b.tanggal || "").localeCompare(a.tanggal || ""));
+  const sign = dir === "asc" ? 1 : -1;
+
+  list.sort((a, b) => {
+    let cmp = 0;
+    switch (key) {
+      case "wait_review":
+        cmp = compareWaitMs(warehouseReviewWaitMs(a), warehouseReviewWaitMs(b));
+        break;
+      case "wait_verify":
+        cmp = compareWaitMs(warehouseVerifyWaitMs(a), warehouseVerifyWaitMs(b));
+        break;
+      case "wait_supplier_confirm":
+        cmp = compareWaitMs(supplierRevisionWaitMs(a), supplierRevisionWaitMs(b));
+        break;
+      case "tanggal":
+        cmp = tanggalSortKey(a.tanggal) - tanggalSortKey(b.tanggal);
+        break;
+      case "noSuratJalan":
+        cmp = compareStrings(a.noSuratJalan || "", b.noSuratJalan || "");
+        break;
+      case "supplier":
+        cmp = compareStrings(a.supplier || "", b.supplier || "");
+        break;
+      case "gudang":
+        cmp = compareStrings(a.gudang || "", b.gudang || "");
+        break;
+      case "lineStatus":
+        cmp = compareStrings(a.lineStatus || "", b.lineStatus || "");
+        break;
+      case "statusReview": {
+        const la = ocrReviewStatusLabel(normalizeOcrReviewStatus(a.statusReview));
+        const lb = ocrReviewStatusLabel(normalizeOcrReviewStatus(b.statusReview));
+        cmp = compareStrings(la, lb);
+        break;
+      }
+      default:
+        cmp = 0;
+    }
+    if (cmp !== 0) return sign * cmp;
+    return compareStrings(a.noSuratJalan || "", b.noSuratJalan || "");
+  });
+
+  return list;
 }
 
 export function docMatchesSjYear(doc: OcrSheetDocument, year: number | undefined): boolean {
