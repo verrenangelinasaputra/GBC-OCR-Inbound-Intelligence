@@ -13,15 +13,20 @@ export type WorkflowStampFields = {
 
 const ISO_TS = /^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})$/;
 
-/** Parse cap waktu sheet (`YYYY-MM-DD HH:mm:ss` WIB) atau tanggal ekspor `dd/mm/yyyy`. */
+/** Konversi jam dinding WIB → `Date` (instant UTC). */
+function jakartaWallToDate(y: number, mo: number, d: number, h: number, mi: number, s: number): Date {
+  return new Date(Date.UTC(y, mo - 1, d, h - 7, mi, s));
+}
+
+/** Parse cap waktu sheet (`YYYY-MM-DD HH:mm:ss` WIB) atau tanggal ekspor `dd/mm/yyyy` (00:00 WIB). */
 export function parseWorkflowInstant(raw: string | undefined | null): Date | null {
   const text = String(raw ?? "").trim();
   if (!text) return null;
   const iso = ISO_TS.exec(text);
   if (iso) {
-    return new Date(
+    return jakartaWallToDate(
       Number(iso[1]),
-      Number(iso[2]) - 1,
+      Number(iso[2]),
       Number(iso[3]),
       Number(iso[4]),
       Number(iso[5]),
@@ -30,7 +35,7 @@ export function parseWorkflowInstant(raw: string | undefined | null): Date | nul
   }
   const slash = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(text);
   if (slash) {
-    return new Date(Number(slash[3]), Number(slash[2]) - 1, Number(slash[1]), 0, 0, 0);
+    return jakartaWallToDate(Number(slash[3]), Number(slash[2]), Number(slash[1]), 0, 0, 0);
   }
   return null;
 }
@@ -41,6 +46,7 @@ export function formatWorkflowShort(raw: string | undefined | null): string {
   const d = parseWorkflowInstant(text);
   if (!d) return text;
   return new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Jakarta",
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -53,7 +59,8 @@ export function formatWorkflowShort(raw: string | undefined | null): string {
 export function formatDurationMs(ms: number): string {
   if (!Number.isFinite(ms) || ms < 0) return "—";
   const totalMinutes = Math.floor(ms / 60_000);
-  if (totalMinutes < 60) return `${Math.max(1, totalMinutes)} menit`;
+  if (totalMinutes < 1) return "baru saja";
+  if (totalMinutes < 60) return `${totalMinutes} menit`;
   const hours = Math.floor(totalMinutes / 60);
   if (hours < 48) return `${hours} jam`;
   const days = Math.floor(hours / 24);
@@ -63,8 +70,8 @@ export function formatDurationMs(ms: number): string {
 
 /** Waktu sejak kirim supplier sampai ditinjau gudang (atau sampai sekarang jika belum ditinjau). */
 export function warehouseReviewWaitMs(fields: WorkflowStampFields, now = new Date()): number | null {
-  const start =
-    parseWorkflowInstant(fields.tsKirimSupplier) ?? parseWorkflowInstant(fields.exportTimestamp);
+  // Hanya TS Kirim Supplier (jam pasti). Tanggal Ekspor = 00:00 sehingga pagi tampak +7 jam.
+  const start = parseWorkflowInstant(fields.tsKirimSupplier);
   if (!start) return null;
   const reviewed = parseWorkflowInstant(fields.tsDitinjauGudang);
   const status = normalizeOcrReviewStatus(fields.statusReview);

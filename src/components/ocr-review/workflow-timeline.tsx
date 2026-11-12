@@ -12,8 +12,15 @@ import { normalizeOcrReviewStatus } from "@/lib/ocr-review/workflow-status";
 export function WarehouseWaitBadge({ fields }: { fields: WorkflowStampFields }) {
   const status = normalizeOcrReviewStatus(fields.statusReview);
   const wait = warehouseReviewWaitMs(fields);
-  if (status !== "BELUM_DITINJAU" || wait == null) {
+  if (status !== "BELUM_DITINJAU") {
     return <span className="text-slate-400">—</span>;
+  }
+  if (wait == null) {
+    return (
+      <span className="text-xs text-slate-500" title="Isi kolom TS Kirim Supplier di sheet (upload setelah deploy).">
+        —
+      </span>
+    );
   }
   return (
     <span
