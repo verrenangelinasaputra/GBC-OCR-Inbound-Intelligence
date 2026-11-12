@@ -1,7 +1,7 @@
 import "server-only";
 
 import { google } from "googleapis";
-import { createGoogleAuthClient } from "@/lib/providers/google-workspace/client";
+import { createGoogleSheetsAuthClient } from "@/lib/providers/google-workspace/client";
 import { getDbmInboundSheetId, getDbmInboundTabName } from "@/lib/config/sku-mapping-sheets";
 import type { SkuMappingLineRow } from "@/lib/sku-matching/sku-mapping-line";
 import type { SkuRekapEntry } from "@/lib/sku-matching/sku-rekap-types";
@@ -35,6 +35,21 @@ export const DBM_INBOUND_HEADERS = [
 
 function quoteTab(tab: string): string {
   return `'${tab.replace(/'/g, "''")}'`;
+}
+
+function wrapDbmSheetError(error: unknown): never {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/permission|403|caller does not have/i.test(message)) {
+    const id = getDbmInboundSheetId();
+    throw new Error(
+      `Tidak bisa menulis ke spreadsheet Data Barang Masuk (ID: ${id}). ` +
+        "Pastikan: (1) Share → Editor untuk " +
+        "gbc-inbound-export@gbc-inbound-intelligence.iam.gserviceaccount.com (atau client_email di Vercel), " +
+        "(2) env DBM_INBOUND_SHEET_ID = ID di URL sheet yang Anda buka (bukan file lain), " +
+        "(3) tab DBM_INBOUND_TAB cocok dengan nama tab di bawah."
+    );
+  }
+  throw error instanceof Error ? error : new Error(message);
 }
 
 async function ensureDbmInboundTab(sheets: ReturnType<typeof google.sheets>, spreadsheetId: string, tab: string) {
@@ -71,7 +86,7 @@ export async function listDbmFinalizedRowKeys(): Promise<Set<string>> {
   const cfg = googleConfigForSpreadsheet(getDbmInboundSheetId());
   if (!cfg) return new Set();
 
-  const auth = createGoogleAuthClient(cfg);
+  const auth = createGoogleSheetsAuthClient(cfg);
   const sheets = google.sheets({ version: "v4", auth });
   const tab = getDbmInboundTabName();
   const spreadsheetId = getDbmInboundSheetId();
@@ -113,18 +128,27 @@ export async function appendDbmInboundRow(params: {
   const cfg = googleConfigForSpreadsheet(getDbmInboundSheetId());
   if (!cfg) throw new Error("Google export tidak dikonfigurasi");
 
-  const auth = createGoogleAuthClient(cfg);
+  const auth = createGoogleSheetsAuthClient(cfg);
   const sheets = google.sheets({ version: "v4", auth });
   const spreadsheetId = getDbmInboundSheetId();
   const tab = getDbmInboundTabName();
 
-  await ensureDbmInboundTab(sheets, spreadsheetId, tab);
+  try {
+    await ensureDbmInboundTab(sheets, spreadsheetId, tab);
+  } catch (e) {
+    wrapDbmSheetError(e);
+  }
 
-  const existing = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: `${quoteTab(tab)}!A:A`,
-  });
-  const nextRow = (existing.data.values?.length ?? 0) + 1;
+  let nextRow = 2;
+  try {
+    const existing = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `${quoteTab(tab)}!A:A`,
+    });
+    nextRow = (existing.data.values?.length ?? 0) + 1;
+  } catch (e) {
+    wrapDbmSheetError(e);
+  }
 
   const now = new Date();
   const stamp = `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
@@ -155,12 +179,16 @@ export async function appendDbmInboundRow(params: {
     params.linkSjDrive || params.line.fileUrl || "",
   ];
 
-  await sheets.spreadsheets.values.update({
-    spreadsheetId,
-    range: `${quoteTab(tab)}!A${nextRow}`,
-    valueInputOption: "USER_ENTERED",
-    requestBody: { values: [row] },
-  });
+  try {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${quoteTab(tab)}!A${nextRow}`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [row] },
+    });
+  } catch (e) {
+    wrapDbmSheetError(e);
+  }
 }
 
 function matchScoreFormatted(score: number): string {
@@ -203,7 +231,7 @@ export async function listDbmInboundRecords(): Promise<import("@/lib/dbm/dbm-inb
   const cfg = googleConfigForSpreadsheet(getDbmInboundSheetId());
   if (!cfg) return [];
 
-  const auth = createGoogleAuthClient(cfg);
+  const auth = createGoogleSheetsAuthClient(cfg);
   const sheets = google.sheets({ version: "v4", auth });
   const spreadsheetId = getDbmInboundSheetId();
   const tab = getDbmInboundTabName();

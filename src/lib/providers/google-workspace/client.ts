@@ -36,6 +36,18 @@ export function createGoogleAuthClient(config: GoogleExportConfig) {
   });
 }
 
+/**
+ * Google Sheets — pakai service account langsung (sheet dishare Editor ke client_email).
+ * Jangan pakai `subject` / GOOGLE_WORKSPACE_DELEGATED_USER (delegation hanya Workspace, bukan @gmail.com).
+ */
+export function createGoogleSheetsAuthClient(config: GoogleExportConfig) {
+  return new google.auth.JWT({
+    email: config.credentials.client_email,
+    key: config.credentials.private_key,
+    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+  });
+}
+
 function preferOAuthDriveUpload(): boolean {
   const mode = process.env.GOOGLE_DRIVE_UPLOAD_AUTH?.trim().toLowerCase();
   if (mode === "service_account") return false;

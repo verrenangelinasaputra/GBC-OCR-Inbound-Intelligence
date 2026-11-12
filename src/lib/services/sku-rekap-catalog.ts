@@ -1,7 +1,7 @@
 import "server-only";
 
 import { google } from "googleapis";
-import { createGoogleAuthClient } from "@/lib/providers/google-workspace/client";
+import { createGoogleSheetsAuthClient } from "@/lib/providers/google-workspace/client";
 import { getGoogleExportConfigOptional, type GoogleExportConfig } from "@/lib/providers/google-workspace/config";
 import { getSkuRekapSheetId, getSkuRekapTabName } from "@/lib/config/sku-mapping-sheets";
 import type { SkuRekapEntry } from "@/lib/sku-matching/sku-rekap-types";
@@ -45,7 +45,7 @@ export async function loadSkuRekapCatalog(force = false): Promise<SkuRekapEntry[
   const base = getGoogleExportConfigOptional();
   if (!base) return [];
 
-  const auth = createGoogleAuthClient(base);
+  const auth = createGoogleSheetsAuthClient(base);
   const sheets = google.sheets({ version: "v4", auth });
   const tab = getSkuRekapTabName();
   const res = await sheets.spreadsheets.values.get({

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { google } from "googleapis";
-import { createGoogleAuthClient } from "@/lib/providers/google-workspace/client";
+import { createGoogleSheetsAuthClient } from "@/lib/providers/google-workspace/client";
 import { getGoogleExportConfigOptional } from "@/lib/providers/google-workspace/config";
 import {
   getMasterMappingTabName,
@@ -96,7 +96,7 @@ export async function loadMasterMappingEntries(force = false): Promise<MasterMap
 
   const spreadsheetId = getSkuRekapSheetId();
   const tab = getMasterMappingTabName();
-  const auth = createGoogleAuthClient(googleConfigForSpreadsheet(spreadsheetId) ?? base);
+  const auth = createGoogleSheetsAuthClient(googleConfigForSpreadsheet(spreadsheetId) ?? base);
   const sheets = google.sheets({ version: "v4", auth });
 
   await ensureMasterMappingTab(sheets, spreadsheetId, tab);
@@ -127,7 +127,7 @@ export async function appendMasterMappingEntry(
 
   const spreadsheetId = getSkuRekapSheetId();
   const tab = getMasterMappingTabName();
-  const auth = createGoogleAuthClient(googleConfigForSpreadsheet(spreadsheetId) ?? base);
+  const auth = createGoogleSheetsAuthClient(googleConfigForSpreadsheet(spreadsheetId) ?? base);
   const sheets = google.sheets({ version: "v4", auth });
   await ensureMasterMappingTab(sheets, spreadsheetId, tab);
 
