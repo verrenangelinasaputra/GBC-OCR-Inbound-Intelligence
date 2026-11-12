@@ -6,7 +6,12 @@ import type { OcrSheetDocument } from "@/lib/services/ocr-sheet-list";
 import { sortOcrReviewDocs, type OcrReviewSortMode } from "@/lib/ocr-review/list-filters";
 import { ReviewStatusBadge } from "./review-status-badge";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { WarehouseWaitBadge, WorkflowTimelineCompact } from "./workflow-timeline";
+import {
+  SupplierRevisionWaitBadge,
+  WarehouseVerifyWaitBadge,
+  WarehouseWaitBadge,
+  WorkflowTimelineCompact,
+} from "./workflow-timeline";
 
 const SORT_OPTIONS: { value: OcrReviewSortMode; label: string }[] = [
   { value: "wait_review", label: "Terlama belum ditinjau" },
@@ -61,6 +66,8 @@ export function OcrReviewQueueTable({
           <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-600">
             <tr>
               <th className="px-4 py-3">Tunggu tinjauan</th>
+              <th className="px-4 py-3">Tunggu verifikasi</th>
+              <th className="px-4 py-3">Tunggu revisi supplier</th>
               <th className="px-4 py-3">Tanggal SJ</th>
               <th className="px-4 py-3">No. SJ</th>
               <th className="px-4 py-3">Supplier</th>
@@ -76,6 +83,12 @@ export function OcrReviewQueueTable({
               <tr key={d.docKey} className="align-top hover:bg-slate-50">
                 <td className="whitespace-nowrap px-4 py-3">
                   <WarehouseWaitBadge fields={d} />
+                </td>
+                <td className="whitespace-nowrap px-4 py-3">
+                  <WarehouseVerifyWaitBadge fields={d} />
+                </td>
+                <td className="whitespace-nowrap px-4 py-3">
+                  <SupplierRevisionWaitBadge fields={d} />
                 </td>
                 <td className="whitespace-nowrap px-4 py-3">{d.tanggal || "—"}</td>
                 <td className="px-4 py-3 font-medium text-slate-900">{d.noSuratJalan || "—"}</td>

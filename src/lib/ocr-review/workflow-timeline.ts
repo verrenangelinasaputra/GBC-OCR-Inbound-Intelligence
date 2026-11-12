@@ -91,6 +91,30 @@ export function warehouseReviewWaitMs(fields: WorkflowStampFields, now = new Dat
   return null;
 }
 
+/** Ditinjau gudang → approve gudang (atau keputusan revisi); aktif saat status SUDAH_DITINJAU. */
+export function warehouseVerifyWaitMs(fields: WorkflowStampFields, now = new Date()): number | null {
+  const start = parseWorkflowInstant(fields.tsDitinjauGudang);
+  if (!start) return null;
+  const approved = parseWorkflowInstant(fields.tsApproveGudang);
+  const revisi = parseWorkflowInstant(fields.tsRevisiGudang);
+  const status = normalizeOcrReviewStatus(fields.statusReview);
+  if (approved) return approved.getTime() - start.getTime();
+  if (revisi) return revisi.getTime() - start.getTime();
+  if (status === "SUDAH_DITINJAU") return now.getTime() - start.getTime();
+  return null;
+}
+
+/** Setelah permintaan revisi gudang → konfirmasi supplier; aktif saat menunggu revisi supplier. */
+export function supplierRevisionWaitMs(fields: WorkflowStampFields, now = new Date()): number | null {
+  const start = parseWorkflowInstant(fields.tsRevisiGudang);
+  if (!start) return null;
+  const confirmed = parseWorkflowInstant(fields.tsKonfirmasiSupplier);
+  const status = normalizeOcrReviewStatus(fields.statusReview);
+  if (confirmed) return confirmed.getTime() - start.getTime();
+  if (status === "MENUNGGU_REVISI_SUPPLIER") return now.getTime() - start.getTime();
+  return null;
+}
+
 /** Untuk sorting: nilai besar = menunggu lebih lama; sudah ditinjau = -1. */
 export function warehouseReviewWaitSortKey(fields: WorkflowStampFields, now = new Date()): number {
   const status = normalizeOcrReviewStatus(fields.statusReview);
