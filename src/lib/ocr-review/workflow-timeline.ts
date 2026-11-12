@@ -104,7 +104,7 @@ export function warehouseVerifyWaitMs(fields: WorkflowStampFields, now = new Dat
   return null;
 }
 
-/** Setelah permintaan revisi gudang → konfirmasi supplier; aktif saat menunggu revisi supplier. */
+/** Setelah permintaan revisi gudang → konfirmasi supplier; aktif saat menunggu konfirmasi supplier. */
 export function supplierRevisionWaitMs(fields: WorkflowStampFields, now = new Date()): number | null {
   const start = parseWorkflowInstant(fields.tsRevisiGudang);
   if (!start) return null;

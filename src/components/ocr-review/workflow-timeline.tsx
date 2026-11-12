@@ -91,9 +91,9 @@ export function SupplierRevisionWaitBadge({ fields }: { fields: WorkflowStampFie
       wait={wait}
       active={status === "MENUNGGU_REVISI_SUPPLIER"}
       activeClassName="bg-orange-100 text-orange-950"
-      activeTitle="Menunggu revisi / konfirmasi supplier"
+      activeTitle="Menunggu konfirmasi supplier"
       idleTitle="Lama tunggu dari permintaan revisi gudang sampai konfirmasi supplier"
-      missingTitle="Butuh TS Revisi Gudang (Y) — muncul setelah gudang minta revisi."
+      missingTitle="Butuh TS Revisi Gudang (Y) — muncul setelah gudang minta revisi, berjalan sampai konfirmasi (AA)."
     />
   );
 }

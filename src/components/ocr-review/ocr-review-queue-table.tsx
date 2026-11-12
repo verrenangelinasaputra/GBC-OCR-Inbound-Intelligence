@@ -67,7 +67,7 @@ export function OcrReviewQueueTable({
             <tr>
               <th className="px-4 py-3">Tunggu tinjauan</th>
               <th className="px-4 py-3">Tunggu verifikasi</th>
-              <th className="px-4 py-3">Tunggu revisi supplier</th>
+              <th className="px-4 py-3">Tunggu konfirmasi supplier</th>
               <th className="px-4 py-3">Tanggal SJ</th>
               <th className="px-4 py-3">No. SJ</th>
               <th className="px-4 py-3">Supplier</th>
