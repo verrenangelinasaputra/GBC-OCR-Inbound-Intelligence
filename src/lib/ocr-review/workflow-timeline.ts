@@ -61,11 +61,21 @@ export function formatDurationMs(ms: number): string {
   const totalMinutes = Math.floor(ms / 60_000);
   if (totalMinutes < 1) return "baru saja";
   if (totalMinutes < 60) return `${totalMinutes} menit`;
-  const hours = Math.floor(totalMinutes / 60);
-  if (hours < 48) return `${hours} jam`;
-  const days = Math.floor(hours / 24);
-  const remH = hours % 24;
-  return remH > 0 ? `${days} h ${remH} j` : `${days} hari`;
+  const totalHours = Math.floor(totalMinutes / 60);
+  if (totalHours < 24) return `${totalHours} jam`;
+  const totalDays = Math.floor(totalHours / 24);
+  if (totalDays < 30) {
+    const remH = totalHours % 24;
+    return remH > 0 ? `${totalDays} h ${remH} j` : `${totalDays} hari`;
+  }
+  const totalMonths = Math.floor(totalDays / 30);
+  if (totalMonths < 12) {
+    const remD = totalDays % 30;
+    return remD > 0 ? `${totalMonths} bln ${remD} h` : `${totalMonths} bulan`;
+  }
+  const years = Math.floor(totalMonths / 12);
+  const remM = totalMonths % 12;
+  return remM > 0 ? `${years} thn ${remM} bln` : `${years} tahun`;
 }
 
 /** Waktu sejak kirim supplier sampai ditinjau gudang (atau sampai sekarang jika belum ditinjau). */
