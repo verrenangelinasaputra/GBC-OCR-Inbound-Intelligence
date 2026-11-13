@@ -29,8 +29,8 @@ const LABELS: Record<OcrReviewStatus, string> = {
   SUDAH_DITINJAU: "Sudah Ditinjau",
   TERVERIFIKASI_DISETUJUI: "Terverifikasi & Disetujui",
   MEMERLUKAN_REVISI: "Memerlukan Revisi",
-  MENUNGGU_REVISI_SUPPLIER: "Menunggu Revisi Supplier",
-  TIDAK_SESUAI_KONFIRMASI: "Menunggu Revisi Supplier",
+  MENUNGGU_REVISI_SUPPLIER: "Menunggu Konfirmasi Supplier",
+  TIDAK_SESUAI_KONFIRMASI: "Menunggu Konfirmasi Supplier",
   SELESAI: "Selesai",
 };
 

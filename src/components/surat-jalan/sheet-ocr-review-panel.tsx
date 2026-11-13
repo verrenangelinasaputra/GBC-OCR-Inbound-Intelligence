@@ -6,12 +6,27 @@ import { ReviewStatusBadge } from "@/components/ocr-review/review-status-badge";
 import { WarehouseWaitBadge, WorkflowTimelineCompact } from "@/components/ocr-review/workflow-timeline";
 import { StatusBadge } from "@/components/ui/status-badge";
 import Link from "next/link";
-import { Plus, Trash2 } from "lucide-react";
+import { Download, Plus, Trash2 } from "lucide-react";
 import {
   SAMPLE_ITEM_TAG,
   normalizeSampleItemTag,
   type SampleItemTag,
 } from "@/lib/surat-jalan/sample-item-tag";
+
+function filenameFromContentDisposition(header: string | null): string | null {
+  if (!header) return null;
+  const star = /filename\*=UTF-8''([^;]+)/i.exec(header);
+  if (star) {
+    try {
+      return decodeURIComponent(star[1].trim());
+    } catch {
+      return star[1].trim();
+    }
+  }
+  const quoted = /filename="([^"]+)"/i.exec(header);
+  if (quoted) return quoted[1];
+  return null;
+}
 
 export function SheetOcrReviewPanel({
   docKey,
@@ -39,6 +54,7 @@ export function SheetOcrReviewPanel({
   const [confirmRejectOpen, setConfirmRejectOpen] = useState(false);
   const [confirmApproveOpen, setConfirmApproveOpen] = useState(false);
   const [pendingDeleteRows, setPendingDeleteRows] = useState<number[]>([]);
+  const [exportingPhoto, setExportingPhoto] = useState(false);
   const [sampleType, setSampleType] = useState<SampleItemTag>(
     normalizeSampleItemTag(initial.sampleType)
   );
@@ -196,6 +212,45 @@ export function SheetOcrReviewPanel({
   const isPdf = (doc.fileName || "").toLowerCase().endsWith(".pdf");
   const canShowOriginal = (doc.fileUrl || doc.fileName) && !imageError;
   const canShowRevision = revisionCount > 0 && typeof photoView === "number";
+  const canExportPhoto =
+    photoView === "original" ? Boolean(canShowOriginal) : Boolean(canShowRevision && !revisionImageError);
+
+  async function exportCurrentPhoto() {
+    if (!canExportPhoto || exportingPhoto) return;
+    const isOriginal = photoView === "original";
+    const baseUrl = isOriginal ? imageSrc : revisionSrc;
+    if (!baseUrl) return;
+
+    const url = `${baseUrl}${baseUrl.includes("?") ? "&" : "?"}download=1`;
+    setExportingPhoto(true);
+    setError("");
+    try {
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(typeof data.error === "string" ? data.error : "Gagal mengunduh file dari Drive.");
+        return;
+      }
+      const fileName =
+        filenameFromContentDisposition(res.headers.get("Content-Disposition")) ||
+        (isOriginal ? doc.fileName.trim() : "") ||
+        (typeof photoView === "number" ? `Revisi_${photoView + 1}.png` : "Surat_Jalan");
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = fileName;
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch {
+      setError("Gagal mengunduh — cek koneksi atau sesi login.");
+    } finally {
+      setExportingPhoto(false);
+    }
+  }
 
   const reportImageLoadError = useCallback(async () => {
     try {
@@ -257,8 +312,29 @@ export function SheetOcrReviewPanel({
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="rounded-xl border border-slate-200 bg-white p-4">
-          <h2 className="font-medium">Foto Surat Jalan</h2>
-          <p className="mt-1 text-xs text-slate-500">{doc.fileName || "—"}</p>
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <h2 className="font-medium">Foto Surat Jalan</h2>
+              <p className="mt-1 truncate text-xs text-slate-500" title={doc.fileName || undefined}>
+                {doc.fileName || "—"}
+              </p>
+            </div>
+            <button
+              type="button"
+              title={
+                photoView === "original"
+                  ? "Unduh foto asli (nama file seperti di Drive)"
+                  : `Unduh Revisi ${typeof photoView === "number" ? photoView + 1 : ""}`
+              }
+              disabled={!canExportPhoto || exportingPhoto}
+              onClick={() => void exportCurrentPhoto()}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-slate-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800 disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="Unduh gambar yang ditampilkan"
+            >
+              <Download className="h-4 w-4" aria-hidden />
+              <span className="hidden sm:inline">{exportingPhoto ? "Mengunduh…" : "Export"}</span>
+            </button>
+          </div>
           <div className="mt-3 flex flex-wrap gap-2 border-b border-slate-100 pb-2">
             <button
               type="button"

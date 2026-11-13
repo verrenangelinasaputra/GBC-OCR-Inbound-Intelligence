@@ -6,7 +6,7 @@ import { getOcrSheetDocumentDetail } from "@/lib/services/ocr-sheet-detail";
 export async function getOcrSheetRevisionImage(
   docKey: string,
   index: number
-): Promise<{ buffer: Buffer; mimeType: string }> {
+): Promise<{ buffer: Buffer; mimeType: string; name: string }> {
   const config = getGoogleExportConfigOptional();
   if (!config) throw new Error("Google export tidak dikonfigurasi");
 
@@ -22,5 +22,9 @@ export async function getOcrSheetRevisionImage(
   if (!fileId) throw new Error("Link revisi tidak valid");
 
   const downloaded = await downloadDriveFile({ config, fileId });
-  return { buffer: downloaded.buffer, mimeType: downloaded.mimeType || "image/png" };
+  return {
+    buffer: downloaded.buffer,
+    mimeType: downloaded.mimeType || "image/png",
+    name: downloaded.name,
+  };
 }

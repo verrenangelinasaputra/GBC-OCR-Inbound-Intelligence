@@ -2,6 +2,7 @@ import { jsonError, requireApiSession } from "@/lib/api/auth-context";
 import { requirePermission } from "@/lib/rbac/permissions";
 import { isSheetOnlyMode } from "@/lib/config/app-mode";
 import { hasDatabase } from "@/lib/db";
+import { contentDispositionAttachment } from "@/lib/http/content-disposition";
 import { getOcrSheetRevisionImage } from "@/lib/services/ocr-sheet-revision-image";
 
 function sheetReviewEnabled(): boolean {
@@ -18,14 +19,20 @@ export async function GET(request: Request, context: { params: Promise<{ key: st
     const { key } = await context.params;
     const url = new URL(request.url);
     const index = Number(url.searchParams.get("index") ?? "-1");
-    const { buffer, mimeType } = await getOcrSheetRevisionImage(key, Number.isFinite(index) ? index : -1);
+    const asDownload = url.searchParams.get("download") === "1";
+    const { buffer, mimeType, name } = await getOcrSheetRevisionImage(
+      key,
+      Number.isFinite(index) ? index : -1
+    );
     const displayMime = mimeType.startsWith("image/") ? mimeType : "image/png";
-    return new Response(new Uint8Array(buffer), {
-      headers: {
-        "Content-Type": displayMime,
-        "Cache-Control": "private, max-age=120",
-      },
-    });
+    const headers: Record<string, string> = {
+      "Content-Type": displayMime,
+      "Cache-Control": "private, max-age=120",
+    };
+    if (asDownload) {
+      headers["Content-Disposition"] = contentDispositionAttachment(name);
+    }
+    return new Response(new Uint8Array(buffer), { headers });
   } catch (e) {
     return jsonError(e, 404);
   }

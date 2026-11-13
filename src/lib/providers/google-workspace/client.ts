@@ -452,27 +452,28 @@ export async function findDriveFileInFolder(params: {
 export async function downloadDriveFile(params: {
   config: GoogleExportConfig;
   fileId: string;
-}): Promise<{ buffer: Buffer; mimeType: string }> {
+}): Promise<{ buffer: Buffer; mimeType: string; name: string }> {
   const auth = await createDriveAuthForRead(params.config);
   const drive = google.drive({ version: "v3", auth });
   const meta = await drive.files.get({
     fileId: params.fileId,
-    fields: "mimeType",
+    fields: "mimeType,name",
     supportsAllDrives: true,
   });
   const mimeType = meta.data.mimeType || "application/octet-stream";
+  const name = String(meta.data.name || "").trim() || params.fileId;
   const media = await drive.files.get(
     { fileId: params.fileId, alt: "media", supportsAllDrives: true },
     { responseType: "arraybuffer" }
   );
-  return { buffer: Buffer.from(media.data as ArrayBuffer), mimeType };
+  return { buffer: Buffer.from(media.data as ArrayBuffer), mimeType, name };
 }
 
 export async function resolveAndDownloadSuratJalanImage(params: {
   config: GoogleExportConfig;
   fileUrl: string;
   fileName: string;
-}): Promise<{ buffer: Buffer; mimeType: string; fileId: string }> {
+}): Promise<{ buffer: Buffer; mimeType: string; fileId: string; name: string }> {
   let fileId = parseDriveFileId(params.fileUrl);
   let mimeType = "image/jpeg";
   if (!fileId && params.fileName) {
@@ -487,5 +488,6 @@ export async function resolveAndDownloadSuratJalanImage(params: {
     throw new Error("Tidak ada link Drive atau nama file untuk foto Surat Jalan");
   }
   const downloaded = await downloadDriveFile({ config: params.config, fileId });
-  return { ...downloaded, fileId };
+  const name = downloaded.name || params.fileName.trim() || fileId;
+  return { ...downloaded, fileId, name };
 }
