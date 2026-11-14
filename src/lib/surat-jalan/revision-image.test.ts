@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { revisionFileName, revisionTableDataRowY } from "./revision-image";
+import { revisionFileName, revisionTableDataRowY, textWidth, wrapTextLines } from "./revision-image";
 
 describe("revisionFileName", () => {
   it("numbered prefix and .png", () => {
@@ -18,5 +18,19 @@ describe("revisionTableDataRowY", () => {
   it("first body row uses index 0 (not 1)", () => {
     expect(revisionTableDataRowY(0)).toBeLessThan(revisionTableDataRowY(1));
     expect(revisionTableDataRowY(0)).toBe(255 + 44 + 40 * 0.72);
+  });
+});
+
+describe("wrapTextLines", () => {
+  it("wraps keterangan panjang ke dalam lebar kolom", () => {
+    const note =
+      "Koreksi tulisan: BOTOL BR 250ML N24 PUTIH - BOTOL BR 250ML N24 HITAM M SS";
+    const maxW = 188 - 12;
+  const fontSize = 10;
+    const lines = wrapTextLines(note, maxW, fontSize);
+    expect(lines.length).toBeGreaterThan(1);
+    for (const line of lines) {
+      expect(textWidth(line, fontSize)).toBeLessThanOrEqual(maxW + 0.5);
+    }
   });
 });

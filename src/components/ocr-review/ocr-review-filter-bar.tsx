@@ -50,7 +50,7 @@ export function OcrReviewFilterBar({
   return (
     <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex flex-wrap items-end gap-4">
-        <label className="flex min-w-[120px] flex-col gap-1 text-xs font-medium text-slate-600">
+        <label className="flex w-full min-w-0 flex-col gap-1 text-xs font-medium text-slate-600 sm:min-w-[120px] sm:w-auto">
           Tahun
           <select
             className={selectClass()}
@@ -69,7 +69,7 @@ export function OcrReviewFilterBar({
           </select>
         </label>
 
-        <label className="flex min-w-[140px] flex-col gap-1 text-xs font-medium text-slate-600">
+        <label className="flex w-full min-w-0 flex-col gap-1 text-xs font-medium text-slate-600 sm:min-w-[140px] sm:w-auto">
           Bulan
           <select
             className={selectClass()}
@@ -88,7 +88,7 @@ export function OcrReviewFilterBar({
           </select>
         </label>
 
-        <label className="flex min-w-[200px] flex-1 flex-col gap-1 text-xs font-medium text-slate-600">
+        <label className="flex w-full min-w-0 flex-1 flex-col gap-1 text-xs font-medium text-slate-600 sm:min-w-[200px]">
           Status tinjauan
           <select
             className={selectClass()}

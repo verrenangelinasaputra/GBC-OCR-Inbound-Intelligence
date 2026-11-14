@@ -1,4 +1,5 @@
 import { AppSidebar } from "./app-sidebar";
+import { MobileShellLayout } from "./mobile-shell-layout";
 import { WarehouseProfileChip } from "./warehouse-profile-chip";
 import { getSession } from "@/lib/auth/session";
 import Link from "next/link";
@@ -7,32 +8,30 @@ export async function AppShell({ children, title }: { children: React.ReactNode;
   const session = await getSession();
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
-      <AppSidebar
-        roles={session?.roles ?? []}
-        allowedModules={session?.allowedModules}
-      />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
-          <div>
-            <h1 className="text-lg font-semibold text-slate-900">{title}</h1>
-            <p className="text-sm text-slate-500">GBC Inbound Intelligence</p>
-          </div>
-          <div className="flex items-center gap-4 text-sm text-slate-600">
+    <MobileShellLayout
+      title={title}
+      subtitle="GBC Inbound Intelligence"
+      sidebar={
+        <AppSidebar roles={session?.roles ?? []} allowedModules={session?.allowedModules} />
+      }
+      headerEnd={
+        <>
+          <div className="hidden sm:block">
             <WarehouseProfileChip />
-            <span className="hidden sm:inline">{session?.username}</span>
-            <form action="/api/auth/logout" method="post">
-              <button type="submit" className="text-blue-600 hover:underline">
-                Logout
-              </button>
-            </form>
-            <Link href="/notifications" className="text-blue-600 hover:underline">
-              Notifikasi
-            </Link>
           </div>
-        </header>
-        <main className="flex-1 p-6">{children}</main>
-      </div>
-    </div>
+          <span className="hidden text-slate-600 md:inline">{session?.username}</span>
+          <form action="/api/auth/logout" method="post">
+            <button type="submit" className="text-blue-600 hover:underline">
+              Logout
+            </button>
+          </form>
+          <Link href="/notifications" className="hidden text-blue-600 hover:underline sm:inline">
+            Notifikasi
+          </Link>
+        </>
+      }
+    >
+      {children}
+    </MobileShellLayout>
   );
 }

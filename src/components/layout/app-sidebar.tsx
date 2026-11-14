@@ -73,8 +73,8 @@ export function AppSidebar({
   return (
     <aside
       className={clsx(
-        "flex min-h-screen shrink-0 flex-col self-stretch border-r border-slate-200 bg-slate-950 text-slate-100 transition-all",
-        collapsed ? "w-[72px]" : "w-64"
+        "flex h-full min-h-screen max-h-screen w-full flex-col overflow-hidden border-r border-slate-200 bg-slate-950 text-slate-100 transition-[width]",
+        collapsed ? "w-[72px] max-w-[72px]" : "w-64 max-w-[16rem]"
       )}
     >
       <div className="flex items-center justify-between gap-2 border-b border-slate-800 px-4 py-4">
