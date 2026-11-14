@@ -371,6 +371,49 @@ export async function findOrCreateDriveFolder(params: {
   return id;
 }
 
+const CUSTOMER_DRIVE_SEGMENT = "Customer";
+const CUSTOMER_SURAT_JALAN_FOLDER = "Surat Jalan";
+
+/** `Customer / {nama customer} / Surat Jalan / [tanggal] - no - supplier /` file. */
+export async function uploadSuratJalanToCustomerDrive(params: {
+  config: GoogleExportConfig;
+  buffer: Buffer;
+  fileName: string;
+  mimeType: string;
+  customerName: string;
+  subfolderName: string;
+  rootFolderId?: string;
+}): Promise<{ fileId: string; fileUrl: string }> {
+  const rootId = params.rootFolderId?.trim() || params.config.driveFolderId;
+  const customerRootId = await findOrCreateDriveFolder({
+    config: params.config,
+    parentId: rootId,
+    folderName: CUSTOMER_DRIVE_SEGMENT,
+  });
+  const clientFolderId = await findOrCreateDriveFolder({
+    config: params.config,
+    parentId: customerRootId,
+    folderName: params.customerName.trim(),
+  });
+  const sjTypeFolderId = await findOrCreateDriveFolder({
+    config: params.config,
+    parentId: clientFolderId,
+    folderName: CUSTOMER_SURAT_JALAN_FOLDER,
+  });
+  const batchFolderId = await findOrCreateDriveFolder({
+    config: params.config,
+    parentId: sjTypeFolderId,
+    folderName: params.subfolderName.trim(),
+  });
+  return uploadFileToDrive({
+    config: params.config,
+    buffer: params.buffer,
+    fileName: params.fileName,
+    mimeType: params.mimeType,
+    folderId: batchFolderId,
+  });
+}
+
 /** `…/Gudang X/[tanggal] - no - supplier/` lalu unggah file di dalamnya. */
 export async function uploadSuratJalanToGudangDrive(params: {
   config: GoogleExportConfig;

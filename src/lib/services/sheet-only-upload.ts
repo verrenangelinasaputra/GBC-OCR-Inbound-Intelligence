@@ -12,8 +12,10 @@ import {
   getGoogleExportConfig,
   isGoogleExportConfigured,
   uploadFileToDrive,
+  uploadSuratJalanToCustomerDrive,
   uploadSuratJalanToGudangDrive,
 } from "@/lib/providers/google-workspace";
+import { isCustomerDestination, sanitizeCustomerFolderName } from "@/lib/config/supplier-destination";
 import { resolveSupplierUploadMapping } from "@/lib/services/supplier-upload-mapping";
 import { notifySupplierUploadTelegram } from "@/lib/services/supplier-upload-telegram-notify";
 import { formatTelegramBarangLines } from "@/lib/services/telegram-upload-message";
@@ -49,6 +51,7 @@ export async function processSheetOnlyUpload(params: {
   notes?: string;
   vehicleInfo?: string;
   gudang?: string;
+  customerName?: string;
   supplierName?: string;
   supplierUsername?: string;
   batchIndex?: number;
@@ -85,6 +88,9 @@ export async function processSheetOnlyUpload(params: {
   const noSj = payload.no_surat_jalan || result.suratJalanNumber || submissionRef;
   const ext = params.file.name.match(/\.[a-z0-9]+$/i)?.[0] || ".jpeg";
   const gudangLabel = params.gudang?.trim() ?? "";
+  const customerLabel = isCustomerDestination(gudangLabel)
+    ? sanitizeCustomerFolderName(params.customerName ?? "")
+    : "";
   const supplierName = params.supplierName?.trim() ?? "";
   const supplierMapping = await resolveSupplierUploadMapping({
     supplierName,
@@ -120,17 +126,26 @@ export async function processSheetOnlyUpload(params: {
   );
   try {
     const uploaded =
-      gudangLabel && supplierName && driveSubfolder
-        ? await uploadSuratJalanToGudangDrive({
+      isCustomerDestination(gudangLabel) && customerLabel && supplierName && driveSubfolder
+        ? await uploadSuratJalanToCustomerDrive({
             config,
             buffer: params.file.buffer,
             fileName,
             mimeType: params.file.mimeType || "image/jpeg",
-            gudang: gudangLabel,
+            customerName: customerLabel,
             subfolderName: driveSubfolder,
-            supplierFolderName: supplierMapping?.supplierFolderName,
           })
-        : await uploadFileToDrive({
+        : gudangLabel && supplierName && driveSubfolder
+          ? await uploadSuratJalanToGudangDrive({
+              config,
+              buffer: params.file.buffer,
+              fileName,
+              mimeType: params.file.mimeType || "image/jpeg",
+              gudang: gudangLabel,
+              subfolderName: driveSubfolder,
+              supplierFolderName: supplierMapping?.supplierFolderName,
+            })
+          : await uploadFileToDrive({
             config,
             buffer: params.file.buffer,
             fileName,
@@ -154,16 +169,28 @@ export async function processSheetOnlyUpload(params: {
       try {
         const driveSettings = await getSupplierDriveSettings(mirrorUser);
         if (driveSettings?.mirrorEnabled && driveSettings.driveRootFolderId) {
-          await uploadSuratJalanToGudangDrive({
-            config,
-            rootFolderId: driveSettings.driveRootFolderId,
-            buffer: params.file.buffer,
-            fileName,
-            mimeType: params.file.mimeType || "image/jpeg",
-            gudang: gudangLabel,
-            subfolderName: driveSubfolder,
-            supplierFolderName: supplierMapping?.supplierFolderName,
-          });
+          if (isCustomerDestination(gudangLabel) && customerLabel) {
+            await uploadSuratJalanToCustomerDrive({
+              config,
+              rootFolderId: driveSettings.driveRootFolderId,
+              buffer: params.file.buffer,
+              fileName,
+              mimeType: params.file.mimeType || "image/jpeg",
+              customerName: customerLabel,
+              subfolderName: driveSubfolder,
+            });
+          } else {
+            await uploadSuratJalanToGudangDrive({
+              config,
+              rootFolderId: driveSettings.driveRootFolderId,
+              buffer: params.file.buffer,
+              fileName,
+              mimeType: params.file.mimeType || "image/jpeg",
+              gudang: gudangLabel,
+              subfolderName: driveSubfolder,
+              supplierFolderName: supplierMapping?.supplierFolderName,
+            });
+          }
         }
       } catch (mirrorErr) {
         const mirrorMsg = mirrorErr instanceof Error ? mirrorErr.message : "Mirror Drive supplier gagal";
@@ -189,6 +216,7 @@ export async function processSheetOnlyUpload(params: {
     fileName,
     fileUrl,
     gudang: params.gudang,
+    customerName: customerLabel,
     supplierName: supplierName || "Unverified",
     kendaraanDriver: params.vehicleInfo,
     catatan: params.notes,

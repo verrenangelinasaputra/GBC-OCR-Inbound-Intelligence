@@ -7,6 +7,7 @@ import { inferSampleItemTag } from "@/lib/surat-jalan/sample-item-tag";
 export const OCR_SHEET_HEADERS = [
   "Gudang tujuan",
   "Supplier",
+  "Nama Customer",
   "Tanggal Ekspor",
   "Tanggal SJ",
   "No. Surat Jalan",
@@ -157,6 +158,7 @@ export function buildGoogleSheetRows(params: {
   exportedAt?: Date;
   gudang?: string;
   supplierName?: string;
+  customerName?: string;
   kendaraanDriver?: string;
   catatan?: string;
   fallback?: {
@@ -177,6 +179,7 @@ export function buildGoogleSheetRows(params: {
   const noKendaraan = (payload.no_kendaraan || fallback?.vehicleInfo || "").toUpperCase();
   const noPo = payload.no_po || fallback?.poReference || "";
   const gudang = (params.gudang || "").trim();
+  const customerName = (params.customerName || "").trim();
   const supplier =
     (params.supplierName || "").trim() || "Unverified";
   const kendaraanDriver = (params.kendaraanDriver || "").trim();
@@ -200,6 +203,7 @@ export function buildGoogleSheetRows(params: {
       [
         gudang,
         supplier,
+        customerName,
         timestamp,
         tanggal,
         noSj,
@@ -237,6 +241,7 @@ export function buildGoogleSheetRows(params: {
     return [
       gudang,
       supplier,
+      customerName,
       timestamp,
       tanggal,
       noSj,
@@ -280,7 +285,7 @@ export function isMeaningfulOcrDataRow(row: string[] | undefined): boolean {
   if (!row?.length) return false;
   const exportedLegacy = String(row[0] ?? "").trim();
   if (exportedLegacy && /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(exportedLegacy)) return true;
-  const exportedV3 = String(row[2] ?? "").trim();
+  const exportedV3 = String(row[3] ?? row[2] ?? "").trim();
   if (exportedV3 && /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(exportedV3)) return true;
   const exportedV2 = String(row[1] ?? "").trim();
   if (exportedV2 && /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(exportedV2)) return true;

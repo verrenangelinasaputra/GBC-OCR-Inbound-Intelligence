@@ -1,4 +1,7 @@
-import { SUPPLIER_GUDANG_OPTIONS } from "@/lib/config/supplier-gudang";
+import {
+  SUPPLIER_CUSTOMER_DESTINATION,
+  SUPPLIER_GUDANG_WAREHOUSE_OPTIONS,
+} from "@/lib/config/supplier-gudang";
 
 function parseGudangChatIdMap(): Map<string, string> {
   const map = new Map<string, string>();
@@ -16,7 +19,7 @@ function parseGudangChatIdMap(): Map<string, string> {
     }
   }
 
-  for (const gudang of SUPPLIER_GUDANG_OPTIONS) {
+  for (const gudang of SUPPLIER_GUDANG_WAREHOUSE_OPTIONS) {
     const envKey = `TELEGRAM_CHAT_${gudang.replace(/\s+/g, "_").toUpperCase()}`;
     const fromEnv = process.env[envKey]?.trim();
     if (fromEnv) map.set(gudang, fromEnv);
@@ -49,7 +52,10 @@ export function resolveTelegramChatIdForGudang(gudang: string): string | null {
   const map = getTelegramGudangChatIds();
   if (map.has(label)) return map.get(label)!;
   const legacy = process.env.TELEGRAM_CHAT_ID?.trim();
-  if (legacy && SUPPLIER_GUDANG_OPTIONS.includes(label as (typeof SUPPLIER_GUDANG_OPTIONS)[number])) {
+  if (label === SUPPLIER_CUSTOMER_DESTINATION) {
+    return map.get(SUPPLIER_CUSTOMER_DESTINATION) ?? null;
+  }
+  if (legacy && SUPPLIER_GUDANG_WAREHOUSE_OPTIONS.includes(label as (typeof SUPPLIER_GUDANG_WAREHOUSE_OPTIONS)[number])) {
     return legacy;
   }
   return null;

@@ -103,16 +103,17 @@ describe("buildGoogleSheetRows", () => {
       exportedAt: new Date("2026-10-03T12:00:00+07:00"),
     });
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toHaveLength(19);
+    expect(rows[0]).toHaveLength(OCR_SHEET_HEADERS.length);
     expect(rows[0][0]).toBe("Gudang Karanggan");
     expect(rows[0][1]).toBe("PT Maju Jaya");
-    expect(rows[0][4]).toBe("SG071351");
-    expect(rows[0][9]).toBe("116 DUS");
-    expect(rows[0][10]).toBe("144 PCS");
-    expect(rows[0][12]).toBe("16704 PCS");
-    expect(rows[0][16]).toBe("Pak Budi");
-    expect(rows[0][17]).toBe("Urgent");
-    expect(rows[0][18]).toBe("OK");
+    expect(rows[0][2]).toBe("");
+    expect(rows[0][5]).toBe("SG071351");
+    expect(rows[0][10]).toBe("116 DUS");
+    expect(rows[0][11]).toBe("144 PCS");
+    expect(rows[0][13]).toBe("16704 PCS");
+    expect(rows[0][17]).toBe("Pak Budi");
+    expect(rows[0][18]).toBe("Urgent");
+    expect(rows[0][19]).toBe("OK");
   });
 });
 

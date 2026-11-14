@@ -1,10 +1,20 @@
-export const SUPPLIER_GUDANG_OPTIONS = [
+export const SUPPLIER_GUDANG_WAREHOUSE_OPTIONS = [
   "Gudang Karanggan",
   "Gudang Loumina",
   "Gudang Klapanunggal",
   "Gudang Barata",
   "Gudang Kijang",
   "Gudang Kediri",
+] as const;
+
+export type SupplierGudangWarehouse = (typeof SUPPLIER_GUDANG_WAREHOUSE_OPTIONS)[number];
+
+/** Opsi khusus: kirim ke customer (bukan gudang GBC). */
+export const SUPPLIER_CUSTOMER_DESTINATION = "Customer" as const;
+
+export const SUPPLIER_GUDANG_OPTIONS = [
+  ...SUPPLIER_GUDANG_WAREHOUSE_OPTIONS,
+  SUPPLIER_CUSTOMER_DESTINATION,
 ] as const;
 
 export type SupplierGudang = (typeof SUPPLIER_GUDANG_OPTIONS)[number];
@@ -33,6 +43,9 @@ export function normalizeGudangSelection(raw: unknown): string {
     throw new Error("Pilih minimal satu gudang tujuan.");
   }
   for (const g of unique) {
+    if (g === SUPPLIER_CUSTOMER_DESTINATION) {
+      throw new Error("Customer tidak boleh dipakai di pemilihan multi-gudang internal.");
+    }
     if (!GUDANG_SET.has(g)) {
       throw new Error("Pilih gudang tujuan yang valid.");
     }

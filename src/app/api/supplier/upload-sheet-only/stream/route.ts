@@ -1,15 +1,14 @@
 import { jsonError } from "@/lib/api/auth-context";
 import { getSession } from "@/lib/auth/session";
 import { isSheetOnlyMode } from "@/lib/config/app-mode";
-import { SUPPLIER_GUDANG_OPTIONS, SUPPLIER_MAX_SJ_FILES } from "@/lib/config/supplier-gudang";
+import { validateSupplierGudangSelection } from "@/lib/config/supplier-destination";
+import { SUPPLIER_MAX_SJ_FILES } from "@/lib/config/supplier-gudang";
 import { resolveSupplierCompanyName } from "@/lib/supplier-auth/resolve-company";
 import { enforceSupplierMappingIfUser } from "@/lib/services/supplier-mapping-gate";
 import { processSheetOnlyUpload } from "@/lib/services/sheet-only-upload";
 
 const ALLOWED = new Set(["image/jpeg", "image/jpg", "image/png"]);
 const MAX_BYTES = 15 * 1024 * 1024;
-const GUDANG_SET = new Set<string>(SUPPLIER_GUDANG_OPTIONS);
-
 /** OCR multi-file bisa >60s — naikkan limit di Vercel (Pro: hingga 300s). */
 export const maxDuration = 300;
 export const runtime = "nodejs";
@@ -65,6 +64,7 @@ export async function POST(request: Request) {
   const notes = String(form.get("notes") ?? "");
   const vehicleInfo = String(form.get("vehicleInfo") ?? "");
   const gudang = String(form.get("gudang") ?? "").trim();
+  const customerName = String(form.get("customerName") ?? "").trim();
   const files = form.getAll("files").filter((f): f is File => f instanceof File);
 
   if (files.length === 0) {
@@ -73,8 +73,10 @@ export async function POST(request: Request) {
   if (files.length > SUPPLIER_MAX_SJ_FILES) {
     return jsonError(new Error(`Maksimal ${SUPPLIER_MAX_SJ_FILES} Surat Jalan per submit`), 400);
   }
-  if (!gudang || !GUDANG_SET.has(gudang)) {
-    return jsonError(new Error("Pilih gudang tujuan yang valid"), 400);
+  try {
+    validateSupplierGudangSelection(gudang, customerName);
+  } catch (e) {
+    return jsonError(e instanceof Error ? e : new Error("Gudang tidak valid"), 400);
   }
 
   const supplierName = await resolveSupplierCompanyName(session.username);
@@ -124,6 +126,7 @@ export async function POST(request: Request) {
           notes: notes || undefined,
           vehicleInfo: vehicleInfo || undefined,
           gudang,
+          customerName: customerName || undefined,
           supplierName,
           supplierUsername: session.username,
           batchIndex: fileIndex,

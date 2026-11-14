@@ -18,6 +18,7 @@ export {
 export {
   uploadFileToDrive,
   uploadSuratJalanToGudangDrive,
+  uploadSuratJalanToCustomerDrive,
   findOrCreateDriveFolder,
   appendRowsToSheet,
   ensureOcrSheetHeaders,

@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ImagePlus, Trash2, X } from "lucide-react";
-import { SUPPLIER_GUDANG_OPTIONS, SUPPLIER_MAX_SJ_FILES } from "@/lib/config/supplier-gudang";
+import {
+  SUPPLIER_CUSTOMER_DESTINATION,
+  SUPPLIER_GUDANG_OPTIONS,
+  SUPPLIER_MAX_SJ_FILES,
+} from "@/lib/config/supplier-gudang";
 import type { SheetUploadProgressPhase } from "@/lib/services/sheet-only-upload";
 import {
   UploadProgressPanel,
@@ -55,6 +59,7 @@ export function SupplierUploadForm() {
   const [sheetOnly, setSheetOnly] = useState(false);
   const [staged, setStaged] = useState<StagedFile[]>([]);
   const [gudang, setGudang] = useState("");
+  const [customerName, setCustomerName] = useState("");
   const [notes, setNotes] = useState("");
   const [vehicleInfo, setVehicleInfo] = useState("");
   const [verifyOpen, setVerifyOpen] = useState(false);
@@ -134,6 +139,10 @@ export function SupplierUploadForm() {
     }
     if (!gudang) {
       setError("Pilih gudang tujuan");
+      return;
+    }
+    if (gudang === SUPPLIER_CUSTOMER_DESTINATION && !customerName.trim()) {
+      setError("Isi nama customer");
       return;
     }
     setVerifyOpen(true);
@@ -319,6 +328,9 @@ export function SupplierUploadForm() {
     const form = new FormData();
     staged.forEach((s) => form.append("files", s.file));
     form.append("gudang", gudang);
+    if (gudang === SUPPLIER_CUSTOMER_DESTINATION) {
+      form.append("customerName", customerName.trim());
+    }
     form.append("notes", notes);
     form.append("vehicleInfo", vehicleInfo);
     const fileTotal = staged.length;
@@ -371,6 +383,7 @@ export function SupplierUploadForm() {
       setNotes("");
       setVehicleInfo("");
       setGudang("");
+      setCustomerName("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload gagal");
     } finally {
@@ -477,7 +490,11 @@ export function SupplierUploadForm() {
               <select
                 required
                 value={gudang}
-                onChange={(e) => setGudang(e.target.value)}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setGudang(next);
+                  if (next !== SUPPLIER_CUSTOMER_DESTINATION) setCustomerName("");
+                }}
                 className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               >
                 <option value="">— Pilih gudang —</option>
@@ -488,6 +505,23 @@ export function SupplierUploadForm() {
                 ))}
               </select>
             </label>
+            {gudang === SUPPLIER_CUSTOMER_DESTINATION ? (
+              <label className="block sm:col-span-2">
+                <span className="text-sm font-medium text-slate-700">
+                  Nama customer <span className="text-red-500">*</span>
+                </span>
+                <input
+                  required
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="Contoh: PT ABC Retail"
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  Foto disimpan di Drive: Customer → nama ini → Surat Jalan → per SJ.
+                </p>
+              </label>
+            ) : null}
             <label className="block">
               <span className="text-sm font-medium text-slate-700">Kendaraan / Driver (opsional)</span>
               <input
@@ -584,6 +618,12 @@ export function SupplierUploadForm() {
                 <dt className="text-slate-500">Gudang tujuan</dt>
                 <dd className="font-medium text-slate-900">{gudang}</dd>
               </div>
+              {gudang === SUPPLIER_CUSTOMER_DESTINATION && customerName.trim() ? (
+                <div className="flex justify-between gap-4 border-b border-slate-100 pb-2">
+                  <dt className="text-slate-500">Nama customer</dt>
+                  <dd className="text-right font-medium text-slate-900">{customerName.trim()}</dd>
+                </div>
+              ) : null}
               {vehicleInfo && (
                 <div className="flex justify-between gap-4 border-b border-slate-100 pb-2">
                   <dt className="text-slate-500">Kendaraan</dt>

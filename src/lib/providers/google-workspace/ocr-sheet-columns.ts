@@ -10,32 +10,46 @@ import { OCR_SHEET_HEADERS } from "./google-sj-export-rows";
 export const OCR_COL = {
   GUDANG: 0,
   SUPPLIER: 1,
-  TANGGAL_EKSPOR: 2,
-  TANGGAL_SJ: 3,
-  NO_SJ: 4,
-  NO_KENDARAAN: 5,
-  NO_PO: 6,
-  NAMA_PENERIMA: 7,
-  ALAMAT: 8,
-  BANYAKNYA: 9,
-  ISI: 10,
-  NAMA_BARANG: 11,
-  JUMLAH: 12,
-  KETERANGAN: 13,
-  NAMA_FILE: 14,
-  LINK_DRIVE: 15,
-  KENDARAAN_DRIVER: 16,
-  CATATAN: 17,
-  STATUS: 18,
-  STATUS_REVIEW: 19,
-  LINK_REVISI: 20,
-  SAMPLE_TYPE: 21,
-  TS_KIRIM_SUPPLIER: 22,
-  TS_DITINJAU_GUDANG: 23,
-  TS_REVISI_GUDANG: 24,
-  TS_APPROVE_GUDANG: 25,
-  TS_KONFIRMASI_SUPPLIER: 26,
+  NAMA_CUSTOMER: 2,
+  TANGGAL_EKSPOR: 3,
+  TANGGAL_SJ: 4,
+  NO_SJ: 5,
+  NO_KENDARAAN: 6,
+  NO_PO: 7,
+  NAMA_PENERIMA: 8,
+  ALAMAT: 9,
+  BANYAKNYA: 10,
+  ISI: 11,
+  NAMA_BARANG: 12,
+  JUMLAH: 13,
+  KETERANGAN: 14,
+  NAMA_FILE: 15,
+  LINK_DRIVE: 16,
+  KENDARAAN_DRIVER: 17,
+  CATATAN: 18,
+  STATUS: 19,
+  STATUS_REVIEW: 20,
+  LINK_REVISI: 21,
+  SAMPLE_TYPE: 22,
+  TS_KIRIM_SUPPLIER: 23,
+  TS_DITINJAU_GUDANG: 24,
+  TS_REVISI_GUDANG: 25,
+  TS_APPROVE_GUDANG: 26,
+  TS_KONFIRMASI_SUPPLIER: 27,
 } as const;
+
+const DATE_CELL = /^\d{1,2}\/\d{1,2}\/\d{4}$/;
+
+/** Baris lama tanpa kolom Nama Customer — Tanggal Ekspor masih di indeks 2. */
+export function ocrSheetRowHasCustomerColumn(row: string[]): boolean {
+  const c2 = String(row[2] ?? "").trim();
+  return !(c2 && DATE_CELL.test(c2));
+}
+
+function v3Col(row: string[], col: number): number {
+  if (col < OCR_COL.NAMA_CUSTOMER) return col;
+  return ocrSheetRowHasCustomerColumn(row) ? col : col - 1;
+}
 
 export const OCR_SHEET_COLUMN_COUNT = OCR_SHEET_HEADERS.length;
 
@@ -81,6 +95,7 @@ export type OcrSheetRowFields = {
   alamat: string;
   banyaknya: string;
   isi: string;
+  namaCustomer: string;
   namaBarang: string;
   jumlah: string;
   keterangan: string;
@@ -122,6 +137,7 @@ export function mapOcrSheetRow(row: string[] | undefined): OcrSheetRowFields {
     return {
       gudang: "",
       supplier: "Unverified",
+      namaCustomer: "",
       exportTimestamp: String(r[0] ?? ""),
       tanggal: String(r[1] ?? ""),
       noSuratJalan: String(r[2] ?? ""),
@@ -149,6 +165,7 @@ export function mapOcrSheetRow(row: string[] | undefined): OcrSheetRowFields {
     return {
       gudang: String(r[0] ?? ""),
       supplier: "Unverified",
+      namaCustomer: "",
       exportTimestamp: String(r[1] ?? ""),
       tanggal: String(r[2] ?? ""),
       noSuratJalan: String(r[3] ?? ""),
@@ -173,40 +190,43 @@ export function mapOcrSheetRow(row: string[] | undefined): OcrSheetRowFields {
     };
   }
   return {
-    gudang: String(r[OCR_COL.GUDANG] ?? ""),
-    supplier: String(r[OCR_COL.SUPPLIER] ?? "").trim() || "Unverified",
-    exportTimestamp: String(r[OCR_COL.TANGGAL_EKSPOR] ?? ""),
-    tanggal: String(r[OCR_COL.TANGGAL_SJ] ?? ""),
-    noSuratJalan: String(r[OCR_COL.NO_SJ] ?? ""),
-    noKendaraan: String(r[OCR_COL.NO_KENDARAAN] ?? ""),
-    noPo: String(r[OCR_COL.NO_PO] ?? ""),
-    namaPenerima: String(r[OCR_COL.NAMA_PENERIMA] ?? ""),
-    alamat: String(r[OCR_COL.ALAMAT] ?? ""),
-    banyaknya: String(r[OCR_COL.BANYAKNYA] ?? ""),
-    isi: String(r[OCR_COL.ISI] ?? ""),
-    namaBarang: String(r[OCR_COL.NAMA_BARANG] ?? ""),
-    jumlah: String(r[OCR_COL.JUMLAH] ?? ""),
-    keterangan: String(r[OCR_COL.KETERANGAN] ?? ""),
-    fileName: String(r[OCR_COL.NAMA_FILE] ?? ""),
-    fileUrl: String(r[OCR_COL.LINK_DRIVE] ?? ""),
-    kendaraanDriver: String(r[OCR_COL.KENDARAAN_DRIVER] ?? ""),
-    catatan: String(r[OCR_COL.CATATAN] ?? ""),
-    status: String(r[OCR_COL.STATUS] ?? "").trim() || "OK",
-    statusReview: normalizeOcrReviewStatus(r[OCR_COL.STATUS_REVIEW]),
-    linkRevisi: String(r[OCR_COL.LINK_REVISI] ?? "").trim(),
+    gudang: String(r[v3Col(r, OCR_COL.GUDANG)] ?? ""),
+    supplier: String(r[v3Col(r, OCR_COL.SUPPLIER)] ?? "").trim() || "Unverified",
+    namaCustomer: ocrSheetRowHasCustomerColumn(r)
+      ? String(r[v3Col(r, OCR_COL.NAMA_CUSTOMER)] ?? "").trim()
+      : "",
+    exportTimestamp: String(r[v3Col(r, OCR_COL.TANGGAL_EKSPOR)] ?? ""),
+    tanggal: String(r[v3Col(r, OCR_COL.TANGGAL_SJ)] ?? ""),
+    noSuratJalan: String(r[v3Col(r, OCR_COL.NO_SJ)] ?? ""),
+    noKendaraan: String(r[v3Col(r, OCR_COL.NO_KENDARAAN)] ?? ""),
+    noPo: String(r[v3Col(r, OCR_COL.NO_PO)] ?? ""),
+    namaPenerima: String(r[v3Col(r, OCR_COL.NAMA_PENERIMA)] ?? ""),
+    alamat: String(r[v3Col(r, OCR_COL.ALAMAT)] ?? ""),
+    banyaknya: String(r[v3Col(r, OCR_COL.BANYAKNYA)] ?? ""),
+    isi: String(r[v3Col(r, OCR_COL.ISI)] ?? ""),
+    namaBarang: String(r[v3Col(r, OCR_COL.NAMA_BARANG)] ?? ""),
+    jumlah: String(r[v3Col(r, OCR_COL.JUMLAH)] ?? ""),
+    keterangan: String(r[v3Col(r, OCR_COL.KETERANGAN)] ?? ""),
+    fileName: String(r[v3Col(r, OCR_COL.NAMA_FILE)] ?? ""),
+    fileUrl: String(r[v3Col(r, OCR_COL.LINK_DRIVE)] ?? ""),
+    kendaraanDriver: String(r[v3Col(r, OCR_COL.KENDARAAN_DRIVER)] ?? ""),
+    catatan: String(r[v3Col(r, OCR_COL.CATATAN)] ?? ""),
+    status: String(r[v3Col(r, OCR_COL.STATUS)] ?? "").trim() || "OK",
+    statusReview: normalizeOcrReviewStatus(r[v3Col(r, OCR_COL.STATUS_REVIEW)]),
+    linkRevisi: String(r[v3Col(r, OCR_COL.LINK_REVISI)] ?? "").trim(),
     sampleType: normalizeSampleItemTag(
-      String(r[OCR_COL.SAMPLE_TYPE] ?? "").trim() ||
+      String(r[v3Col(r, OCR_COL.SAMPLE_TYPE)] ?? "").trim() ||
         inferSampleItemTag(
-          String(r[OCR_COL.KETERANGAN] ?? ""),
-          String(r[OCR_COL.CATATAN] ?? ""),
-          String(r[OCR_COL.NAMA_BARANG] ?? "")
+          String(r[v3Col(r, OCR_COL.KETERANGAN)] ?? ""),
+          String(r[v3Col(r, OCR_COL.CATATAN)] ?? ""),
+          String(r[v3Col(r, OCR_COL.NAMA_BARANG)] ?? "")
         )
     ),
-    tsKirimSupplier: workflowTsFromRow(r, OCR_COL.TS_KIRIM_SUPPLIER),
-    tsDitinjauGudang: workflowTsFromRow(r, OCR_COL.TS_DITINJAU_GUDANG),
-    tsRevisiGudang: workflowTsFromRow(r, OCR_COL.TS_REVISI_GUDANG),
-    tsApproveGudang: workflowTsFromRow(r, OCR_COL.TS_APPROVE_GUDANG),
-    tsKonfirmasiSupplier: workflowTsFromRow(r, OCR_COL.TS_KONFIRMASI_SUPPLIER),
+    tsKirimSupplier: workflowTsFromRow(r, v3Col(r, OCR_COL.TS_KIRIM_SUPPLIER)),
+    tsDitinjauGudang: workflowTsFromRow(r, v3Col(r, OCR_COL.TS_DITINJAU_GUDANG)),
+    tsRevisiGudang: workflowTsFromRow(r, v3Col(r, OCR_COL.TS_REVISI_GUDANG)),
+    tsApproveGudang: workflowTsFromRow(r, v3Col(r, OCR_COL.TS_APPROVE_GUDANG)),
+    tsKonfirmasiSupplier: workflowTsFromRow(r, v3Col(r, OCR_COL.TS_KONFIRMASI_SUPPLIER)),
   };
 }
 
@@ -214,6 +234,7 @@ export function ocrSheetRowToValues(fields: OcrSheetRowFields): string[] {
   return [
     fields.gudang,
     fields.supplier,
+    fields.namaCustomer,
     fields.exportTimestamp,
     fields.tanggal,
     fields.noSuratJalan,
