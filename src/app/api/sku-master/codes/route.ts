@@ -1,7 +1,12 @@
 import { jsonError, requireApiSession } from "@/lib/api/auth-context";
 import { hasPermission } from "@/lib/rbac/permissions";
 import { skuMasterApiEnabled } from "@/lib/sku-master/api-enabled";
-import { appendSkuMasterCode, loadSkuMasterCodes } from "@/lib/services/sku-master-sheet";
+import {
+  appendSkuMasterCode,
+  loadSkuMasterCodes,
+  loadSkuMasterCodesForTab,
+} from "@/lib/services/sku-master-sheet";
+import { SHEET_QUOTA_USER_MESSAGE } from "@/lib/google-sheets/sheet-values";
 import { hasDatabase, prisma } from "@/lib/db";
 import { getSkuMasterSheetId } from "@/lib/config/sku-mapping-sheets";
 
@@ -16,11 +21,21 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const categoryTab = String(url.searchParams.get("tab") ?? "").trim();
     const subIndex = Number(url.searchParams.get("sub") ?? "1");
+    const allSubs = url.searchParams.get("all") === "1" || url.searchParams.get("all") === "true";
     if (!categoryTab) return jsonError(new Error("Parameter tab wajib"), 400);
+
+    if (allSubs) {
+      const bySub = await loadSkuMasterCodesForTab(categoryTab);
+      return Response.json({ bySub });
+    }
 
     const options = await loadSkuMasterCodes(categoryTab, subIndex);
     return Response.json({ options });
   } catch (e) {
+    const message = e instanceof Error ? e.message : "Unknown";
+    if (message === SHEET_QUOTA_USER_MESSAGE) {
+      return Response.json({ error: message }, { status: 429 });
+    }
     return jsonError(e);
   }
 }

@@ -39,8 +39,18 @@ export async function replaceSheetRows(
 }
 
 export function sheetQuotaError(message: string): boolean {
-  return /quota exceeded|rate limit|resource_exhausted|writes per minute/i.test(message);
+  return /quota exceeded|rate limit|resource_exhausted|writes per minute|read requests per minute/i.test(
+    message
+  );
 }
 
 export const SHEET_QUOTA_USER_MESSAGE =
-  "Kuota tulis Google Sheets habis (batas ~60 kali/menit). Tunggu 1–2 menit, hindari klik berulang «Kirim ulang», lalu coba lagi.";
+  "Kuota Google Sheets habis (baca/tulis per menit). Tunggu 1–2 menit, hindari refresh atau sync berulang, lalu coba lagi.";
+
+export function mapSheetApiError(error: unknown): Error {
+  const message = error instanceof Error ? error.message : String(error);
+  if (sheetQuotaError(message)) {
+    return new Error(SHEET_QUOTA_USER_MESSAGE);
+  }
+  return error instanceof Error ? error : new Error(message);
+}

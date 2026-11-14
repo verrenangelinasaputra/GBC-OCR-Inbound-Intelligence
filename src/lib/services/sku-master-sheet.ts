@@ -17,12 +17,208 @@ import type {
   SkuMasterCodeOption,
   SkuMasterProductInput,
   SkuMasterProductResult,
+  SkuMasterRekapSkulRow,
+  SkuMasterRekapSkusRow,
+  SkuMasterTableRow,
 } from "@/lib/sku-master/types";
 import { googleConfigForSpreadsheet } from "@/lib/services/sku-rekap-catalog";
 import { invalidateSkuRekapCatalogCache } from "@/lib/services/sku-rekap-catalog";
+import { mapSheetApiError } from "@/lib/google-sheets/sheet-values";
 
 const REKAP_SKUL_TAB = "REKAP SKUL";
 const REKAP_SKUS_TAB = "REKAP SKUS";
+
+const CODE_CACHE_MS = 5 * 60 * 1000;
+const TAB_GID_CACHE_MS = 30 * 60 * 1000;
+const codeCache = new Map<string, { at: number; bySub: Record<number, SkuMasterCodeOption[]> }>();
+const tabGidCache = new Map<string, { at: number; gids: Record<string, number> }>();
+
+export function invalidateSkuMasterCodeCache(categoryTab?: string): void {
+  if (!categoryTab) {
+    codeCache.clear();
+    return;
+  }
+  const prefix = `${getSkuMasterSheetId()}\t${categoryTab}`;
+  for (const key of codeCache.keys()) {
+    if (key.startsWith(prefix)) codeCache.delete(key);
+  }
+}
+
+const LIST_CACHE_MS = 5 * 60 * 1000;
+const tableListCache = new Map<string, { at: number; rows: SkuMasterTableRow[] }>();
+let rekapSkulListCache: { at: number; rows: SkuMasterRekapSkulRow[] } | null = null;
+let rekapSkusListCache: { at: number; rows: SkuMasterRekapSkusRow[] } | null = null;
+
+export function invalidateSkuMasterListCaches(categoryTab?: string): void {
+  if (!categoryTab) {
+    tableListCache.clear();
+  } else {
+    const key = `${getSkuMasterSheetId()}\t${categoryTab}`;
+    tableListCache.delete(key);
+  }
+  rekapSkulListCache = null;
+  rekapSkusListCache = null;
+}
+
+function rel(row: string[], offsetFromNo: number): string {
+  return String(row[offsetFromNo] ?? "").trim();
+}
+
+function parseTableSliceRow(categoryTab: string, sheetRow: number, row: string[]): SkuMasterTableRow | null {
+  const namaProdukAcuan = rel(row, COL.TABEL_NAMA_PRODUK_ACUAN - COL.TABEL_NO);
+  const skuLengkap = rel(row, COL.TABEL_SKU_LENGKAP - COL.TABEL_NO);
+  if (!namaProdukAcuan && !skuLengkap) return null;
+  return {
+    categoryTab,
+    sheetRow,
+    no: rel(row, 0),
+    namaProdukAcuan,
+    namaInternalAccurate: rel(row, COL.TABEL_NAMA_INTERNAL - COL.TABEL_NO),
+    sub1: rel(row, COL.TABEL_SUB1 - COL.TABEL_NO),
+    sub2: rel(row, COL.TABEL_SUB2 - COL.TABEL_NO),
+    sub3: rel(row, COL.TABEL_SUB3 - COL.TABEL_NO),
+    sub4: rel(row, COL.TABEL_SUB4 - COL.TABEL_NO),
+    sub5: rel(row, COL.TABEL_SUB5 - COL.TABEL_NO),
+    sub6: rel(row, COL.TABEL_SUB6 - COL.TABEL_NO),
+    sub7: rel(row, COL.TABEL_SUB7 - COL.TABEL_NO),
+    sub8: rel(row, COL.TABEL_SUB8 - COL.TABEL_NO),
+    sub9: rel(row, COL.TABEL_SUB9 - COL.TABEL_NO),
+    skuLengkap,
+    skus: rel(row, COL.TABEL_SKUS - COL.TABEL_NO),
+    barcode: rel(row, COL.TABEL_BARCODE - COL.TABEL_NO),
+  };
+}
+
+export async function listSkuMasterTableRows(
+  categoryTab: string,
+  force = false
+): Promise<SkuMasterTableRow[]> {
+  if (!isGeneratorCategoryTab(categoryTab)) {
+    throw new Error(`Kategori tidak valid: ${categoryTab}`);
+  }
+
+  const cacheKey = `${getSkuMasterSheetId()}\t${categoryTab}`;
+  const now = Date.now();
+  const cached = tableListCache.get(cacheKey);
+  if (!force && cached && now - cached.at < LIST_CACHE_MS) return cached.rows;
+
+  const { sheets, spreadsheetId } = sheetsClient();
+  const start = columnIndexToA1(COL.TABEL_NO, TABEL_FIRST_DATA_ROW);
+  const end = columnIndexToA1(COL.TABEL_SKUS, 5000);
+  try {
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `${quoteTab(categoryTab)}!${start}:${end}`,
+    });
+    const rows = res.data.values ?? [];
+    const out: SkuMasterTableRow[] = [];
+    for (let i = 0; i < rows.length; i += 1) {
+      const parsed = parseTableSliceRow(categoryTab, TABEL_FIRST_DATA_ROW + i, rows[i] ?? []);
+      if (parsed) out.push(parsed);
+    }
+    tableListCache.set(cacheKey, { at: now, rows: out });
+    return out;
+  } catch (e) {
+    throw mapSheetApiError(e);
+  }
+}
+
+export async function listSkuMasterRekapSkulRows(force = false): Promise<SkuMasterRekapSkulRow[]> {
+  const now = Date.now();
+  if (!force && rekapSkulListCache && now - rekapSkulListCache.at < LIST_CACHE_MS) {
+    return rekapSkulListCache.rows;
+  }
+  const raw = await fetchRekapSkulRows();
+  const out: SkuMasterRekapSkulRow[] = [];
+  for (let i = 1; i < raw.length; i += 1) {
+    const row = raw[i] ?? [];
+    const skuLengkap = String(row[1] ?? "").trim();
+    if (!skuLengkap) continue;
+    out.push({
+      rowNo: String(row[0] ?? "").trim(),
+      skuLengkap,
+      namaInternalAccurate: String(row[2] ?? "").trim(),
+      namaProdukAcuan: String(row[3] ?? "").trim(),
+      kategoriUtama: String(row[4] ?? "").trim(),
+      skus: String(row[5] ?? "").trim(),
+      barcode: String(row[6] ?? "").trim(),
+      sumberLembar: String(row[7] ?? "").trim(),
+    });
+  }
+  rekapSkulListCache = { at: now, rows: out };
+  return out;
+}
+
+export async function listSkuMasterRekapSkusRows(force = false): Promise<SkuMasterRekapSkusRow[]> {
+  const now = Date.now();
+  if (!force && rekapSkusListCache && now - rekapSkusListCache.at < LIST_CACHE_MS) {
+    return rekapSkusListCache.rows;
+  }
+  const raw = await fetchRekapSkusRows();
+  const out: SkuMasterRekapSkusRow[] = [];
+  for (let i = 1; i < raw.length; i += 1) {
+    const row = raw[i] ?? [];
+    const skus = String(row[1] ?? "").trim();
+    if (!skus) continue;
+    out.push({
+      rowNo: String(row[0] ?? "").trim(),
+      skus,
+      namaInternal: String(row[2] ?? "").trim(),
+      variantCount: Number(String(row[3] ?? "0").replace(/\D/g, "")) || 0,
+      sourceTab: String(row[4] ?? "").trim(),
+    });
+  }
+  rekapSkusListCache = { at: now, rows: out };
+  return out;
+}
+
+function parseSubColumnFromRows(rows: string[][], subIndex: number): SkuMasterCodeOption[] {
+  const { code: codeCol, label: labelCol } = codePairColumns(subIndex);
+  const out: SkuMasterCodeOption[] = [];
+  for (let i = 0; i < rows.length; i += 1) {
+    const row = rows[i] ?? [];
+    const codeVal = String(row[codeCol] ?? "").trim();
+    if (!codeVal) break;
+    out.push({
+      code: codeVal,
+      label: String(row[labelCol] ?? "").trim() || codeVal,
+      sheetRow: CODE_DICT_FIRST_DATA_ROW + i,
+    });
+  }
+  return out;
+}
+
+/** Satu read (A:R) untuk semua Sub 1–9 — menghemat kuota vs 9× values.get. */
+export async function loadSkuMasterCodesForTab(
+  categoryTab: string,
+  force = false
+): Promise<Record<number, SkuMasterCodeOption[]>> {
+  if (!isGeneratorCategoryTab(categoryTab)) {
+    throw new Error(`Kategori tidak valid: ${categoryTab}`);
+  }
+
+  const cacheKey = `${getSkuMasterSheetId()}\t${categoryTab}`;
+  const now = Date.now();
+  const cached = codeCache.get(cacheKey);
+  if (!force && cached && now - cached.at < CODE_CACHE_MS) {
+    return cached.bySub;
+  }
+
+  const { sheets, spreadsheetId } = sheetsClient();
+  const range = `${quoteTab(categoryTab)}!A${CODE_DICT_FIRST_DATA_ROW}:R`;
+  try {
+    const res = await sheets.spreadsheets.values.get({ spreadsheetId, range });
+    const rows = res.data.values ?? [];
+    const bySub: Record<number, SkuMasterCodeOption[]> = {};
+    for (let subIndex = 1; subIndex <= 9; subIndex += 1) {
+      bySub[subIndex] = parseSubColumnFromRows(rows, subIndex);
+    }
+    codeCache.set(cacheKey, { at: now, bySub });
+    return bySub;
+  } catch (e) {
+    throw mapSheetApiError(e);
+  }
+}
 
 function quoteTab(tab: string): string {
   return `'${tab.replace(/'/g, "''")}'`;
@@ -42,44 +238,41 @@ async function getTabSheetId(
   spreadsheetId: string,
   tabTitle: string
 ): Promise<number> {
-  const meta = await sheets.spreadsheets.get({
-    spreadsheetId,
-    fields: "sheets.properties(sheetId,title)",
-  });
-  const found = meta.data.sheets?.find((s) => s.properties?.title === tabTitle);
-  const id = found?.properties?.sheetId;
-  if (id == null) throw new Error(`Tab "${tabTitle}" tidak ditemukan`);
-  return id;
+  const cacheKey = spreadsheetId;
+  const now = Date.now();
+  const cached = tabGidCache.get(cacheKey);
+  if (cached && now - cached.at < TAB_GID_CACHE_MS) {
+    const id = cached.gids[tabTitle];
+    if (id != null) return id;
+  }
+
+  try {
+    const meta = await sheets.spreadsheets.get({
+      spreadsheetId,
+      fields: "sheets.properties(sheetId,title)",
+    });
+    const gids: Record<string, number> = { ...(cached?.gids ?? {}) };
+    for (const s of meta.data.sheets ?? []) {
+      const title = s.properties?.title;
+      const sid = s.properties?.sheetId;
+      if (title != null && sid != null) gids[title] = sid;
+    }
+    tabGidCache.set(cacheKey, { at: now, gids });
+    const id = gids[tabTitle];
+    if (id == null) throw new Error(`Tab "${tabTitle}" tidak ditemukan`);
+    return id;
+  } catch (e) {
+    throw mapSheetApiError(e);
+  }
 }
 
 export async function loadSkuMasterCodes(
   categoryTab: string,
   subIndex: number
 ): Promise<SkuMasterCodeOption[]> {
-  if (!isGeneratorCategoryTab(categoryTab)) {
-    throw new Error(`Kategori tidak valid: ${categoryTab}`);
-  }
   if (subIndex < 1 || subIndex > 9) throw new Error("subIndex harus 1–9");
-
-  const { sheets, spreadsheetId } = sheetsClient();
-  const { code, label } = codePairColumns(subIndex);
-  const codeCol = String.fromCharCode(65 + code);
-  const range = `${quoteTab(categoryTab)}!${codeCol}${CODE_DICT_FIRST_DATA_ROW}:${String.fromCharCode(65 + label)}`;
-  const res = await sheets.spreadsheets.values.get({ spreadsheetId, range });
-
-  const rows = res.data.values ?? [];
-  const out: SkuMasterCodeOption[] = [];
-  for (let i = 0; i < rows.length; i += 1) {
-    const row = rows[i] ?? [];
-    const codeVal = String(row[0] ?? "").trim();
-    if (!codeVal) break;
-    out.push({
-      code: codeVal,
-      label: String(row[1] ?? "").trim() || codeVal,
-      sheetRow: CODE_DICT_FIRST_DATA_ROW + i,
-    });
-  }
-  return out;
+  const bySub = await loadSkuMasterCodesForTab(categoryTab);
+  return bySub[subIndex] ?? [];
 }
 
 export async function appendSkuMasterCode(
@@ -106,13 +299,18 @@ export async function appendSkuMasterCode(
   const { code: codeCol, label: labelCol } = codePairColumns(subIndex);
   const range = `${quoteTab(categoryTab)}!${columnIndexToA1(codeCol, nextRow)}:${columnIndexToA1(labelCol, nextRow)}`;
 
-  await sheets.spreadsheets.values.update({
-    spreadsheetId,
-    range,
-    valueInputOption: "RAW",
-    requestBody: { values: [[trimmedCode, trimmedLabel]] },
-  });
+  try {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range,
+      valueInputOption: "RAW",
+      requestBody: { values: [[trimmedCode, trimmedLabel]] },
+    });
+  } catch (e) {
+    throw mapSheetApiError(e);
+  }
 
+  invalidateSkuMasterCodeCache(categoryTab);
   return { code: trimmedCode, label: trimmedLabel, sheetRow: nextRow };
 }
 
@@ -251,6 +449,16 @@ async function upsertRekapSkusFamily(
 export async function createSkuMasterProduct(
   input: SkuMasterProductInput
 ): Promise<SkuMasterProductResult> {
+  try {
+    return await createSkuMasterProductInner(input);
+  } catch (e) {
+    throw mapSheetApiError(e);
+  }
+}
+
+async function createSkuMasterProductInner(
+  input: SkuMasterProductInput
+): Promise<SkuMasterProductResult> {
   if (!isGeneratorCategoryTab(input.categoryTab)) {
     throw new Error(`Kategori tidak valid: ${input.categoryTab}`);
   }
@@ -356,6 +564,7 @@ export async function createSkuMasterProduct(
   );
 
   invalidateSkuRekapCatalogCache();
+  invalidateSkuMasterListCaches(input.categoryTab);
 
   return {
     categoryTab: input.categoryTab,
@@ -375,20 +584,28 @@ export async function createSkuMasterProduct(
 
 export async function fetchRekapSkulRows(): Promise<string[][]> {
   const { sheets, spreadsheetId } = sheetsClient();
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: `${quoteTab(REKAP_SKUL_TAB)}!A:H`,
-  });
-  return res.data.values ?? [];
+  try {
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `${quoteTab(REKAP_SKUL_TAB)}!A:H`,
+    });
+    return res.data.values ?? [];
+  } catch (e) {
+    throw mapSheetApiError(e);
+  }
 }
 
 export async function fetchRekapSkusRows(): Promise<string[][]> {
   const { sheets, spreadsheetId } = sheetsClient();
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: `${quoteTab(REKAP_SKUS_TAB)}!A:E`,
-  });
-  return res.data.values ?? [];
+  try {
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `${quoteTab(REKAP_SKUS_TAB)}!A:E`,
+    });
+    return res.data.values ?? [];
+  } catch (e) {
+    throw mapSheetApiError(e);
+  }
 }
 
 export function getSkuMasterSpreadsheetIdForClient(): string {

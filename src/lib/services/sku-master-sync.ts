@@ -7,52 +7,86 @@ import type { SkuMasterSyncSummary } from "@/lib/sku-master/types";
 import {
   fetchRekapSkulRows,
   fetchRekapSkusRows,
-  loadSkuMasterCodes,
+  invalidateSkuMasterListCaches,
+  loadSkuMasterCodesForTab,
 } from "@/lib/services/sku-master-sheet";
 
-export async function syncSkuMasterMirrorFromSpreadsheet(): Promise<SkuMasterSyncSummary> {
+async function persistCodesForTab(
+  spreadsheetId: string,
+  categoryTab: string,
+  bySub: Record<number, import("@/lib/sku-master/types").SkuMasterCodeOption[]>
+): Promise<number> {
+  if (!hasDatabase()) return 0;
+  let n = 0;
+  for (let subIndex = 1; subIndex <= 9; subIndex += 1) {
+    for (const opt of bySub[subIndex] ?? []) {
+      n += 1;
+      await prisma.skuMasterCode.upsert({
+        where: {
+          spreadsheetId_categoryTab_subIndex_code: {
+            spreadsheetId,
+            categoryTab,
+            subIndex,
+            code: opt.code,
+          },
+        },
+        create: {
+          spreadsheetId,
+          categoryTab,
+          subIndex,
+          code: opt.code,
+          label: opt.label,
+          sheetRow: opt.sheetRow,
+        },
+        update: {
+          label: opt.label,
+          sheetRow: opt.sheetRow,
+        },
+      });
+    }
+  }
+  return n;
+}
+
+export async function syncSkuMasterMirrorFromSpreadsheet(options?: {
+  codes?: boolean;
+  rekap?: boolean;
+}): Promise<SkuMasterSyncSummary> {
+  const includeCodes = options?.codes !== false;
+  const includeRekap = options?.rekap !== false;
+
   const spreadsheetId = getSkuMasterSheetId();
   let codesCount = 0;
 
-  for (const tab of SKU_GENERATOR_CATEGORY_TABS) {
-    for (let subIndex = 1; subIndex <= 9; subIndex += 1) {
+  if (includeCodes) {
+    for (const tab of SKU_GENERATOR_CATEGORY_TABS) {
       try {
-        const options = await loadSkuMasterCodes(tab, subIndex);
-        codesCount += options.length;
-        if (!hasDatabase()) continue;
-
-        for (const opt of options) {
-          await prisma.skuMasterCode.upsert({
-            where: {
-              spreadsheetId_categoryTab_subIndex_code: {
-                spreadsheetId,
-                categoryTab: tab,
-                subIndex,
-                code: opt.code,
-              },
-            },
-            create: {
-              spreadsheetId,
-              categoryTab: tab,
-              subIndex,
-              code: opt.code,
-              label: opt.label,
-              sheetRow: opt.sheetRow,
-            },
-            update: {
-              label: opt.label,
-              sheetRow: opt.sheetRow,
-            },
-          });
+        const bySub = await loadSkuMasterCodesForTab(tab);
+        for (let subIndex = 1; subIndex <= 9; subIndex += 1) {
+          codesCount += (bySub[subIndex] ?? []).length;
         }
+        await persistCodesForTab(spreadsheetId, tab, bySub);
       } catch {
         // Tab mungkin belum ada di sheet tertentu — lewati.
       }
     }
   }
 
+  let rekapSkulCount = 0;
+  let rekapSkusCount = 0;
+
+  if (!includeRekap) {
+    return {
+      spreadsheetId,
+      codes: codesCount,
+      rekapSkul: 0,
+      rekapSkus: 0,
+      dbPersisted: hasDatabase(),
+    };
+  }
+
   const rekapRows = await fetchRekapSkulRows();
-  const rekapSkulCount = Math.max(0, rekapRows.length - 1);
+  rekapSkulCount = Math.max(0, rekapRows.length - 1);
 
   if (hasDatabase()) {
     for (let i = 1; i < rekapRows.length; i += 1) {
@@ -86,7 +120,7 @@ export async function syncSkuMasterMirrorFromSpreadsheet(): Promise<SkuMasterSyn
   }
 
   const skusRows = await fetchRekapSkusRows();
-  const rekapSkusCount = Math.max(0, skusRows.length - 1);
+  rekapSkusCount = Math.max(0, skusRows.length - 1);
 
   if (hasDatabase()) {
     for (let i = 1; i < skusRows.length; i += 1) {
@@ -111,6 +145,8 @@ export async function syncSkuMasterMirrorFromSpreadsheet(): Promise<SkuMasterSyn
       });
     }
   }
+
+  invalidateSkuMasterListCaches();
 
   return {
     spreadsheetId,

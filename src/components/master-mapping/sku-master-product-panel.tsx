@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { SkuMasterCodeOption } from "@/lib/sku-master/types";
+import { SkuMasterListTabs } from "@/components/master-mapping/sku-master-list-tabs";
 
 const SUB_KEYS = ["sub1", "sub2", "sub3", "sub4", "sub5", "sub6", "sub7", "sub8", "sub9"] as const;
 
@@ -35,6 +36,7 @@ export function SkuMasterProductPanel({ canEdit }: { canEdit: boolean }) {
   const [newCodeSub, setNewCodeSub] = useState(1);
   const [newCode, setNewCode] = useState("");
   const [newLabel, setNewLabel] = useState("");
+  const [listRefreshKey, setListRefreshKey] = useState(0);
 
   const loadMeta = useCallback(async () => {
     const res = await fetch("/api/sku-master/meta");
@@ -52,14 +54,12 @@ export function SkuMasterProductPanel({ canEdit }: { canEdit: boolean }) {
     setLoadingCodes(true);
     setError(null);
     try {
-      const next: Record<number, SkuMasterCodeOption[]> = {};
-      for (let sub = 1; sub <= 9; sub += 1) {
-        const res = await fetch(`/api/sku-master/codes?tab=${encodeURIComponent(categoryTab)}&sub=${sub}`);
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Gagal memuat kode");
-        next[sub] = data.options ?? [];
-      }
-      setCodeOptions(next);
+      const res = await fetch(
+        `/api/sku-master/codes?tab=${encodeURIComponent(categoryTab)}&all=1`
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal memuat kode");
+      setCodeOptions((data.bySub as Record<number, SkuMasterCodeOption[]>) ?? {});
     } catch (e) {
       setError(e instanceof Error ? e.message : "Gagal memuat kode");
     } finally {
@@ -75,8 +75,14 @@ export function SkuMasterProductPanel({ canEdit }: { canEdit: boolean }) {
     void loadAllCodes();
   }, [loadAllCodes]);
 
+  const [syncCooldownUntil, setSyncCooldownUntil] = useState(0);
+
   async function onSync() {
     if (!canEdit) return;
+    if (Date.now() < syncCooldownUntil) {
+      setError("Tunggu ~90 detik sebelum sync lagi (kuota Google Sheets).");
+      return;
+    }
     setSyncing(true);
     setMessage(null);
     setError(null);
@@ -84,8 +90,10 @@ export function SkuMasterProductPanel({ canEdit }: { canEdit: boolean }) {
       const res = await fetch("/api/sku-master/sync", { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Sync gagal");
+      setSyncCooldownUntil(Date.now() + 90_000);
+      setListRefreshKey((k) => k + 1);
       setMessage(
-        `Mirror selesai — kode: ${data.summary?.codes ?? 0}, REKAP SKUL: ${data.summary?.rekapSkul ?? 0}, REKAP SKUS: ${data.summary?.rekapSkus ?? 0}${data.summary?.dbPersisted ? " (tersimpan di DB)" : ""}.`
+        `Mirror selesai — kode: ${data.summary?.codes ?? 0}, REKAP SKUL: ${data.summary?.rekapSkul ?? 0}, REKAP SKUS: ${data.summary?.rekapSkus ?? 0}${data.summary?.dbPersisted ? " (tersimpan di DB)" : ""}. Jangan spam sync — tunggu 1–2 menit jika kuota habis.`
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Sync gagal");
@@ -156,6 +164,7 @@ export function SkuMasterProductPanel({ canEdit }: { canEdit: boolean }) {
         sub8: "",
         sub9: "",
       });
+      setListRefreshKey((k) => k + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal simpan produk");
     } finally {
@@ -188,7 +197,7 @@ export function SkuMasterProductPanel({ canEdit }: { canEdit: boolean }) {
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          disabled={!canEdit || syncing}
+          disabled={!canEdit || syncing || Date.now() < syncCooldownUntil}
           onClick={() => void onSync()}
           className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-50"
         >
@@ -318,6 +327,10 @@ export function SkuMasterProductPanel({ canEdit }: { canEdit: boolean }) {
             </button>
           </form>
         </section>
+      ) : null}
+
+      {generatorTabs.length > 0 ? (
+        <SkuMasterListTabs generatorTabs={generatorTabs} refreshKey={listRefreshKey} />
       ) : null}
     </div>
   );
