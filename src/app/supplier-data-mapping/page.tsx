@@ -5,7 +5,15 @@ import { getSession } from "@/lib/auth/session";
 import { getSupplierMasterDataSheetId } from "@/lib/config/supplier-master-data-sheet";
 import { hasPermission } from "@/lib/rbac/permissions";
 
-export default async function SupplierDataMappingPage() {
+type SearchParams = { nama?: string };
+
+export default async function SupplierDataMappingPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
+  const query = await searchParams;
+  const initialNama = String(query.nama ?? "").trim();
   if (!spreadsheetModeActive()) {
     return <SpreadsheetModePage title="Mapping Data Supplier" />;
   }
@@ -50,7 +58,11 @@ export default async function SupplierDataMappingPage() {
         </a>
         . Service account perlu akses <strong>Editor</strong> pada spreadsheet tersebut.
       </p>
-      <SupplierDataMappingPanel canEdit={canEdit} isSuperAdmin={isSuperAdmin} />
+      <SupplierDataMappingPanel
+        canEdit={canEdit}
+        isSuperAdmin={isSuperAdmin}
+        initialNamaSupplier={initialNama}
+      />
     </ModuleListPage>
   );
 }

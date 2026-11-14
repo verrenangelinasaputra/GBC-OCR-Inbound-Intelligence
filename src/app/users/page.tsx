@@ -1,6 +1,7 @@
 import { ModuleListPage } from "@/components/layout/module-list-page";
 import { SpreadsheetModePage, spreadsheetModeActive } from "@/components/layout/spreadsheet-mode-page";
-import { InternalUsersAdmin } from "@/components/admin/internal-users-admin";
+import { UsersAdminTabs } from "@/components/admin/users-admin-tabs";
+import { Suspense } from "react";
 import { getSession } from "@/lib/auth/session";
 import { isInternalSheetAuthEnabled } from "@/lib/config/internal-sheet";
 import { getWarehouseCredentialsSpreadsheetId } from "@/lib/config/credentials-sheet";
@@ -29,10 +30,10 @@ export default async function UsersPage() {
     return (
       <ModuleListPage
         title="User & Role Management"
-        description="Setujui pendaftar baru, atur gudang, dan centang halaman yang boleh diakses (per user)."
+        description="Warehouse: akun internal & gudang. Supplier: cek kode mapping vs nama di portal."
       >
         <p className="mb-4 text-sm text-slate-600">
-          Data tersimpan di sheet{" "}
+          Tab <strong>Warehouse</strong>: sheet{" "}
           <a
             href={`https://docs.google.com/spreadsheets/d/${getWarehouseCredentialsSpreadsheetId()}/edit`}
             target="_blank"
@@ -40,10 +41,17 @@ export default async function UsersPage() {
             className="text-blue-600 hover:underline"
           >
             {getInternalUsersTab()}
+          </a>{" "}
+          (<code>allowed_modules</code> dipisah <code>;</code>). Tab <strong>Supplier</strong>: cocokkan nama akun
+          portal dengan kode di{" "}
+          <a href="/supplier-data-mapping" className="text-blue-600 hover:underline">
+            Mapping Data Supplier
           </a>
-          . Kolom <strong>allowed_modules</strong> = daftar halaman (pisah dengan <code>;</code>).
+          .
         </p>
-        <InternalUsersAdmin currentUsername={session?.username ?? ""} />
+        <Suspense fallback={<p className="text-sm text-slate-500">Memuat…</p>}>
+          <UsersAdminTabs currentUsername={session?.username ?? ""} />
+        </Suspense>
       </ModuleListPage>
     );
   }

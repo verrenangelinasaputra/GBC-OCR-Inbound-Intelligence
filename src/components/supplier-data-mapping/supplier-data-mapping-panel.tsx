@@ -14,16 +14,21 @@ const emptyForm = (): FormState => ({ tipeSupplier: "", kode: "", namaSupplier: 
 export function SupplierDataMappingPanel({
   canEdit,
   isSuperAdmin,
+  initialNamaSupplier = "",
 }: {
   canEdit: boolean;
   isSuperAdmin: boolean;
+  initialNamaSupplier?: string;
 }) {
   const [rows, setRows] = useState<SupplierMasterDataRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [addForm, setAddForm] = useState<FormState>(emptyForm);
+  const [addForm, setAddForm] = useState<FormState>(() => ({
+    ...emptyForm(),
+    namaSupplier: initialNamaSupplier,
+  }));
   const [editRow, setEditRow] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<FormState>(emptyForm);
 
@@ -45,6 +50,12 @@ export function SupplierDataMappingPanel({
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (initialNamaSupplier) {
+      setAddForm((f) => ({ ...f, namaSupplier: initialNamaSupplier }));
+    }
+  }, [initialNamaSupplier]);
 
   async function onAdd(e: React.FormEvent) {
     e.preventDefault();
