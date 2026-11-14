@@ -97,6 +97,7 @@ export function SupplierSubmissionsHistory({
     null
   );
   const [confirmingDoc, setConfirmingDoc] = useState<string | null>(null);
+  const [receiptConfirm, setReceiptConfirm] = useState<{ docKey: string; noSj: string } | null>(null);
   const [expandedDocs, setExpandedDocs] = useState<Set<string>>(() => new Set());
   const [viewGrouped, setViewGrouped] = useState(true);
 
@@ -212,11 +213,14 @@ export function SupplierSubmissionsHistory({
     }
   }, []);
 
-  const confirmReceipt = useCallback(async (docKey: string, noSj: string) => {
-    const ok = window.confirm(
-      `Konfirmasi Anda sudah menerima data revisi / hasil gudang untuk SJ ${noSj || "?"}?\n\nStatus akan menjadi Selesai di spreadsheet GBC.`
-    );
-    if (!ok) return;
+  const openReceiptConfirm = useCallback((docKey: string, noSj: string) => {
+    setReceiptConfirm({ docKey, noSj: noSj.trim() || "?" });
+    setError(null);
+  }, []);
+
+  const submitReceiptConfirm = useCallback(async () => {
+    if (!receiptConfirm) return;
+    const { docKey } = receiptConfirm;
     setConfirmingDoc(docKey);
     setError(null);
     try {
@@ -227,13 +231,14 @@ export function SupplierSubmissionsHistory({
       });
       const data = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(data.error ?? "Gagal konfirmasi");
+      setReceiptConfirm(null);
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Gagal konfirmasi");
     } finally {
       setConfirmingDoc(null);
     }
-  }, [refresh]);
+  }, [receiptConfirm, refresh]);
 
   const exportMeta = `Diekspor ${new Date().toLocaleString("id-ID")} · ${filtered.length} baris · ${
     isMaster ? "Semua supplier" : companyLabel
@@ -564,7 +569,7 @@ export function SupplierSubmissionsHistory({
                               <button
                                 type="button"
                                 disabled={confirmingDoc === r.docKey}
-                                onClick={() => void confirmReceipt(r.docKey, r.noSuratJalan)}
+                                onClick={() => openReceiptConfirm(r.docKey, r.noSuratJalan)}
                                 className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
                               >
                                 {confirmingDoc === r.docKey ? "…" : "Terima data"}
@@ -679,7 +684,7 @@ export function SupplierSubmissionsHistory({
                           <button
                             type="button"
                             disabled={confirmingDoc === r.docKey}
-                            onClick={() => void confirmReceipt(r.docKey, r.noSuratJalan)}
+                            onClick={() => openReceiptConfirm(r.docKey, r.noSuratJalan)}
                             className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
                           >
                             {confirmingDoc === r.docKey ? "…" : "Terima data"}
@@ -703,6 +708,46 @@ export function SupplierSubmissionsHistory({
           </table>
         </div>
       </div>
+
+      {receiptConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-receipt-title"
+        >
+          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-lg">
+            <h3 id="confirm-receipt-title" className="text-lg font-medium text-slate-900">
+              Konfirmasi terima data
+            </h3>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+              Anda menyatakan sudah menerima data revisi / hasil gudang untuk surat jalan{" "}
+              <strong className="text-slate-900">{receiptConfirm.noSj}</strong>.
+            </p>
+            <p className="mt-2 text-sm text-slate-600">
+              Status pada spreadsheet GBC akan diubah menjadi <strong>Selesai</strong>.
+            </p>
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                onClick={() => setReceiptConfirm(null)}
+                disabled={confirmingDoc === receiptConfirm.docKey}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                onClick={() => void submitReceiptConfirm()}
+                disabled={confirmingDoc === receiptConfirm.docKey}
+              >
+                {confirmingDoc === receiptConfirm.docKey ? "Memproses…" : "Ya, sudah terima"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {preview && (
         <div
