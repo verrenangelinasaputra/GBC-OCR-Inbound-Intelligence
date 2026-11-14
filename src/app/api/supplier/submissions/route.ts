@@ -6,11 +6,18 @@ import {
   filterRowsForSupplier,
   listOcrSheetSubmissionRows,
 } from "@/lib/services/ocr-sheet-submissions";
+import { enforceSupplierMappingIfUser } from "@/lib/services/supplier-mapping-gate";
+import { jsonError } from "@/lib/api/auth-context";
 
 export async function GET() {
   const session = await getSession();
   if (!session?.username) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  try {
+    await enforceSupplierMappingIfUser(session);
+  } catch (e) {
+    return jsonError(e, 403);
   }
 
   const config = getGoogleExportConfigOptional();

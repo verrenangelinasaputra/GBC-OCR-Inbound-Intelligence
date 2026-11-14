@@ -4,11 +4,18 @@ import { assertSupplierCanAccessDocKey } from "@/lib/services/supplier-submissio
 import { getOcrSheetDocumentDetail } from "@/lib/services/ocr-sheet-detail";
 import { setOcrDocumentReviewStatus } from "@/lib/services/ocr-sheet-review";
 import { supplierCanConfirmReceipt } from "@/lib/services/ocr-sheet-submissions";
+import { enforceSupplierMappingIfUser } from "@/lib/services/supplier-mapping-gate";
+import { jsonError } from "@/lib/api/auth-context";
 
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session?.username) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  try {
+    await enforceSupplierMappingIfUser(session);
+  } catch (e) {
+    return jsonError(e, 403);
   }
 
   try {

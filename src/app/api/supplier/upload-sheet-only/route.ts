@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { isSheetOnlyMode } from "@/lib/config/app-mode";
 import { SUPPLIER_GUDANG_OPTIONS, SUPPLIER_MAX_SJ_FILES } from "@/lib/config/supplier-gudang";
 import { resolveSupplierCompanyName } from "@/lib/supplier-auth/resolve-company";
+import { enforceSupplierMappingIfUser } from "@/lib/services/supplier-mapping-gate";
 import { processSheetOnlyUpload } from "@/lib/services/sheet-only-upload";
 
 const ALLOWED = new Set(["image/jpeg", "image/jpg", "image/png"]);
@@ -20,6 +21,11 @@ export async function POST(request: Request) {
   const session = await getSession();
   if (!session?.roles.includes("SUPPLIER_USER") && !session?.roles.includes("SUPER_ADMIN")) {
     return jsonError(new Error("UNAUTHORIZED"), 401);
+  }
+  try {
+    await enforceSupplierMappingIfUser(session);
+  } catch (e) {
+    return jsonError(e, 403);
   }
 
   const supplierName = await resolveSupplierCompanyName(session.username);

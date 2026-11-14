@@ -33,7 +33,8 @@ export default async function UsersPage() {
         description="Warehouse: akun internal & gudang. Supplier: cek kode mapping vs nama di portal."
       >
         <p className="mb-4 text-sm text-slate-600">
-          Tab <strong>Warehouse</strong>: sheet{" "}
+          Tab <strong>Supplier</strong> juga mengatur <strong>mirror Drive</strong> per username (tab{" "}
+          <code>SupplierDrive</code>). Tab <strong>Warehouse</strong>: sheet{" "}
           <a
             href={`https://docs.google.com/spreadsheets/d/${getWarehouseCredentialsSpreadsheetId()}/edit`}
             target="_blank"

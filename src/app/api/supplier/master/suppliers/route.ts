@@ -2,38 +2,27 @@ import { jsonError } from "@/lib/api/auth-context";
 import { listAllSupplierAccounts } from "@/lib/supplier-auth/directory";
 import { supplierAuthStatus } from "@/lib/supplier-auth/errors";
 import { requireSupplierMasterSession } from "@/lib/supplier-auth/require-master";
-import { listSupplierDriveSettings } from "@/lib/supplier-auth/supplier-drive-settings";
+import { listSupplierAccountsWithDrive } from "@/lib/services/supplier-drive-admin-list";
 
 export async function GET() {
   try {
     await requireSupplierMasterSession();
-    const [accounts, driveSettings] = await Promise.all([
-      listAllSupplierAccounts(),
-      listSupplierDriveSettings(),
-    ]);
-    const driveByUser = new Map(driveSettings.map((d) => [d.username, d]));
+    const driveRows = await listSupplierAccountsWithDrive();
+    const accounts = await listAllSupplierAccounts();
+    const meta = new Map(accounts.map((a) => [a.username, a]));
 
-    const suppliers = accounts.map((a) => {
-      const drive = driveByUser.get(a.username);
+    const suppliers = driveRows.map((row) => {
+      const a = meta.get(row.username);
       return {
-        userId: a.userId,
-        supplierName: a.supplierName,
-        contactName: a.contactName,
-        username: a.username,
-        email: a.email,
-        phone: a.phone,
-        status: a.status,
-        emailVerified: a.emailVerified,
-        drive: drive
-          ? {
-              driveRootFolderId: drive.driveRootFolderId,
-              driveRootFolderUrl: drive.driveRootFolderUrl,
-              mirrorEnabled: drive.mirrorEnabled,
-              pathLocked: drive.pathLocked,
-              updatedAt: drive.updatedAt,
-              updatedBy: drive.updatedBy,
-            }
-          : null,
+        userId: a?.userId ?? "",
+        supplierName: row.supplierName,
+        contactName: row.contactName,
+        username: row.username,
+        email: a?.email ?? "",
+        phone: a?.phone ?? "",
+        status: row.status,
+        emailVerified: a?.emailVerified ?? false,
+        drive: row.drive,
       };
     });
 

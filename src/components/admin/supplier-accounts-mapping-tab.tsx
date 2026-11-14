@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { SupplierDriveSettingsTable } from "@/components/admin/supplier-drive-settings-table";
 
 type ReviewRow = {
   username: string;
@@ -142,7 +143,8 @@ export function SupplierAccountsMappingTab() {
       ) : null}
 
       <p className="text-sm text-slate-600">
-        Super Admin bisa <strong>edit / hapus</strong> akun di sheet Supplier Credentials. Kode &amp; alias dicek
+        Supplier dengan status <strong>Belum cocok</strong> tidak bisa login sampai alias/kode ditambahkan di Mapping Data
+        Supplier. Super Admin bisa <strong>edit / hapus</strong> akun di sheet Supplier Credentials. Kode &amp; alias dicek
         terhadap{" "}
         <Link href="/supplier-data-mapping" className="font-medium text-blue-600 hover:underline">
           Mapping Data Supplier
@@ -266,6 +268,18 @@ export function SupplierAccountsMappingTab() {
           </tbody>
         </table>
       </div>
+
+      <section className="border-t border-slate-200 pt-8">
+        <h2 className="text-base font-semibold text-slate-900">Mirror upload ke Drive supplier</h2>
+        <div className="mt-4">
+          <SupplierDriveSettingsTable
+            listUrl="/api/admin/supplier-drive"
+            driveSaveUrl={(username) =>
+              `/api/admin/supplier-drive/${encodeURIComponent(username)}`
+            }
+          />
+        </div>
+      </section>
 
       {editing ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog">

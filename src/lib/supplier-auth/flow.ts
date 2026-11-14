@@ -14,6 +14,7 @@ import {
 import { SupplierAuthError } from "./errors";
 import { maskEmail, validateEmail, validatePasswordPair, validateUsername } from "./fields";
 import { adminNotifyEmail, newSupplierNotifyText, sendMail, verificationEmailText } from "./mail";
+import { requireSupplierMappingApproved } from "@/lib/services/supplier-mapping-gate";
 
 function asError(error: unknown): SupplierAuthError {
   if (error instanceof SupplierAuthError) return error;
@@ -101,7 +102,10 @@ export async function verifyRegisterCode(usernameRaw: string, codeRaw: string): 
   } catch (error) {
     console.error("[supplier.register.notify]", error instanceof Error ? error.message : error);
   }
-  return { message: "Pendaftaran berhasil. Silakan login." };
+  return {
+    message:
+      "Pendaftaran berhasil. Anda bisa login setelah tim GBC memverifikasi mapping nama supplier di sistem (Mapping Data Supplier).",
+  };
 }
 
 export async function loginSupplier(usernameRaw: string, password: string): Promise<{ redirect: string }> {
@@ -113,6 +117,7 @@ export async function loginSupplier(usernameRaw: string, password: string): Prom
   const ok = account?.emailVerified && (await verifyPassword(password, account.passwordHash));
   if (!account || !ok) throw new SupplierAuthError("Username atau password salah.", 401);
   if (account.status !== "ACTIVE") throw new SupplierAuthError("Akun dinonaktifkan. Hubungi tim GBC.", 403);
+  await requireSupplierMappingApproved(account.username);
   await markSupplierLogin(account.rowNumber);
   const token = await createSessionToken({
     userId: account.userId || `supplier:${account.username}`,
