@@ -222,7 +222,6 @@ export async function processSheetOnlyUpload(params: {
     ocrWarnings: result.warnings,
   };
 
-  const gudangLabel = params.gudang?.trim();
   if (gudangLabel) {
     void notifySupplierUploadTelegram({
       gudang: gudangLabel,
