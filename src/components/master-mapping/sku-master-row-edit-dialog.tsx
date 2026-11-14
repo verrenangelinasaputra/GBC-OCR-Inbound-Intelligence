@@ -164,10 +164,10 @@ export function SkuMasterRowEditDialog({
                         required
                         value={subs.sub1}
                         onChange={(e) => setSubs((s) => ({ ...s, sub1: e.target.value }))}
-                        className="rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                        className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm"
                         disabled={loadingCodes}
                       >
-                        <option value="">— pilih —</option>
+                        {options.length > 1 ? <option value="">— pilih —</option> : null}
                         {options.map((o) => (
                           <option key={o.code} value={o.code}>
                             {o.code} — {o.label}
@@ -177,17 +177,12 @@ export function SkuMasterRowEditDialog({
                     </label>
                   );
                 }
-                const sub1Value = subs.sub1 || resolveSub1ForCategoryTab(row.categoryTab, options);
-                const sub1Label =
-                  options.find((o) => o.code === sub1Value)?.label ??
-                  categoryTabDisplayName(row.categoryTab);
+                const sub1Value = resolveSub1ForCategoryTab(row.categoryTab, options);
                 return (
                   <label key={key} className="flex flex-col gap-1">
                     <span className="text-xs font-medium text-slate-600">{label}</span>
-                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-2 text-sm">
-                      {mode === "category-name"
-                        ? `${categoryTabDisplayName(row.categoryTab)}${sub1Value ? ` → ${sub1Value}` : ""}`
-                        : `${sub1Value} — ${sub1Label}`}
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-2 text-sm">
+                      {categoryTabDisplayName(row.categoryTab)} → {sub1Value || "—"}
                     </div>
                   </label>
                 );

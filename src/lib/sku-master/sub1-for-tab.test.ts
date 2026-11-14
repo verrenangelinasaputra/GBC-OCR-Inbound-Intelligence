@@ -15,8 +15,8 @@ describe("sub1FieldMode", () => {
   it("dropdown when many KACA codes", () => {
     expect(sub1FieldMode(kacaOptions)).toBe("dropdown");
   });
-  it("locked when single code", () => {
-    expect(sub1FieldMode([{ code: "PET", label: "PET", sheetRow: 5 }])).toBe("locked");
+  it("dropdown even when single PET code", () => {
+    expect(sub1FieldMode([{ code: "PET", label: "PET", sheetRow: 4 }])).toBe("dropdown");
   });
 });
 

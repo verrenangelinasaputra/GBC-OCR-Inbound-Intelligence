@@ -85,6 +85,7 @@ export function SkuMasterProductPanel({ canEdit }: { canEdit: boolean }) {
     const mode = sub1FieldMode(opts);
     setSubs((s) => {
       if (mode === "dropdown") {
+        if (opts.length === 1) return { ...s, sub1: opts[0]!.code };
         if (s.sub1 && opts.some((o) => o.code === s.sub1)) return s;
         return { ...s, sub1: "" };
       }
@@ -284,17 +285,19 @@ export function SkuMasterProductPanel({ canEdit }: { canEdit: boolean }) {
                         <span className="text-xs font-medium text-slate-600">
                           {label}{" "}
                           <span className="font-normal text-slate-500">
-                            (pilih jenis di tab {categoryTabDisplayName(categoryTab)})
+                            (tab {categoryTabDisplayName(categoryTab)} — {options.length} pilihan)
                           </span>
                         </span>
                         <select
                           required
                           value={subs.sub1}
                           onChange={(e) => setSubs((s) => ({ ...s, sub1: e.target.value }))}
-                          className="rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                          className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm"
                           disabled={loadingCodes}
                         >
-                          <option value="">— pilih kode Sub 1 —</option>
+                          {options.length > 1 ? (
+                            <option value="">— pilih kode Sub 1 —</option>
+                          ) : null}
                           {options.map((o) => (
                             <option key={o.code} value={o.code}>
                               {o.code} — {o.label}
@@ -304,26 +307,24 @@ export function SkuMasterProductPanel({ canEdit }: { canEdit: boolean }) {
                       </label>
                     );
                   }
-                  const sub1Value = subs.sub1 || resolveSub1ForCategoryTab(categoryTab, options);
-                  const sub1Label =
-                    options.find((o) => o.code === sub1Value)?.label ??
-                    categoryTabDisplayName(categoryTab);
+                  const sub1Value = resolveSub1ForCategoryTab(categoryTab, options);
                   return (
-                    <label key={key} className="flex flex-col gap-1">
+                    <label key={key} className="flex flex-col gap-1 sm:col-span-2">
                       <span className="text-xs font-medium text-slate-600">
                         {label}{" "}
-                        <span className="font-normal text-slate-500">
-                          ({mode === "category-name" ? "kategori tab" : "otomatis"}{" "}
-                          {categoryTabDisplayName(categoryTab)})
+                        <span className="font-normal text-amber-700">
+                          (kamus kosong — pakai default tab {categoryTabDisplayName(categoryTab)})
                         </span>
                       </span>
-                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-2 text-sm text-slate-800">
-                        {loadingCodes
-                          ? "Memuat…"
-                          : mode === "category-name"
-                            ? `${categoryTabDisplayName(categoryTab)}${sub1Value ? ` → ${sub1Value}` : ""}`
-                            : `${sub1Value} — ${sub1Label}`}
-                      </div>
+                      <input
+                        readOnly
+                        value={
+                          loadingCodes
+                            ? "Memuat…"
+                            : `${categoryTabDisplayName(categoryTab)} → ${sub1Value || "—"}`
+                        }
+                        className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-2 text-sm"
+                      />
                     </label>
                   );
                 }

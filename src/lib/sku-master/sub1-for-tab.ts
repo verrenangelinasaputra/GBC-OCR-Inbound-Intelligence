@@ -4,7 +4,7 @@ import type { SkuMasterCodeOption } from "@/lib/sku-master/types";
 const TAB_SUB1_FALLBACK: Record<string, string> = {
   PET: "PET",
   HDPE: "HDP",
-  TUTUP: "TUT",
+  TUTUP: "TTP",
   KACA: "BKC",
   POT: "POT",
   LAINNYA: "LNN",
@@ -17,10 +17,11 @@ export function categoryTabDisplayName(categoryTab: string): string {
   return categoryTab.split("/")[0]!.trim();
 }
 
-/** Satu kode = kunci; banyak kode (mis. KACA: BKC, BKP, …) = dropdown; kosong = nama tab + fallback kode. */
+/**
+ * Kosong = fallback nama tab. Ada ≥1 kode di kamus = selalu dropdown (jangan kotak abu-abu terkunci).
+ */
 export function sub1FieldMode(sub1Options: SkuMasterCodeOption[]): Sub1FieldMode {
   if (sub1Options.length === 0) return "category-name";
-  if (sub1Options.length === 1) return "locked";
   return "dropdown";
 }
 

@@ -6,7 +6,8 @@ export const TABEL_HEADER_ROW = 4;
 export const TABEL_TEMPLATE_DATA_ROW = 5;
 export const TABEL_FIRST_DATA_ROW = 5;
 
-export const CODE_DICT_FIRST_DATA_ROW = 5;
+/** Baris pertama data kamus kode (baris 3 = header Kode/Keterangan). */
+export const CODE_DICT_FIRST_DATA_ROW = 4;
 export const CODE_DICT_PAIR_COUNT = 9;
 
 export const COL = {
