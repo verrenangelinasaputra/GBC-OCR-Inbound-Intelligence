@@ -350,3 +350,107 @@ export async function consumeAuthCode(
     wrapSheetError(error);
   }
 }
+
+async function resolveSupplierUsersTabGridId(
+  sheets: ReturnType<typeof google.sheets>,
+  spreadsheetId: string
+): Promise<number> {
+  const tab = USERS_TAB();
+  const meta = await sheets.spreadsheets.get({
+    spreadsheetId,
+    fields: "sheets.properties",
+  });
+  const sheet = meta.data.sheets?.find((s) => s.properties?.title === tab);
+  const gridId = sheet?.properties?.sheetId;
+  if (gridId == null) {
+    throw new SupplierAuthError(`Tab "${tab}" tidak ditemukan di spreadsheet supplier.`, 500);
+  }
+  return gridId;
+}
+
+export type SupplierAccountAdminPatch = {
+  supplierName?: string;
+  contactName?: string;
+  email?: string;
+  phone?: string;
+  status?: string;
+};
+
+export async function updateSupplierAccountAdmin(
+  username: string,
+  patch: SupplierAccountAdminPatch
+): Promise<SupplierAccount> {
+  const account = await findSupplierByUsername(username);
+  if (!account) throw new SupplierAuthError("Akun supplier tidak ditemukan.", 404);
+
+  const supplierName = (patch.supplierName ?? account.supplierName).trim();
+  const contactName = (patch.contactName ?? account.contactName).trim();
+  const email = (patch.email ?? account.email).trim().toLowerCase();
+  const phone = (patch.phone ?? account.phone).trim();
+  const status = (patch.status ?? account.status).trim().toUpperCase() || "ACTIVE";
+
+  const { sheets, sheetId } = sheetTarget();
+  const rows = await readTab(USERS_TAB());
+  const raw = rows[account.rowNumber - 1] ?? [];
+  const createdAt = raw[9] ?? "";
+
+  const fullRow = [
+    account.userId,
+    supplierName,
+    contactName,
+    account.username,
+    email,
+    phone,
+    account.passwordHash,
+    account.emailVerified ? "true" : "false",
+    status,
+    createdAt,
+    raw[10] ?? "",
+    raw[11] ?? "",
+  ];
+
+  try {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: sheetId,
+      range: a1(USERS_TAB(), `A${account.rowNumber}:L${account.rowNumber}`),
+      valueInputOption: "RAW",
+      requestBody: { values: [fullRow] },
+    });
+  } catch (error) {
+    wrapSheetError(error);
+  }
+
+  const updated = await findSupplierByUsername(username);
+  if (!updated) throw new SupplierAuthError("Gagal membaca akun setelah update.", 500);
+  return updated;
+}
+
+export async function deleteSupplierAccount(username: string): Promise<void> {
+  const key = username.trim().toLowerCase();
+  const account = await findSupplierByUsername(key);
+  if (!account) throw new SupplierAuthError("Akun supplier tidak ditemukan.", 404);
+
+  const { sheets, sheetId } = sheetTarget();
+  const gridId = await resolveSupplierUsersTabGridId(sheets, sheetId);
+  try {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: sheetId,
+      requestBody: {
+        requests: [
+          {
+            deleteDimension: {
+              range: {
+                sheetId: gridId,
+                dimension: "ROWS",
+                startIndex: account.rowNumber - 1,
+                endIndex: account.rowNumber,
+              },
+            },
+          },
+        ],
+      },
+    });
+  } catch (error) {
+    wrapSheetError(error);
+  }
+}

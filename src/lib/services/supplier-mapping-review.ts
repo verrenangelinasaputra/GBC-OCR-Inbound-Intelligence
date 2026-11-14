@@ -8,6 +8,9 @@ import { loadSupplierMasterDataRows } from "@/lib/services/supplier-master-data-
 export type SupplierMappingReviewRow = {
   username: string;
   supplierName: string;
+  contactName: string;
+  email: string;
+  phone: string;
   accountStatus: string;
   mappingStatus: "matched" | "unmatched";
   kode?: string;
@@ -33,6 +36,9 @@ export async function buildSupplierMappingReview(): Promise<SupplierMappingRevie
       return {
         username: account.username,
         supplierName: account.supplierName,
+        contactName: account.contactName,
+        email: account.email,
+        phone: account.phone,
         accountStatus: account.status,
         mappingStatus,
         kode: match?.kode.trim() || undefined,
