@@ -1,5 +1,4 @@
 import { jsonError, requireApiPermission } from "@/lib/api/auth-context";
-import { isDbmAccurateExported } from "@/lib/dbm/accurate-transaction-import";
 import { getInternalUserProfile, userCanAccessGudang } from "@/lib/internal-auth/profile";
 import {
   accurateExportFileName,
@@ -34,16 +33,6 @@ export async function POST(request: Request) {
       if (gudangFilter?.length && !userCanAccessGudang(gudangFilter, r.gudang)) {
         return jsonError(new Error("FORBIDDEN"), 403);
       }
-    }
-
-    const already = selected.filter(isDbmAccurateExported);
-    if (already.length) {
-      return jsonError(
-        new Error(
-          `${already.length} baris sudah diekspor Accurate (${already[0]?.accurateExportedAt || "—"}). Hapus centang baris tersebut.`
-        ),
-        409
-      );
     }
 
     const buffer = await buildAccurateImportXlsxBuffer(selected);

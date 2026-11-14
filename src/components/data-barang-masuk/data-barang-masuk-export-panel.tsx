@@ -15,27 +15,23 @@ export function DataBarangMasukExportPanel({
   canExport: boolean;
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [showExported, setShowExported] = useState(false);
+  const [hideExported, setHideExported] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const router = useRouter();
 
   const visibleRows = useMemo(
-    () => (showExported ? rows : rows.filter((r) => !isDbmAccurateExported(r))),
-    [rows, showExported]
+    () => (hideExported ? rows.filter((r) => !isDbmAccurateExported(r)) : rows),
+    [rows, hideExported]
   );
 
-  const exportableKeys = useMemo(
-    () => visibleRows.filter((r) => !isDbmAccurateExported(r)).map((r) => r.rowKey),
-    [visibleRows]
-  );
+  const exportableKeys = useMemo(() => visibleRows.map((r) => r.rowKey), [visibleRows]);
 
   const allVisibleSelected =
     exportableKeys.length > 0 && exportableKeys.every((k) => selected.has(k));
 
-  function toggleRow(rowKey: string, disabled: boolean) {
-    if (disabled) return;
+  function toggleRow(rowKey: string) {
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(rowKey)) next.delete(rowKey);
@@ -61,12 +57,9 @@ export function DataBarangMasukExportPanel({
   }
 
   async function exportSelected() {
-    const keys = [...selected].filter((k) => {
-      const row = rows.find((r) => r.rowKey === k);
-      return row && !isDbmAccurateExported(row);
-    });
+    const keys = [...selected].filter((k) => rows.some((r) => r.rowKey === k));
     if (!keys.length) {
-      setError("Pilih minimal satu baris yang belum diekspor Accurate.");
+      setError("Pilih minimal satu baris untuk diekspor.");
       return;
     }
     setBusy(true);
@@ -93,7 +86,9 @@ export function DataBarangMasukExportPanel({
       a.click();
       URL.revokeObjectURL(url);
       setSelected(new Set());
-      setMessage(`${keys.length} baris diekspor — kolom Ekspor Accurate di spreadsheet sudah diisi.`);
+      setMessage(
+        `${keys.length} baris diekspor. Baris yang sudah pernah diekspor tetap bertanda Ya — tanggal ekspor diperbarui jika diekspor ulang.`
+      );
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ekspor gagal");
@@ -110,7 +105,8 @@ export function DataBarangMasukExportPanel({
         <div>
           <h2 className="text-base font-semibold text-slate-900">Ekspor ke Accurate</h2>
           <p className="text-sm text-slate-600">
-            Format kolom mengikuti template <em>transaction-item-import-item-id</em>. Baris yang sudah diekspor ditandai di spreadsheet.
+            Format kolom mengikuti template <em>transaction-item-import-item-id</em>. Baris yang pernah diekspor tetap
+            bertanda <strong>Ekspor Accurate = Ya</strong> di spreadsheet dan boleh diekspor ulang (mis. untuk ulang import).
           </p>
         </div>
         {canExport ? (
@@ -121,7 +117,7 @@ export function DataBarangMasukExportPanel({
               onClick={toggleSelectAllVisible}
               disabled={!exportableKeys.length || busy}
             >
-              {allVisibleSelected ? "Hapus semua centang" : "Pilih semua (belum ekspor)"}
+              {allVisibleSelected ? "Hapus semua centang" : "Pilih semua di tabel"}
             </button>
             <button
               type="button"
@@ -141,11 +137,11 @@ export function DataBarangMasukExportPanel({
       <label className="mb-3 flex items-center gap-2 text-sm text-slate-600">
         <input
           type="checkbox"
-          checked={showExported}
-          onChange={(e) => setShowExported(e.target.checked)}
+          checked={hideExported}
+          onChange={(e) => setHideExported(e.target.checked)}
           className="rounded border-slate-300"
         />
-        Tampilkan baris yang sudah diekspor Accurate
+        Sembunyikan baris yang sudah diekspor Accurate
       </label>
 
       {error ? <p className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p> : null}
@@ -179,8 +175,8 @@ export function DataBarangMasukExportPanel({
                         type="checkbox"
                         className="rounded border-slate-300"
                         checked={selected.has(r.rowKey)}
-                        disabled={exported || busy}
-                        onChange={() => toggleRow(r.rowKey, exported)}
+                        disabled={busy}
+                        onChange={() => toggleRow(r.rowKey)}
                         aria-label={`Pilih ${product}`}
                       />
                     </td>
@@ -211,7 +207,7 @@ export function DataBarangMasukExportPanel({
         </table>
         {!visibleRows.length ? (
           <p className="p-6 text-center text-sm text-slate-500">
-            Semua baris sudah diekspor — centang &quot;Tampilkan baris yang sudah diekspor&quot; untuk melihat riwayat.
+            Tidak ada baris di filter ini — matikan opsi &quot;Sembunyikan baris yang sudah diekspor&quot; untuk melihat semua.
           </p>
         ) : null}
       </div>
