@@ -1,19 +1,20 @@
 import "server-only";
 
 import ExcelJS from "exceljs";
-import {
-  ACCURATE_TRANSACTION_ITEM_HEADERS,
-  dbmRecordsToAccurateRows,
-} from "@/lib/dbm/accurate-transaction-import";
+import { dbmRecordsToAccurateRows } from "@/lib/dbm/accurate-transaction-import";
+import { styleAccurateTransactionImportSheet } from "@/lib/dbm/accurate-excel-styles";
 import type { DbmInboundRecord } from "@/lib/dbm/dbm-inbound-types";
 
 export async function buildAccurateImportXlsxBuffer(records: DbmInboundRecord[]): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
+  workbook.creator = "GBC Inbound Intelligence";
   const sheet = workbook.addWorksheet("Template");
-  sheet.addRow([...ACCURATE_TRANSACTION_ITEM_HEADERS]);
-  for (const row of dbmRecordsToAccurateRows(records)) {
+  const dataRows = dbmRecordsToAccurateRows(records);
+  for (const row of dataRows) {
     sheet.addRow(row);
   }
+  sheet.insertRow(1, []);
+  styleAccurateTransactionImportSheet(sheet, dataRows.length);
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);
 }
