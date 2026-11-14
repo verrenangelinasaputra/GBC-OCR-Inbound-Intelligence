@@ -37,7 +37,7 @@ export function MobileShellLayout({
   }, [navOpen]);
 
   return (
-    <div className="flex min-h-screen min-w-0 bg-slate-50">
+    <div className="flex min-h-svh min-w-0 bg-slate-50">
       {navOpen ? (
         <button
           type="button"
@@ -49,8 +49,8 @@ export function MobileShellLayout({
 
       <div
         className={clsx(
-          "fixed inset-y-0 left-0 z-40 h-svh max-w-[min(100vw,20rem)] shrink-0",
-          "lg:inset-auto lg:sticky lg:top-0 lg:z-auto lg:h-svh lg:max-w-none lg:self-start",
+          "fixed inset-y-0 left-0 z-40 flex h-svh max-w-[min(100vw,20rem)] shrink-0 flex-col",
+          "lg:relative lg:sticky lg:top-0 lg:z-auto lg:max-w-none",
           "transition-transform duration-200 ease-out lg:translate-x-0",
           navOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
