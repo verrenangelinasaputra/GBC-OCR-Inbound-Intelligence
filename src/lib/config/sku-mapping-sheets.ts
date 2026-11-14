@@ -1,5 +1,8 @@
-/** Spreadsheet master rekap SKU (tab REKAP SKUL). */
+/** Spreadsheet master rekap SKU (tab REKAP SKUL) — legacy file. */
 export const SKU_REKAP_SHEET_ID = "1QePx5At4B0SiDfeLU9s5N7vsz394Z7K1kElSPxxJmYE";
+
+/** Spreadsheet generator SKU v2 (operasional baru) — dipakai jika env kosong di production v2. */
+export const SKU_MASTER_SHEET_ID_DEFAULT = "1vbCQDgMRfUb8YKZ_E6DVHSa-lS7iWUAhylwImnJGJsw";
 
 export const SKU_REKAP_TAB_NAME = "REKAP SKUL";
 
@@ -16,6 +19,11 @@ export const DBM_INBOUND_TAB_NAME = "Data Barang Masuk";
 
 export function getSkuRekapSheetId(): string {
   return process.env.SKU_REKAP_SHEET_ID?.trim() || SKU_REKAP_SHEET_ID;
+}
+
+/** Modul master produk — default spreadsheet v2; tidak mengubah default katalog lama. */
+export function getSkuMasterSheetId(): string {
+  return process.env.SKU_MASTER_SHEET_ID?.trim() || SKU_MASTER_SHEET_ID_DEFAULT;
 }
 
 export function getSkuRekapTabName(): string {

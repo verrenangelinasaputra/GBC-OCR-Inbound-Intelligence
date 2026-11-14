@@ -712,3 +712,53 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([createdAt])
 }
+
+/// Mirror kamus kode Sub 1–9 dari tab PET / HDPE / …
+model SkuMasterCode {
+  id          String   @id @default(cuid())
+  spreadsheetId String
+  categoryTab String
+  subIndex    Int
+  code        String
+  label       String?
+  sheetRow    Int?
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@unique([spreadsheetId, categoryTab, subIndex, code])
+  @@index([spreadsheetId, categoryTab, subIndex])
+}
+
+/// Mirror baris REKAP SKUL (katalog untuk mapping SJ)
+model SkuMasterCatalogLine {
+  id                   String   @id @default(cuid())
+  spreadsheetId        String
+  rowNo                String
+  skuLengkap           String
+  namaInternalAccurate String?
+  namaProdukAcuan      String?
+  kategoriUtama        String?
+  skus                 String?
+  barcode              String?
+  sumberLembar         String?
+  updatedAt            DateTime @updatedAt
+  createdAt            DateTime @default(now())
+
+  @@unique([spreadsheetId, skuLengkap])
+  @@index([spreadsheetId, namaProdukAcuan])
+  @@index([spreadsheetId, skus])
+}
+
+/// Mirror REKAP SKUS (keluarga 6 sub)
+model SkuMasterSkusFamily {
+  id            String   @id @default(cuid())
+  spreadsheetId String
+  skus          String
+  namaInternal  String?
+  variantCount  Int      @default(0)
+  sourceTab     String?
+  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now())
+
+  @@unique([spreadsheetId, skus])
+}

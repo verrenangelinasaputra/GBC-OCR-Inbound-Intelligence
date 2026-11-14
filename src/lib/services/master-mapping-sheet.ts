@@ -3,10 +3,7 @@ import "server-only";
 import { google } from "googleapis";
 import { createGoogleSheetsAuthClient } from "@/lib/providers/google-workspace/client";
 import { getGoogleExportConfigOptional } from "@/lib/providers/google-workspace/config";
-import {
-  getMasterMappingTabName,
-  getSkuRekapSheetId,
-} from "@/lib/config/sku-mapping-sheets";
+import { getMasterMappingTabName, getSkuMasterSheetId } from "@/lib/config/sku-mapping-sheets";
 import type { MasterMappingEntry } from "@/lib/sku-matching/master-mapping-types";
 import { googleConfigForSpreadsheet } from "@/lib/services/sku-rekap-catalog";
 
@@ -94,7 +91,7 @@ export async function loadMasterMappingEntries(force = false): Promise<MasterMap
   const base = getGoogleExportConfigOptional();
   if (!base) return [];
 
-  const spreadsheetId = getSkuRekapSheetId();
+  const spreadsheetId = getSkuMasterSheetId();
   const tab = getMasterMappingTabName();
   const auth = createGoogleSheetsAuthClient(googleConfigForSpreadsheet(spreadsheetId) ?? base);
   const sheets = google.sheets({ version: "v4", auth });
@@ -128,7 +125,7 @@ export async function appendMasterMappingEntry(
   const base = getGoogleExportConfigOptional();
   if (!base) throw new Error("Google export tidak dikonfigurasi");
 
-  const spreadsheetId = getSkuRekapSheetId();
+  const spreadsheetId = getSkuMasterSheetId();
   const tab = getMasterMappingTabName();
   const auth = createGoogleSheetsAuthClient(googleConfigForSpreadsheet(spreadsheetId) ?? base);
   const sheets = google.sheets({ version: "v4", auth });

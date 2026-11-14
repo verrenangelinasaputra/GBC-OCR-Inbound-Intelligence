@@ -1,9 +1,10 @@
 import { ModuleListPage } from "@/components/layout/module-list-page";
 import { SpreadsheetModePage, spreadsheetModeActive } from "@/components/layout/spreadsheet-mode-page";
-import { MasterMappingPanel } from "@/components/master-mapping/master-mapping-panel";
+import { MasterMappingWorkspace } from "@/components/master-mapping/master-mapping-workspace";
+import { getSkuMasterSheetId } from "@/lib/config/sku-mapping-sheets";
 import { getSession } from "@/lib/auth/session";
-import { getSkuRekapSheetId } from "@/lib/config/sku-mapping-sheets";
 import { hasPermission } from "@/lib/rbac/permissions";
+import Link from "next/link";
 
 type SearchParams = { ocr?: string };
 
@@ -41,21 +42,23 @@ export default async function MasterMappingPage({
   return (
     <ModuleListPage
       title="Mapping Produk"
-      description="Petakan nama barang dari OCR ke SKU master — dipakai saat tidak ada match otomatis di REKAP SKUL."
+      description="Master produk (TABEL → REKAP SKUL) dan alias nama OCR untuk SKU Mapping."
     >
       <p className="mb-4 text-sm text-slate-600">
-        Data disimpan di tab <strong>Master Mapping</strong> pada{" "}
+        Generator produk menulis ke tab kategori lalu <strong>REKAP SKUL</strong> / <strong>REKAP SKUS</strong> pada{" "}
         <a
-          href={`https://docs.google.com/spreadsheets/d/${getSkuRekapSheetId()}/edit`}
+          href={`https://docs.google.com/spreadsheets/d/${getSkuMasterSheetId()}/edit`}
           target="_blank"
           rel="noreferrer"
           className="text-blue-600 hover:underline"
         >
-          spreadsheet REKAP SKUL
+          spreadsheet master v2
         </a>
-        . Service account perlu Editor pada spreadsheet tersebut.
+        . Alias OCR tetap di tab <strong>Master Mapping</strong> pada spreadsheet yang sama. Service account perlu{" "}
+        <strong>Editor</strong>. Untuk <Link href="/sku-mapping" className="text-blue-600 hover:underline">SKU Mapping</Link>, set{" "}
+        <code className="text-xs">SKU_REKAP_SHEET_ID</code> ke ID spreadsheet v2 jika katalog harus sama.
       </p>
-      <MasterMappingPanel canEdit={canEdit} initialOcrName={initialOcr} />
+      <MasterMappingWorkspace canEdit={canEdit} initialOcrName={initialOcr} />
     </ModuleListPage>
   );
 }

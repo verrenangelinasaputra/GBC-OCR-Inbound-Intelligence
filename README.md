@@ -221,6 +221,8 @@ Env **Vercel** (Production):
 | `GOOGLE_DRIVE_FOLDER_ID` | `1_eQPA9BXJj1RjLgfyCPnlgZEsJdpjHnA` (default di kode jika dikosongkan) |
 | `GOOGLE_SHEET_ID` | `1o2No4lV_r1Hrfi3qiyKI0ZX-VUaQaZdcxCbo4qJ1LDc` |
 | `GOOGLE_SHEET_TAB` | `Sheet1` |
+| `SKU_MASTER_SHEET_ID` | `[V2] GENERATOR SKU` — default `1vbCQDgMRfUb8YKZ_E6DVHSa-lS7iWUAhylwImnJGJsw` (`/master-mapping` generator) |
+| `SKU_REKAP_SHEET_ID` | Spreadsheet yang dibaca `/sku-mapping` — set sama dengan v2 agar REKAP SKUL sinkron |
 | `CREDENTIALS_SHEET_ID` | `1CNmLX2Qca-9GxDJTh77W8VaVaDAcMchqj7tzeeYEyZw` (warehouse) |
 | `SUPPLIER_SHEET_ID` | `156m4HFAUnqubtCJumBJZ9BCCel_kNVcU_ZV9kHi4HtY` (supplier — terpisah) |
 | `INTERNAL_SHEET_TAB` | `Users` |

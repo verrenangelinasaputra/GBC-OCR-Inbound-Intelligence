@@ -9,6 +9,10 @@ import type { SkuRekapEntry } from "@/lib/sku-matching/sku-rekap-types";
 const CACHE_MS = 10 * 60 * 1000;
 let cache: { at: number; entries: SkuRekapEntry[] } | null = null;
 
+export function invalidateSkuRekapCatalogCache(): void {
+  cache = null;
+}
+
 function quoteTab(tab: string): string {
   return `'${tab.replace(/'/g, "''")}'`;
 }
