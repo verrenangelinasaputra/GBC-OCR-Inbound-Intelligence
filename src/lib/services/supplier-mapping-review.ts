@@ -22,16 +22,19 @@ export async function buildSupplierMappingReview(): Promise<SupplierMappingRevie
 
   return accounts
     .filter((a) => !isSupplierMasterUsername(a.username))
-    .map((account) => {
+    .map((account): SupplierMappingReviewRow => {
       const match = resolveSupplierMasterMatch(catalog, {
         supplierName: account.supplierName,
         supplierUsername: account.username,
       });
+      const mappingStatus: SupplierMappingReviewRow["mappingStatus"] = match
+        ? "matched"
+        : "unmatched";
       return {
         username: account.username,
         supplierName: account.supplierName,
         accountStatus: account.status,
-        mappingStatus: match ? "matched" : "unmatched",
+        mappingStatus,
         kode: match?.kode.trim() || undefined,
         matchedAlias: match?.namaSupplier.trim() || undefined,
       };
