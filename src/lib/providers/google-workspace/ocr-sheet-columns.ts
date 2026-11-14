@@ -54,8 +54,8 @@ function v3Col(row: string[], col: number): number {
 export const OCR_SHEET_COLUMN_COUNT = OCR_SHEET_HEADERS.length;
 
 /** Huruf kolom terakhir (mis. 28 kolom → AB). */
-export function ocrSheetLastColumnA1(columnCount = OCR_SHEET_COLUMN_COUNT): string {
-  let n = columnCount;
+export function ocrSheetLastColumnA1(columnCount: number = OCR_SHEET_COLUMN_COUNT): string {
+  let n: number = columnCount;
   let letters = "";
   while (n > 0) {
     const rem = (n - 1) % 26;
