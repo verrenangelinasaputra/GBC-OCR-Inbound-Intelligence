@@ -1,5 +1,5 @@
-export function normalizeProductName(text: string): string {
-  return text
+export function normalizeProductName(text: string | null | undefined): string {
+  return String(text ?? "")
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ")

@@ -1,3 +1,4 @@
+import { coerceSheetCell } from "@/lib/sku-matching/coerce-string";
 import { productNameSimilarity, normalizeProductName } from "@/lib/sku-matching/text-similarity";
 import type { SkuMatchSuggestion, SkuRekapEntry } from "@/lib/sku-matching/sku-rekap-types";
 import type { MasterMappingEntry } from "@/lib/sku-matching/master-mapping-types";
@@ -10,18 +11,18 @@ function masterMappingMatches(
   if (!nq) return [];
   const hits: SkuMatchSuggestion[] = [];
   for (const m of mappings) {
-    const alias = normalizeProductName(m.namaBarangOcr);
+    const alias = normalizeProductName(coerceSheetCell(m.namaBarangOcr));
     if (!alias) continue;
     if (alias === nq) {
       hits.push({
-        rowNo: m.rowNo,
-        skuLengkap: m.skuLengkap,
-        namaInternalAccurate: m.namaInternalAccurate,
-        namaProdukAcuan: m.namaProdukAcuan,
-        kategoriUtama: m.kategoriUtama,
-        skus: m.skus,
-        barcode: m.barcode,
-        sumberLembar: m.sumberLembar,
+        rowNo: coerceSheetCell(m.rowNo),
+        skuLengkap: coerceSheetCell(m.skuLengkap),
+        namaInternalAccurate: coerceSheetCell(m.namaInternalAccurate),
+        namaProdukAcuan: coerceSheetCell(m.namaProdukAcuan),
+        kategoriUtama: coerceSheetCell(m.kategoriUtama),
+        skus: coerceSheetCell(m.skus),
+        barcode: coerceSheetCell(m.barcode),
+        sumberLembar: coerceSheetCell(m.sumberLembar),
         score: 1,
         matchType: "exact",
       });
@@ -36,7 +37,7 @@ export function findTopRekapSkuMatches(
   limit = 3,
   masterMappings: MasterMappingEntry[] = []
 ): SkuMatchSuggestion[] {
-  const query = namaBarangOcr.trim();
+  const query = coerceSheetCell(namaBarangOcr);
   if (!query) return [];
 
   const fromMaster = masterMappingMatches(query, masterMappings);
@@ -49,7 +50,7 @@ export function findTopRekapSkuMatches(
   const scored: SkuMatchSuggestion[] = [];
 
   for (const entry of catalog) {
-    const acuan = entry.namaProdukAcuan.trim();
+    const acuan = coerceSheetCell(entry.namaProdukAcuan);
     if (!acuan) continue;
 
     const nq = normalizeProductName(query);
@@ -71,10 +72,25 @@ export function findTopRekapSkuMatches(
 
     if (score < 0.35) continue;
 
-    scored.push({ ...entry, score, matchType });
+    scored.push({
+      rowNo: coerceSheetCell(entry.rowNo),
+      skuLengkap: coerceSheetCell(entry.skuLengkap),
+      namaInternalAccurate: coerceSheetCell(entry.namaInternalAccurate),
+      namaProdukAcuan: acuan,
+      kategoriUtama: coerceSheetCell(entry.kategoriUtama),
+      skus: coerceSheetCell(entry.skus),
+      barcode: coerceSheetCell(entry.barcode),
+      sumberLembar: coerceSheetCell(entry.sumberLembar),
+      score,
+      matchType,
+    });
   }
 
   return scored
-    .sort((a, b) => b.score - a.score || a.namaProdukAcuan.localeCompare(b.namaProdukAcuan, "id"))
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        coerceSheetCell(a.namaProdukAcuan).localeCompare(coerceSheetCell(b.namaProdukAcuan), "id")
+    )
     .slice(0, limit);
 }

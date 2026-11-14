@@ -4,6 +4,7 @@ import { google } from "googleapis";
 import { createGoogleSheetsAuthClient } from "@/lib/providers/google-workspace/client";
 import { getGoogleExportConfigOptional, type GoogleExportConfig } from "@/lib/providers/google-workspace/config";
 import { getSkuRekapSheetId, getSkuRekapTabName } from "@/lib/config/sku-mapping-sheets";
+import { coerceSheetCell } from "@/lib/sku-matching/coerce-string";
 import type { SkuRekapEntry } from "@/lib/sku-matching/sku-rekap-types";
 
 const CACHE_MS = 10 * 60 * 1000;
@@ -32,13 +33,13 @@ function parseRekapRow(row: string[], rowIndex: number): SkuRekapEntry | null {
   if (!namaProdukAcuan && !skuLengkap) return null;
   return {
     rowNo: rowNo || String(rowIndex),
-    skuLengkap,
-    namaInternalAccurate,
-    namaProdukAcuan,
-    kategoriUtama,
-    skus,
-    barcode,
-    sumberLembar,
+    skuLengkap: coerceSheetCell(skuLengkap),
+    namaInternalAccurate: coerceSheetCell(namaInternalAccurate),
+    namaProdukAcuan: coerceSheetCell(namaProdukAcuan),
+    kategoriUtama: coerceSheetCell(kategoriUtama),
+    skus: coerceSheetCell(skus),
+    barcode: coerceSheetCell(barcode),
+    sumberLembar: coerceSheetCell(sumberLembar),
   };
 }
 
@@ -49,11 +50,13 @@ export async function loadSkuRekapCatalog(force = false): Promise<SkuRekapEntry[
   const base = getGoogleExportConfigOptional();
   if (!base) return [];
 
-  const auth = createGoogleSheetsAuthClient(base);
+  const spreadsheetId = getSkuRekapSheetId();
+  const cfg = googleConfigForSpreadsheet(spreadsheetId) ?? base;
+  const auth = createGoogleSheetsAuthClient(cfg);
   const sheets = google.sheets({ version: "v4", auth });
   const tab = getSkuRekapTabName();
   const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: getSkuRekapSheetId(),
+    spreadsheetId,
     range: `${quoteTab(tab)}!A:H`,
   });
 
@@ -70,7 +73,7 @@ export async function loadSkuRekapCatalog(force = false): Promise<SkuRekapEntry[
 }
 
 export function getCatalogEntryByRowNo(catalog: SkuRekapEntry[], rowNo: string): SkuRekapEntry | null {
-  const key = rowNo.trim();
+  const key = coerceSheetCell(rowNo);
   return catalog.find((e) => e.rowNo === key || e.skuLengkap === key) ?? null;
 }
 

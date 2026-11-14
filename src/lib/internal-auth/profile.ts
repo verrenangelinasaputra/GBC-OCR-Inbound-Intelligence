@@ -7,8 +7,8 @@ export type InternalUserProfile = {
   gudangList: string[];
 };
 
-export function parseGudangList(raw: string): string[] {
-  return raw
+export function parseGudangList(raw: string | null | undefined): string[] {
+  return String(raw ?? "")
     .split(/[;|]/)
     .map((g) => g.trim())
     .filter(Boolean);
@@ -25,8 +25,8 @@ export async function getInternalUserProfile(username: string): Promise<Internal
   };
 }
 
-export function userCanAccessGudang(gudangList: string[], gudang: string): boolean {
-  const g = gudang.trim();
+export function userCanAccessGudang(gudangList: string[], gudang: string | null | undefined): boolean {
+  const g = String(gudang ?? "").trim();
   if (!g) return true;
   if (!gudangList.length) return true;
   return gudangList.some((x) => x === g);
