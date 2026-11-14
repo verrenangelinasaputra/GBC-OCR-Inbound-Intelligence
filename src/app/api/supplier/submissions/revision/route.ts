@@ -3,6 +3,7 @@ import { getOcrSheetRevisionImage } from "@/lib/services/ocr-sheet-revision-imag
 import { assertSupplierCanAccessDocKey } from "@/lib/services/supplier-submission-access";
 import { enforceSupplierMappingIfUser } from "@/lib/services/supplier-mapping-gate";
 import { jsonError } from "@/lib/api/auth-context";
+import { contentDispositionAttachment } from "@/lib/http/content-disposition";
 
 export async function GET(request: Request) {
   const session = await getSession();
@@ -32,11 +33,23 @@ export async function GET(request: Request) {
       Number.isFinite(index) ? index : 0
     );
     const displayMime = mimeType.startsWith("image/") ? mimeType : "image/png";
+    const ext = displayMime.includes("jpeg") || displayMime.includes("jpg") ? ".jpg" : ".png";
+    const wantDownload = url.searchParams.get("download") === "1";
+    const rawName = url.searchParams.get("fileName")?.trim();
+    const safeName = (rawName?.replace(/[^\w\s.\-()]/g, "_").slice(0, 120) || `revisi-${index + 1}`).replace(
+      /\.[a-z0-9]+$/i,
+      ""
+    );
+    const fileName = `${safeName}${ext}`;
+    const headers: Record<string, string> = {
+      "Content-Type": displayMime,
+      "Cache-Control": "private, max-age=120",
+    };
+    if (wantDownload) {
+      headers["Content-Disposition"] = contentDispositionAttachment(fileName);
+    }
     return new Response(new Uint8Array(buffer), {
-      headers: {
-        "Content-Type": displayMime,
-        "Cache-Control": "private, max-age=120",
-      },
+      headers,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Gagal memuat revisi";

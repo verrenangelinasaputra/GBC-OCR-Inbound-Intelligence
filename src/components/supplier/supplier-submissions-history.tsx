@@ -711,15 +711,25 @@ export function SupplierSubmissionsHistory({
           aria-modal="true"
         >
           <div className="max-h-[90vh] w-full max-w-3xl overflow-auto rounded-xl bg-white p-4 shadow-xl">
-            <div className="mb-3 flex items-center justify-between gap-2">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h3 className="font-medium text-slate-900">{preview.label}</h3>
-              <button
-                type="button"
-                className="rounded-lg border border-slate-200 px-3 py-1 text-sm"
-                onClick={() => setPreview(null)}
-              >
-                Tutup
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <a
+                  href={`/api/supplier/submissions/revision?docKey=${encodeURIComponent(preview.docKey)}&index=${preview.index}&download=1&fileName=${encodeURIComponent(preview.label)}`}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-50"
+                  download
+                >
+                  <FileDown className="h-4 w-4" />
+                  Export
+                </a>
+                <button
+                  type="button"
+                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm"
+                  onClick={() => setPreview(null)}
+                >
+                  Tutup
+                </button>
+              </div>
             </div>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
