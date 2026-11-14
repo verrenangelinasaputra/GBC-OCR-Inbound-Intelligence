@@ -31,7 +31,12 @@ export const DBM_INBOUND_HEADERS = [
   "Barcode (Code 128)",
   "Sumber Lembar",
   "Link SJ (Drive)",
+  "Ekspor Accurate",
+  "Tanggal Ekspor Accurate",
 ] as const;
+
+const DBM_COL_ACCURATE_TAG = 23;
+const DBM_COL_ACCURATE_AT = 24;
 
 function quoteTab(tab: string): string {
   return `'${tab.replace(/'/g, "''")}'`;
@@ -69,15 +74,28 @@ async function ensureDbmInboundTab(sheets: ReturnType<typeof google.sheets>, spr
 
   const head = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `${quoteTab(tab)}!A1:V1`,
+    range: `${quoteTab(tab)}!A1:Y1`,
   });
-  const first = head.data.values?.[0]?.[0] ?? "";
-  if (String(first).trim() !== DBM_INBOUND_HEADERS[0]) {
+  const headerRow = head.data.values?.[0] ?? [];
+  const first = headerRow[0] ?? "";
+  const needsFullHeader = String(first).trim() !== DBM_INBOUND_HEADERS[0];
+  const needsAccurateCols =
+    String(headerRow[DBM_COL_ACCURATE_TAG] ?? "").trim() !== DBM_INBOUND_HEADERS[DBM_COL_ACCURATE_TAG];
+  if (needsFullHeader) {
     await sheets.spreadsheets.values.update({
       spreadsheetId,
       range: `${quoteTab(tab)}!A1`,
       valueInputOption: "RAW",
-      requestBody: { values: [ [...DBM_INBOUND_HEADERS] ] },
+      requestBody: { values: [[...DBM_INBOUND_HEADERS]] },
+    });
+  } else if (needsAccurateCols) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${quoteTab(tab)}!X1:Y1`,
+      valueInputOption: "RAW",
+      requestBody: {
+        values: [[DBM_INBOUND_HEADERS[DBM_COL_ACCURATE_TAG], DBM_INBOUND_HEADERS[DBM_COL_ACCURATE_AT]]],
+      },
     });
   }
 }
@@ -177,6 +195,8 @@ export async function appendDbmInboundRow(params: {
     params.catalog.barcode,
     params.catalog.sumberLembar,
     params.linkSjDrive || params.line.fileUrl || "",
+    "",
+    "",
   ];
 
   try {
@@ -195,7 +215,10 @@ function matchScoreFormatted(score: number): string {
   return String(Math.round(score * 1000) / 1000);
 }
 
-function rowToRecord(row: string[]): import("@/lib/dbm/dbm-inbound-types").DbmInboundRecord | null {
+function rowToRecord(
+  row: string[],
+  sheetRow: number
+): import("@/lib/dbm/dbm-inbound-types").DbmInboundRecord | null {
   if (!row.length) return null;
   const rowKey = String(row[12] ?? "").trim();
   if (!rowKey) return null;
@@ -224,6 +247,9 @@ function rowToRecord(row: string[]): import("@/lib/dbm/dbm-inbound-types").DbmIn
     barcode: String(row[20] ?? ""),
     sumberLembar: String(row[21] ?? ""),
     linkSjDrive: String(row[22] ?? ""),
+    sheetRow,
+    accurateExportTag: String(row[DBM_COL_ACCURATE_TAG] ?? ""),
+    accurateExportedAt: String(row[DBM_COL_ACCURATE_AT] ?? ""),
   };
 }
 
@@ -244,13 +270,47 @@ export async function listDbmInboundRecords(): Promise<import("@/lib/dbm/dbm-inb
 
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `${quoteTab(tab)}!A:W`,
+    range: `${quoteTab(tab)}!A:Y`,
   });
 
   const out: import("@/lib/dbm/dbm-inbound-types").DbmInboundRecord[] = [];
   for (let i = 1; i < (res.data.values ?? []).length; i += 1) {
-    const rec = rowToRecord(res.data.values?.[i] ?? []);
+    const rec = rowToRecord(res.data.values?.[i] ?? [], i + 1);
     if (rec) out.push(rec);
   }
   return out;
+}
+
+function formatAccurateExportStamp(d = new Date()): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+export async function markDbmInboundAccurateExported(sheetRows: number[]): Promise<string> {
+  if (!sheetRows.length) return "";
+  const cfg = googleConfigForSpreadsheet(getDbmInboundSheetId());
+  if (!cfg) throw new Error("Google export tidak dikonfigurasi");
+
+  const auth = createGoogleSheetsAuthClient(cfg);
+  const sheets = google.sheets({ version: "v4", auth });
+  const spreadsheetId = getDbmInboundSheetId();
+  const tab = getDbmInboundTabName();
+  const stamp = formatAccurateExportStamp();
+
+  await ensureDbmInboundTab(sheets, spreadsheetId, tab);
+
+  const data = sheetRows.map((sheetRow) => ({
+    range: `${quoteTab(tab)}!X${sheetRow}:Y${sheetRow}`,
+    values: [["Ya", stamp]],
+  }));
+
+  await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      valueInputOption: "USER_ENTERED",
+      data,
+    },
+  });
+
+  return stamp;
 }

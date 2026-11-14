@@ -1,7 +1,9 @@
 import { ModuleListPage } from "@/components/layout/module-list-page";
 import { SpreadsheetModePage, spreadsheetModeActive } from "@/components/layout/spreadsheet-mode-page";
 import { DataBarangMasukTable } from "@/components/data-barang-masuk/data-barang-masuk-table";
+import { DataBarangMasukExportPanel } from "@/components/data-barang-masuk/data-barang-masuk-export-panel";
 import { getSession } from "@/lib/auth/session";
+import { hasPermission } from "@/lib/rbac/permissions";
 import { getInternalUserProfile } from "@/lib/internal-auth/profile";
 import { loadDataBarangMasukView } from "@/lib/services/data-barang-masuk";
 import { getGoogleExportConfigOptional } from "@/lib/providers/google-workspace/config";
@@ -15,18 +17,23 @@ export default async function DataBarangMasukPage() {
 
     let view: Awaited<ReturnType<typeof loadDataBarangMasukView>> = {
       groups: [],
+      rows: [],
       summary: { groupCount: 0, shipmentRows: 0, mergedSkuGroups: 0, totalQty: 0 },
     };
+    let canExport = false;
     try {
       const session = await getSession();
       const profile = session ? await getInternalUserProfile(session.username) : null;
       const gudangFilter = profile?.gudangList.length ? profile.gudangList : undefined;
       view = await loadDataBarangMasukView(gudangFilter);
+      canExport = session
+        ? hasPermission(session.roles, "data_barang_masuk", "EXPORT", session.allowedModules)
+        : false;
     } catch {
       return <SpreadsheetModePage title="Data Barang Masuk" />;
     }
 
-    const { groups, summary } = view;
+    const { groups, rows, summary } = view;
 
     return (
       <ModuleListPage
@@ -64,9 +71,12 @@ export default async function DataBarangMasukPage() {
           >
             spreadsheet Data Barang Masuk
           </a>
-          . Klik panah pada baris untuk melihat tiap SJ + tautan Drive.
+          . Pilih baris untuk ekspor Accurate, atau klik panah pada rekap untuk tiap SJ + Drive.
         </p>
 
+        <DataBarangMasukExportPanel rows={rows} canExport={canExport} />
+
+        <h2 className="mb-3 text-base font-semibold text-slate-900">Rekap produk (agregasi)</h2>
         <DataBarangMasukTable groups={groups} />
       </ModuleListPage>
     );

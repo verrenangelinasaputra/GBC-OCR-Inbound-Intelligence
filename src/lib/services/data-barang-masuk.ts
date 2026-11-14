@@ -19,6 +19,7 @@ function enrichDriveLinks(
 
 export async function loadDataBarangMasukView(gudangFilter?: string[]): Promise<{
   groups: DbmInboundAggregate[];
+  rows: DbmInboundRecord[];
   summary: ReturnType<typeof summarizeInboundTotals>;
 }> {
   const [records, ocrDocs] = await Promise.all([
@@ -35,5 +36,10 @@ export async function loadDataBarangMasukView(gudangFilter?: string[]): Promise<
 
   const enriched = enrichDriveLinks(filtered, docDrive);
   const groups = aggregateDbmInboundRecords(enriched);
-  return { groups, summary: summarizeInboundTotals(groups) };
+  const rows = [...enriched].sort((a, b) => {
+    const t = b.tanggalSj.localeCompare(a.tanggalSj, "id");
+    if (t !== 0) return t;
+    return a.rowKey.localeCompare(b.rowKey, "id");
+  });
+  return { groups, rows, summary: summarizeInboundTotals(groups) };
 }

@@ -22,6 +22,10 @@ export type DbmInboundRecord = {
   barcode: string;
   sumberLembar: string;
   linkSjDrive: string;
+  /** Baris di spreadsheet DBM (1-based), untuk update setelah ekspor Accurate. */
+  sheetRow: number;
+  accurateExportTag: string;
+  accurateExportedAt: string;
 };
 
 export type DbmShipmentAttachment = {
