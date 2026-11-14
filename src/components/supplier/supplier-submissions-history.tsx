@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { Fragment, useCallback, useMemo, useState } from "react";
 import type { SubmissionHistoryRow } from "@/lib/services/ocr-sheet-submissions-shared";
 import { supplierCanConfirmReceipt } from "@/lib/services/ocr-sheet-submissions-shared";
 import { ReviewStatusBadge } from "@/components/ocr-review/review-status-badge";
@@ -8,10 +8,26 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { downloadSubmissionsWord } from "@/lib/utils/export-submissions-table";
 import { warehouseReviewWaitSortKey } from "@/lib/ocr-review/workflow-timeline";
 import { WarehouseWaitBadge, WorkflowTimelineCompact } from "@/components/ocr-review/workflow-timeline";
-import { ArrowDownUp, FileDown, Package, Printer, RefreshCw, Search, Truck } from "lucide-react";
+import {
+  ArrowDownUp,
+  ChevronDown,
+  ChevronRight,
+  FileDown,
+  Package,
+  Printer,
+  RefreshCw,
+  Search,
+  Truck,
+} from "lucide-react";
 
 type SortKey = keyof SubmissionHistoryRow;
 type SortDir = "asc" | "desc";
+
+type DocGroup = {
+  docKey: string;
+  head: SubmissionHistoryRow;
+  lines: SubmissionHistoryRow[];
+};
 
 const COLUMNS: { key: SortKey; label: string; className?: string }[] = [
   { key: "gudang", label: "Gudang" },
@@ -81,6 +97,8 @@ export function SupplierSubmissionsHistory({
     null
   );
   const [confirmingDoc, setConfirmingDoc] = useState<string | null>(null);
+  const [expandedDocs, setExpandedDocs] = useState<Set<string>>(() => new Set());
+  const [viewGrouped, setViewGrouped] = useState(true);
 
   const gudangOptions = useMemo(() => {
     const set = new Set<string>();
@@ -127,28 +145,49 @@ export function SupplierSubmissionsHistory({
     return list;
   }, [rows, search, gudang, status, dateFrom, dateTo, sortKey, sortDir, sortByWaitReview]);
 
-  const isFirstRowForDoc = useMemo(() => {
-    const seen = new Set<string>();
-    const out = new Set<string>();
+  const docGroups = useMemo(() => {
+    const byDoc = new Map<string, SubmissionHistoryRow[]>();
+    const order: string[] = [];
     for (const r of filtered) {
-      if (!seen.has(r.docKey)) {
-        seen.add(r.docKey);
-        out.add(r.rowKey);
-      }
+      if (!byDoc.has(r.docKey)) order.push(r.docKey);
+      const list = byDoc.get(r.docKey) ?? [];
+      list.push(r);
+      byDoc.set(r.docKey, list);
     }
-    return out;
+    const groups: DocGroup[] = order.map((docKey) => {
+      const lines = byDoc.get(docKey) ?? [];
+      return { docKey, head: lines[0]!, lines };
+    });
+    return groups;
   }, [filtered]);
 
   const stats = useMemo(() => {
     let totalUnits = 0;
-    const sj = new Set<string>();
+    const uploads = new Set<string>();
     for (const r of filtered) {
       totalUnits += parseQtyFromJumlah(r.jumlah);
-      const no = r.noSuratJalan.trim();
-      if (no) sj.add(no);
+      uploads.add(r.docKey);
     }
-    return { totalUnits, totalSuratJalan: sj.size };
+    return { totalUnits, totalPengiriman: uploads.size };
   }, [filtered]);
+
+  function toggleDocExpanded(docKey: string) {
+    setExpandedDocs((prev) => {
+      const next = new Set(prev);
+      if (next.has(docKey)) next.delete(docKey);
+      else next.add(docKey);
+      return next;
+    });
+  }
+
+  function ocrSummary(lines: SubmissionHistoryRow[]): string {
+    const ok = lines.filter((l) => l.status.toUpperCase() === "OK").length;
+    const cek = lines.filter((l) => l.status.toUpperCase() === "CEK").length;
+    const parts: string[] = [];
+    if (ok) parts.push(`${ok} OK`);
+    if (cek) parts.push(`${cek} CEK`);
+    return parts.length ? parts.join(", ") : "—";
+  }
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -336,6 +375,17 @@ export function SupplierSubmissionsHistory({
             <option value="column">Urut kolom (klik header tabel)</option>
           </select>
         </label>
+        <label className="flex flex-col justify-end gap-1 sm:col-span-2 lg:col-span-1">
+          <span className="text-xs font-medium text-slate-500">Tampilan tabel</span>
+          <select
+            value={viewGrouped ? "grouped" : "flat"}
+            onChange={(e) => setViewGrouped(e.target.value === "grouped")}
+            className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+          >
+            <option value="grouped">Per foto / pengiriman (disarankan)</option>
+            <option value="flat">Semua baris barang</option>
+          </select>
+        </label>
       </div>
 
       <div className="grid gap-4 print:hidden sm:grid-cols-2">
@@ -357,12 +407,14 @@ export function SupplierSubmissionsHistory({
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                Total Surat Jalan
+                Total pengiriman (foto)
               </p>
               <p className="mt-1 text-3xl font-semibold tabular-nums text-slate-900">
-                {formatUnitCount(stats.totalSuratJalan)}
+                {formatUnitCount(stats.totalPengiriman)}
               </p>
-              <p className="mt-1 text-xs text-slate-500">No. SJ unik pada baris yang ditampilkan</p>
+              <p className="mt-1 text-xs text-slate-500">
+                Satu submit / satu file Drive — bukan jumlah No. SJ unik
+              </p>
             </div>
             <span className="rounded-lg bg-emerald-50 p-2 text-emerald-700">
               <Truck className="h-5 w-5" />
@@ -372,7 +424,11 @@ export function SupplierSubmissionsHistory({
       </div>
 
       <p className="text-sm text-slate-500 print:hidden">
-        Menampilkan <strong className="text-slate-800">{filtered.length}</strong> dari {rows.length} baris
+        Menampilkan{" "}
+        <strong className="text-slate-800">
+          {docGroups.length} pengiriman ({filtered.length} baris barang)
+        </strong>{" "}
+        dari {rows.length} baris total
       </p>
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -395,6 +451,7 @@ export function SupplierSubmissionsHistory({
                     </button>
                   </th>
                 ))}
+                <th className="w-10 whitespace-nowrap px-2 py-3 print:hidden" aria-label="Buka detail" />
                 <th className="whitespace-nowrap px-3 py-3 print:hidden">Menunggu gudang</th>
                 <th className="px-3 py-3 print:hidden">Timeline</th>
                 <th className="px-3 py-3 print:hidden">Foto</th>
@@ -403,103 +460,241 @@ export function SupplierSubmissionsHistory({
               </tr>
             </thead>
             <tbody>
-              {filtered.map((r) => (
-                <tr key={r.rowKey} className="border-t border-slate-100 odd:bg-white even:bg-slate-50/80">
-                  {COLUMNS.map((col) => (
-                    <td key={col.key} className="max-w-[200px] truncate px-3 py-2.5 text-slate-800">
-                      {col.key === "status" ? (
-                        <StatusBadge
-                          label={r.status || "—"}
-                          tone={r.status === "CEK" ? "warning" : "success"}
-                        />
-                      ) : col.key === "statusReview" ? (
-                        <ReviewStatusBadge status={r.statusReview} />
-                      ) : (
-                        String(r[col.key] ?? "—")
-                      )}
-                    </td>
-                  ))}
-                  <td className="px-3 py-2.5 print:hidden">
-                    {isFirstRowForDoc.has(r.rowKey) ? (
-                      <WarehouseWaitBadge fields={r} />
-                    ) : (
-                      <span className="text-slate-300">···</span>
-                    )}
-                  </td>
-                  <td className="min-w-[120px] px-3 py-2.5 print:hidden">
-                    {isFirstRowForDoc.has(r.rowKey) ? (
-                      timelineDocKey === r.docKey ? (
-                        <WorkflowTimelineCompact fields={r} />
-                      ) : (
-                        <button
-                          type="button"
-                          className="text-xs font-medium text-blue-600 hover:underline"
-                          onClick={() => setTimelineDocKey(r.docKey)}
-                        >
-                          Lihat
-                        </button>
-                      )
-                    ) : null}
-                  </td>
-                  <td className="px-3 py-2.5 print:hidden">
-                    {r.fileUrl?.startsWith("http") ? (
-                      <a
-                        href={r.fileUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="font-medium text-blue-600 hover:underline"
-                      >
-                        Drive
-                      </a>
-                    ) : (
-                      <span className="text-slate-400">—</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2.5 print:hidden">
-                    {r.revisionLinks.length === 0 ? (
-                      <span className="text-slate-400">—</span>
-                    ) : (
-                      <div className="flex flex-wrap gap-1">
-                        {r.revisionLinks.map((_, i) => (
+              {viewGrouped
+                ? docGroups.map((g) => {
+                    const r = g.head;
+                    const expanded = expandedDocs.has(g.docKey);
+                    const lineUnits = g.lines.reduce((sum, l) => sum + parseQtyFromJumlah(l.jumlah), 0);
+                    return (
+                      <Fragment key={g.docKey}>
+                        <tr className="border-t border-slate-200 bg-slate-50/90 font-medium text-slate-900">
+                          <td className="px-2 py-2.5 print:hidden">
+                            <button
+                              type="button"
+                              className="rounded p-1 hover:bg-slate-200"
+                              aria-expanded={expanded}
+                              onClick={() => toggleDocExpanded(g.docKey)}
+                              title={expanded ? "Ciutkan barang" : "Lihat barang"}
+                            >
+                              {expanded ? (
+                                <ChevronDown className="h-4 w-4" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4" />
+                              )}
+                            </button>
+                          </td>
+                          <td className="px-3 py-2.5">{r.gudang}</td>
+                          <td className="max-w-[140px] truncate px-3 py-2.5">{r.supplier}</td>
+                          <td className="whitespace-nowrap px-3 py-2.5">{r.exportTimestamp}</td>
+                          <td className="whitespace-nowrap px-3 py-2.5">{r.tanggal}</td>
+                          <td className="px-3 py-2.5 font-semibold">{r.noSuratJalan}</td>
+                          <td className="px-3 py-2.5">{r.noKendaraan}</td>
+                          <td className="px-3 py-2.5 text-slate-600">
+                            {g.lines.length} barang
+                            {!expanded ? (
+                              <span className="mt-0.5 block text-xs font-normal text-slate-500">
+                                Klik panah untuk detail
+                              </span>
+                            ) : null}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2.5 tabular-nums">
+                            {formatUnitCount(lineUnits)} unit
+                          </td>
+                          <td className="px-3 py-2.5 text-xs text-slate-600">{ocrSummary(g.lines)}</td>
+                          <td className="px-3 py-2.5">
+                            <ReviewStatusBadge status={r.statusReview} />
+                          </td>
+                          <td className="px-3 py-2.5">{r.sampleType || "—"}</td>
+                          <td className="px-3 py-2.5 print:hidden">
+                            <WarehouseWaitBadge fields={r} />
+                          </td>
+                          <td className="min-w-[120px] px-3 py-2.5 print:hidden">
+                            {timelineDocKey === r.docKey ? (
+                              <WorkflowTimelineCompact fields={r} />
+                            ) : (
+                              <button
+                                type="button"
+                                className="text-xs font-medium text-blue-600 hover:underline"
+                                onClick={() => setTimelineDocKey(r.docKey)}
+                              >
+                                Lihat
+                              </button>
+                            )}
+                          </td>
+                          <td className="px-3 py-2.5 print:hidden">
+                            {r.fileUrl?.startsWith("http") ? (
+                              <a
+                                href={r.fileUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="font-medium text-blue-600 hover:underline"
+                              >
+                                Drive
+                              </a>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2.5 print:hidden">
+                            {r.revisionLinks.length === 0 ? (
+                              <span className="text-slate-400">—</span>
+                            ) : (
+                              <div className="flex flex-wrap gap-1">
+                                {r.revisionLinks.map((_, i) => (
+                                  <button
+                                    key={i}
+                                    type="button"
+                                    onClick={() =>
+                                      setPreview({
+                                        docKey: r.docKey,
+                                        index: i,
+                                        label: `Revisi ${i + 1} · ${r.noSuratJalan}`,
+                                      })
+                                    }
+                                    className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 hover:bg-amber-200"
+                                  >
+                                    R{i + 1}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-3 py-2.5 print:hidden">
+                            {supplierCanConfirmReceipt(r.statusReview) ? (
+                              <button
+                                type="button"
+                                disabled={confirmingDoc === r.docKey}
+                                onClick={() => void confirmReceipt(r.docKey, r.noSuratJalan)}
+                                className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                              >
+                                {confirmingDoc === r.docKey ? "…" : "Terima data"}
+                              </button>
+                            ) : r.statusReview === "SELESAI" ? (
+                              <span className="text-xs text-emerald-700">Selesai</span>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </td>
+                        </tr>
+                        {expanded
+                          ? g.lines.map((line) => (
+                              <tr
+                                key={line.rowKey}
+                                className="border-t border-slate-100 bg-white text-sm text-slate-700"
+                              >
+                                <td className="print:hidden" />
+                                <td colSpan={6} className="px-3 py-2 pl-8 text-slate-400">
+                                  ↳ Item
+                                </td>
+                                <td className="max-w-[220px] px-3 py-2 font-medium text-slate-800">
+                                  {line.namaBarang}
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-2 tabular-nums">{line.jumlah}</td>
+                                <td className="px-3 py-2">
+                                  <StatusBadge
+                                    label={line.status || "—"}
+                                    tone={line.status === "CEK" ? "warning" : "success"}
+                                  />
+                                </td>
+                                <td colSpan={7} className="print:hidden" />
+                              </tr>
+                            ))
+                          : null}
+                      </Fragment>
+                    );
+                  })
+                : filtered.map((r) => (
+                    <tr key={r.rowKey} className="border-t border-slate-100 odd:bg-white even:bg-slate-50/80">
+                      <td className="print:hidden" />
+                      {COLUMNS.map((col) => (
+                        <td key={col.key} className="max-w-[200px] truncate px-3 py-2.5 text-slate-800">
+                          {col.key === "status" ? (
+                            <StatusBadge
+                              label={r.status || "—"}
+                              tone={r.status === "CEK" ? "warning" : "success"}
+                            />
+                          ) : col.key === "statusReview" ? (
+                            <ReviewStatusBadge status={r.statusReview} />
+                          ) : (
+                            String(r[col.key] ?? "—")
+                          )}
+                        </td>
+                      ))}
+                      <td className="px-3 py-2.5 print:hidden">
+                        <WarehouseWaitBadge fields={r} />
+                      </td>
+                      <td className="min-w-[120px] px-3 py-2.5 print:hidden">
+                        {timelineDocKey === r.docKey ? (
+                          <WorkflowTimelineCompact fields={r} />
+                        ) : (
                           <button
-                            key={i}
                             type="button"
-                            onClick={() =>
-                              setPreview({
-                                docKey: r.docKey,
-                                index: i,
-                                label: `Revisi ${i + 1} · ${r.noSuratJalan}`,
-                              })
-                            }
-                            className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 hover:bg-amber-200"
+                            className="text-xs font-medium text-blue-600 hover:underline"
+                            onClick={() => setTimelineDocKey(r.docKey)}
                           >
-                            R{i + 1}
+                            Lihat
                           </button>
-                        ))}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-3 py-2.5 print:hidden">
-                    {isFirstRowForDoc.has(r.rowKey) && supplierCanConfirmReceipt(r.statusReview) ? (
-                      <button
-                        type="button"
-                        disabled={confirmingDoc === r.docKey}
-                        onClick={() => void confirmReceipt(r.docKey, r.noSuratJalan)}
-                        className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-                      >
-                        {confirmingDoc === r.docKey ? "…" : "Terima data"}
-                      </button>
-                    ) : r.statusReview === "SELESAI" ? (
-                      <span className="text-xs text-emerald-700">Selesai</span>
-                    ) : (
-                      <span className="text-slate-400">—</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 print:hidden">
+                        {r.fileUrl?.startsWith("http") ? (
+                          <a
+                            href={r.fileUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="font-medium text-blue-600 hover:underline"
+                          >
+                            Drive
+                          </a>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 print:hidden">
+                        {r.revisionLinks.length === 0 ? (
+                          <span className="text-slate-400">—</span>
+                        ) : (
+                          <div className="flex flex-wrap gap-1">
+                            {r.revisionLinks.map((_, i) => (
+                              <button
+                                key={i}
+                                type="button"
+                                onClick={() =>
+                                  setPreview({
+                                    docKey: r.docKey,
+                                    index: i,
+                                    label: `Revisi ${i + 1} · ${r.noSuratJalan}`,
+                                  })
+                                }
+                                className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 hover:bg-amber-200"
+                              >
+                                R{i + 1}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 print:hidden">
+                        {supplierCanConfirmReceipt(r.statusReview) ? (
+                          <button
+                            type="button"
+                            disabled={confirmingDoc === r.docKey}
+                            onClick={() => void confirmReceipt(r.docKey, r.noSuratJalan)}
+                            className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                          >
+                            {confirmingDoc === r.docKey ? "…" : "Terima data"}
+                          </button>
+                        ) : r.statusReview === "SELESAI" ? (
+                          <span className="text-xs text-emerald-700">Selesai</span>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={COLUMNS.length + 5} className="px-4 py-12 text-center text-slate-500">
+                  <td colSpan={COLUMNS.length + 6} className="px-4 py-12 text-center text-slate-500">
                     Tidak ada data yang cocok dengan filter.
                   </td>
                 </tr>

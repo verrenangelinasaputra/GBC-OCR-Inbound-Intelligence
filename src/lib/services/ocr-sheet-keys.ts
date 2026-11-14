@@ -19,6 +19,8 @@ export function decodeOcrSheetDocKey(docKey: string): string {
 export function sheetRowMatchesDocKey(row: string[], rawKey: string): boolean {
   if (!isMeaningfulOcrDataRow(row)) return false;
   const fields = mapOcrSheetRow(row);
+  const url = fields.fileUrl?.trim();
+  if (url && url === rawKey) return true;
   if (fields.fileName && fields.fileName === rawKey) return true;
   const parts = rawKey.split("|");
   if (parts.length >= 2) {

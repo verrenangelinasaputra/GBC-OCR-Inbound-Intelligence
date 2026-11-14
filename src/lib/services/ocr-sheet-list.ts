@@ -8,6 +8,7 @@ import {
 } from "@/lib/ocr-review/workflow-status";
 import { mapOcrSheetRow, ocrSheetFullColumnsRange } from "@/lib/providers/google-workspace/ocr-sheet-columns";
 import { encodeOcrSheetDocKey, isMeaningfulOcrDataRow } from "@/lib/services/ocr-sheet-keys";
+import { submissionDocRawKey } from "@/lib/services/ocr-sheet-submissions-shared";
 
 export type OcrSheetDocument = {
   docKey: string;
@@ -55,7 +56,7 @@ export async function listOcrDocumentsFromSheet(
     const row = rows[i] ?? [];
     if (!isMeaningfulOcrDataRow(row)) continue;
     const fields = mapOcrSheetRow(row);
-    const key = fields.fileName || `${fields.noSuratJalan}|${fields.tanggal}|${i}`;
+    const key = submissionDocRawKey(fields);
     const existing = map.get(key);
     const status = fields.status || "OK";
     const review = normalizeOcrReviewStatus(fields.statusReview);

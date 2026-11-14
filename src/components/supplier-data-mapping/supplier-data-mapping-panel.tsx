@@ -38,7 +38,6 @@ export function SupplierDataMappingPanel({
   const [search, setSearch] = useState("");
   const [filterTipe, setFilterTipe] = useState("");
   const [filterKode, setFilterKode] = useState("");
-  const [filterNama, setFilterNama] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("kode");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
@@ -62,18 +61,16 @@ export function SupplierDataMappingPanel({
 
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const namaNeedle = filterNama.trim().toLowerCase();
     return rows.filter((r) => {
       if (filterTipe && r.tipeSupplier.trim() !== filterTipe) return false;
       if (filterKode && r.kode.trim().toUpperCase() !== filterKode.toUpperCase()) return false;
-      if (namaNeedle && !r.namaSupplier.toLowerCase().includes(namaNeedle)) return false;
       if (q) {
         const hay = `${r.tipeSupplier} ${r.kode} ${r.namaSupplier}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
-  }, [rows, search, filterTipe, filterKode, filterNama]);
+  }, [rows, search, filterTipe, filterKode]);
 
   const displayRows = useMemo(() => {
     const list = [...filteredRows];
@@ -351,24 +348,13 @@ export function SupplierDataMappingPanel({
                 ))}
               </select>
             </label>
-            <label className="flex min-w-[160px] flex-col gap-1">
-              <span className="text-xs font-medium text-slate-600">Filter nama supplier</span>
-              <input
-                type="text"
-                value={filterNama}
-                onChange={(e) => setFilterNama(e.target.value)}
-                placeholder="Mengandung teks…"
-                className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              />
-            </label>
-            {(search || filterTipe || filterKode || filterNama) && (
+            {(search || filterTipe || filterKode) && (
               <button
                 type="button"
                 onClick={() => {
                   setSearch("");
                   setFilterTipe("");
                   setFilterKode("");
-                  setFilterNama("");
                 }}
                 className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
               >

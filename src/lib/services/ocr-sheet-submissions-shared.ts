@@ -8,8 +8,15 @@ export type SubmissionHistoryRow = OcrSheetRowFields & {
   statusReview: OcrReviewStatus;
 };
 
-export function submissionDocRawKey(fields: Pick<OcrSheetRowFields, "fileName" | "noSuratJalan" | "tanggal">): string {
-  return fields.fileName?.trim() || `${fields.noSuratJalan}|${fields.tanggal}`;
+/** Satu submit/foto = satu kunci (prioritas link Drive — unik per file). */
+export function submissionDocRawKey(
+  fields: Pick<OcrSheetRowFields, "fileName" | "noSuratJalan" | "tanggal" | "fileUrl">
+): string {
+  const url = fields.fileUrl?.trim();
+  if (url && url.startsWith("http")) return url;
+  const name = fields.fileName?.trim();
+  if (name) return name;
+  return `${fields.noSuratJalan}|${fields.tanggal}`;
 }
 
 export function supplierCanConfirmReceipt(status: OcrReviewStatus): boolean {
