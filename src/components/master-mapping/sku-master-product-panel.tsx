@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { SkuMasterCodeOption } from "@/lib/sku-master/types";
-import { resolveSub1ForCategoryTab } from "@/lib/sku-master/sub1-for-tab";
+import {
+  categoryTabDisplayName,
+  resolveSub1ForCategoryTab,
+  sub1FieldMode,
+} from "@/lib/sku-master/sub1-for-tab";
 import { SkuMasterListTabs } from "@/components/master-mapping/sku-master-list-tabs";
 
 const SUB_KEYS = ["sub1", "sub2", "sub3", "sub4", "sub5", "sub6", "sub7", "sub8", "sub9"] as const;
@@ -77,8 +81,16 @@ export function SkuMasterProductPanel({ canEdit }: { canEdit: boolean }) {
   }, [loadAllCodes]);
 
   useEffect(() => {
-    const sub1 = resolveSub1ForCategoryTab(categoryTab, codeOptions[1] ?? []);
-    setSubs((s) => (s.sub1 === sub1 ? s : { ...s, sub1 }));
+    const opts = codeOptions[1] ?? [];
+    const mode = sub1FieldMode(opts);
+    setSubs((s) => {
+      if (mode === "dropdown") {
+        if (s.sub1 && opts.some((o) => o.code === s.sub1)) return s;
+        return { ...s, sub1: "" };
+      }
+      const sub1 = resolveSub1ForCategoryTab(categoryTab, opts);
+      return s.sub1 === sub1 ? s : { ...s, sub1 };
+    });
   }, [categoryTab, codeOptions]);
 
   const [syncCooldownUntil, setSyncCooldownUntil] = useState(0);
@@ -159,8 +171,14 @@ export function SkuMasterProductPanel({ canEdit }: { canEdit: boolean }) {
       );
       setNamaProdukAcuan("");
       setNamaInternalAccurate("");
+      const sub1Default = (() => {
+        const opts = codeOptions[1] ?? [];
+        return sub1FieldMode(opts) === "dropdown"
+          ? ""
+          : resolveSub1ForCategoryTab(categoryTab, opts);
+      })();
       setSubs({
-        sub1: resolveSub1ForCategoryTab(categoryTab, codeOptions[1] ?? []),
+        sub1: sub1Default,
         sub2: "",
         sub3: "",
         sub4: "",
@@ -258,19 +276,53 @@ export function SkuMasterProductPanel({ canEdit }: { canEdit: boolean }) {
                 const subIndex = idx + 1;
                 const options = codeOptions[subIndex] ?? [];
                 const label = subLabels[idx] ?? `Sub ${subIndex}`;
-                const isSub1 = subIndex === 1;
-                const sub1Value = subs.sub1;
-                const sub1Label =
-                  options.find((o) => o.code === sub1Value)?.label ?? sub1Value ?? categoryTab;
-                if (isSub1) {
+                if (subIndex === 1) {
+                  const mode = sub1FieldMode(options);
+                  if (mode === "dropdown") {
+                    return (
+                      <label key={key} className="flex flex-col gap-1 sm:col-span-2">
+                        <span className="text-xs font-medium text-slate-600">
+                          {label}{" "}
+                          <span className="font-normal text-slate-500">
+                            (pilih jenis di tab {categoryTabDisplayName(categoryTab)})
+                          </span>
+                        </span>
+                        <select
+                          required
+                          value={subs.sub1}
+                          onChange={(e) => setSubs((s) => ({ ...s, sub1: e.target.value }))}
+                          className="rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                          disabled={loadingCodes}
+                        >
+                          <option value="">— pilih kode Sub 1 —</option>
+                          {options.map((o) => (
+                            <option key={o.code} value={o.code}>
+                              {o.code} — {o.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    );
+                  }
+                  const sub1Value = subs.sub1 || resolveSub1ForCategoryTab(categoryTab, options);
+                  const sub1Label =
+                    options.find((o) => o.code === sub1Value)?.label ??
+                    categoryTabDisplayName(categoryTab);
                   return (
                     <label key={key} className="flex flex-col gap-1">
                       <span className="text-xs font-medium text-slate-600">
                         {label}{" "}
-                        <span className="font-normal text-slate-500">(mengikuti tab {categoryTab})</span>
+                        <span className="font-normal text-slate-500">
+                          ({mode === "category-name" ? "kategori tab" : "otomatis"}{" "}
+                          {categoryTabDisplayName(categoryTab)})
+                        </span>
                       </span>
                       <div className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-2 text-sm text-slate-800">
-                        {loadingCodes ? "Memuat…" : `${sub1Value || "…"} — ${sub1Label}`}
+                        {loadingCodes
+                          ? "Memuat…"
+                          : mode === "category-name"
+                            ? `${categoryTabDisplayName(categoryTab)}${sub1Value ? ` → ${sub1Value}` : ""}`
+                            : `${sub1Value} — ${sub1Label}`}
                       </div>
                     </label>
                   );

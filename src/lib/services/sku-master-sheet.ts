@@ -13,7 +13,7 @@ import {
   columnIndexToA1,
 } from "@/lib/sku-master/sheet-layout";
 import { isGeneratorCategoryTab } from "@/lib/sku-master/category-tabs";
-import { resolveSub1ForCategoryTab } from "@/lib/sku-master/sub1-for-tab";
+import { resolveSub1ForSave } from "@/lib/sku-master/sub1-for-tab";
 import type {
   SkuMasterCodeOption,
   SkuMasterProductInput,
@@ -469,7 +469,7 @@ async function createSkuMasterProductInner(
   }
 
   const codesBySub = await loadSkuMasterCodesForTab(input.categoryTab);
-  const sub1Resolved = input.sub1.trim() || resolveSub1ForCategoryTab(input.categoryTab, codesBySub[1] ?? []);
+  const sub1Resolved = resolveSub1ForSave(input.categoryTab, input.sub1, codesBySub[1] ?? []);
   const normalizedInput: SkuMasterProductInput = { ...input, sub1: sub1Resolved };
 
   const { sheets, spreadsheetId } = sheetsClient();
@@ -682,7 +682,7 @@ async function updateSkuMasterProductInner(
   }
 
   const codesBySub = await loadSkuMasterCodesForTab(input.categoryTab);
-  const sub1Resolved = input.sub1.trim() || resolveSub1ForCategoryTab(input.categoryTab, codesBySub[1] ?? []);
+  const sub1Resolved = resolveSub1ForSave(input.categoryTab, input.sub1, codesBySub[1] ?? []);
   const normalizedInput: SkuMasterProductUpdateInput = { ...input, sub1: sub1Resolved };
 
   const { sheets, spreadsheetId } = sheetsClient();

@@ -2,7 +2,11 @@
 
 import { useEffect, useState } from "react";
 import type { SkuMasterCodeOption, SkuMasterTableRow } from "@/lib/sku-master/types";
-import { resolveSub1ForCategoryTab } from "@/lib/sku-master/sub1-for-tab";
+import {
+  categoryTabDisplayName,
+  resolveSub1ForCategoryTab,
+  sub1FieldMode,
+} from "@/lib/sku-master/sub1-for-tab";
 import { SKU_SUB_LABELS } from "@/lib/sku-master/sub-labels";
 
 const SUB_KEYS = ["sub1", "sub2", "sub3", "sub4", "sub5", "sub6", "sub7", "sub8", "sub9"] as const;
@@ -61,8 +65,11 @@ export function SkuMasterRowEditDialog({
   }, [row.categoryTab]);
 
   useEffect(() => {
-    const sub1 = resolveSub1ForCategoryTab(row.categoryTab, codeOptions[1] ?? []);
-    setSubs((s) => ({ ...s, sub1 }));
+    const opts = codeOptions[1] ?? [];
+    const mode = sub1FieldMode(opts);
+    if (mode === "dropdown") return;
+    const sub1 = resolveSub1ForCategoryTab(row.categoryTab, opts);
+    setSubs((s) => (s.sub1 ? s : { ...s, sub1 }));
   }, [row.categoryTab, codeOptions]);
 
   async function onSubmit(e: React.FormEvent) {
@@ -148,13 +155,39 @@ export function SkuMasterRowEditDialog({
               const options = codeOptions[subIndex] ?? [];
               const label = SKU_SUB_LABELS[idx] ?? `Sub ${subIndex}`;
               if (subIndex === 1) {
-                const sub1Value = subs.sub1;
-                const sub1Label = options.find((o) => o.code === sub1Value)?.label ?? sub1Value;
+                const mode = sub1FieldMode(options);
+                if (mode === "dropdown") {
+                  return (
+                    <label key={key} className="flex flex-col gap-1 sm:col-span-2">
+                      <span className="text-xs font-medium text-slate-600">{label}</span>
+                      <select
+                        required
+                        value={subs.sub1}
+                        onChange={(e) => setSubs((s) => ({ ...s, sub1: e.target.value }))}
+                        className="rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                        disabled={loadingCodes}
+                      >
+                        <option value="">— pilih —</option>
+                        {options.map((o) => (
+                          <option key={o.code} value={o.code}>
+                            {o.code} — {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  );
+                }
+                const sub1Value = subs.sub1 || resolveSub1ForCategoryTab(row.categoryTab, options);
+                const sub1Label =
+                  options.find((o) => o.code === sub1Value)?.label ??
+                  categoryTabDisplayName(row.categoryTab);
                 return (
                   <label key={key} className="flex flex-col gap-1">
                     <span className="text-xs font-medium text-slate-600">{label}</span>
                     <div className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-2 text-sm">
-                      {sub1Value} — {sub1Label}
+                      {mode === "category-name"
+                        ? `${categoryTabDisplayName(row.categoryTab)}${sub1Value ? ` → ${sub1Value}` : ""}`
+                        : `${sub1Value} — ${sub1Label}`}
                     </div>
                   </label>
                 );
