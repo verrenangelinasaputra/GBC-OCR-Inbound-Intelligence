@@ -43,7 +43,7 @@ export function SkuMasterWorkspace({ canEdit }: { canEdit: boolean }) {
 
   return (
     <div className="space-y-5">
-      <motionSubNav view={view} onChange={setView} />
+      <MasterSkuSubNav view={view} onChange={setView} />
 
       {metaError ? (
         <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-800">{metaError}</p>
@@ -81,7 +81,7 @@ export function SkuMasterWorkspace({ canEdit }: { canEdit: boolean }) {
   );
 }
 
-function motionSubNav({
+function MasterSkuSubNav({
   view,
   onChange,
 }: {
