@@ -1,7 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import clsx from "clsx";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { SupplierMasterDataRow } from "@/lib/supplier-mapping/types";
+
+type SortKey = "tipeSupplier" | "kode" | "namaSupplier" | "sheetRow";
+type SortDir = "asc" | "desc";
 
 type FormState = {
   tipeSupplier: string;
@@ -31,6 +35,95 @@ export function SupplierDataMappingPanel({
   }));
   const [editRow, setEditRow] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<FormState>(emptyForm);
+  const [search, setSearch] = useState("");
+  const [filterTipe, setFilterTipe] = useState("");
+  const [filterKode, setFilterKode] = useState("");
+  const [filterNama, setFilterNama] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("kode");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  const distinctTipe = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of rows) {
+      const t = r.tipeSupplier.trim();
+      if (t) set.add(t);
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, "id"));
+  }, [rows]);
+
+  const distinctKode = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of rows) {
+      const k = r.kode.trim();
+      if (k) set.add(k);
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, "id"));
+  }, [rows]);
+
+  const filteredRows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const namaNeedle = filterNama.trim().toLowerCase();
+    return rows.filter((r) => {
+      if (filterTipe && r.tipeSupplier.trim() !== filterTipe) return false;
+      if (filterKode && r.kode.trim().toUpperCase() !== filterKode.toUpperCase()) return false;
+      if (namaNeedle && !r.namaSupplier.toLowerCase().includes(namaNeedle)) return false;
+      if (q) {
+        const hay = `${r.tipeSupplier} ${r.kode} ${r.namaSupplier}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [rows, search, filterTipe, filterKode, filterNama]);
+
+  const displayRows = useMemo(() => {
+    const list = [...filteredRows];
+    const dir = sortDir === "asc" ? 1 : -1;
+    list.sort((a, b) => {
+      if (sortKey === "sheetRow") return (a.sheetRow - b.sheetRow) * dir;
+      const av = sortKey === "kode" ? a.kode.toUpperCase() : String(a[sortKey] ?? "").trim();
+      const bv = sortKey === "kode" ? b.kode.toUpperCase() : String(b[sortKey] ?? "").trim();
+      return av.localeCompare(bv, "id", { sensitivity: "base" }) * dir;
+    });
+    return list;
+  }, [filteredRows, sortKey, sortDir]);
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
+
+  function SortableTh({
+    label,
+    column,
+    className,
+  }: {
+    label: string;
+    column: SortKey;
+    className?: string;
+  }) {
+    const active = sortKey === column;
+    return (
+      <th className={clsx("px-3 py-2", className)}>
+        <button
+          type="button"
+          onClick={() => toggleSort(column)}
+          className={clsx(
+            "inline-flex items-center gap-1 font-medium uppercase tracking-wide hover:text-slate-900",
+            active ? "text-blue-700" : "text-slate-600"
+          )}
+        >
+          {label}
+          <span className="text-[10px] normal-case" aria-hidden>
+            {active ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
+          </span>
+        </button>
+      </th>
+    );
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -212,20 +305,89 @@ export function SupplierDataMappingPanel({
       </section>
 
       <section className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-        <h2 className="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-800">
-          Daftar mapping {loading ? "…" : `(${rows.length})`}
-        </h2>
+        <div className="border-b border-slate-100 px-4 py-3">
+          <h2 className="text-sm font-semibold text-slate-800">
+            Daftar mapping{" "}
+            {loading ? "…" : `(${displayRows.length}${displayRows.length !== rows.length ? ` / ${rows.length}` : ""})`}
+          </h2>
+          <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
+            <label className="flex min-w-[200px] flex-1 flex-col gap-1">
+              <span className="text-xs font-medium text-slate-600">Cari</span>
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Tipe, kode, atau nama…"
+                className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="flex min-w-[140px] flex-col gap-1">
+              <span className="text-xs font-medium text-slate-600">Filter tipe</span>
+              <select
+                value={filterTipe}
+                onChange={(e) => setFilterTipe(e.target.value)}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+              >
+                <option value="">Semua tipe</option>
+                {distinctTipe.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex min-w-[120px] flex-col gap-1">
+              <span className="text-xs font-medium text-slate-600">Filter kode</span>
+              <select
+                value={filterKode}
+                onChange={(e) => setFilterKode(e.target.value)}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+              >
+                <option value="">Semua kode</option>
+                {distinctKode.map((k) => (
+                  <option key={k} value={k}>
+                    {k}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex min-w-[160px] flex-col gap-1">
+              <span className="text-xs font-medium text-slate-600">Filter nama supplier</span>
+              <input
+                type="text"
+                value={filterNama}
+                onChange={(e) => setFilterNama(e.target.value)}
+                placeholder="Mengandung teks…"
+                className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              />
+            </label>
+            {(search || filterTipe || filterKode || filterNama) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch("");
+                  setFilterTipe("");
+                  setFilterKode("");
+                  setFilterNama("");
+                }}
+                className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+              >
+                Reset filter
+              </button>
+            )}
+          </div>
+        </div>
         <table className="min-w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-600">
+          <thead className="bg-slate-50 text-left text-xs">
             <tr>
-              <th className="px-3 py-2">Tipe</th>
-              <th className="px-3 py-2">Kode</th>
-              <th className="px-3 py-2">Nama Supplier</th>
-              {canEdit ? <th className="px-3 py-2 w-40">Aksi</th> : null}
+              <SortableTh label="Tipe" column="tipeSupplier" />
+              <SortableTh label="Kode" column="kode" />
+              <SortableTh label="Nama Supplier" column="namaSupplier" />
+              {canEdit ? <th className="px-3 py-2 w-40 text-xs font-medium uppercase text-slate-600">Aksi</th> : null}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {rows.map((row) => {
+            {displayRows.map((row) => {
               const editing = editRow === row.sheetRow;
               return (
                 <tr key={row.sheetRow}>
@@ -312,6 +474,13 @@ export function SupplierDataMappingPanel({
               <tr>
                 <td colSpan={canEdit ? 4 : 3} className="px-4 py-8 text-center text-slate-500">
                   Belum ada data — upload tanpa mapping tetap jalan (format folder lama).
+                </td>
+              </tr>
+            ) : null}
+            {!loading && rows.length > 0 && displayRows.length === 0 ? (
+              <tr>
+                <td colSpan={canEdit ? 4 : 3} className="px-4 py-8 text-center text-slate-500">
+                  Tidak ada baris yang cocok dengan filter / pencarian.
                 </td>
               </tr>
             ) : null}
