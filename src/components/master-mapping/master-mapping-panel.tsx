@@ -185,7 +185,7 @@ export function MasterMappingPanel({
 
       <section className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
         <h2 className="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-800">
-          Daftar Master Mapping {loading ? "…" : `(${entries.length})`}
+          Daftar Mapping Produk {loading ? "…" : `(${entries.length})`}
         </h2>
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase text-slate-600">

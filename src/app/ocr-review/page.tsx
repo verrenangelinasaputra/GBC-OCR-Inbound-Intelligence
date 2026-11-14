@@ -33,7 +33,7 @@ export default async function OcrReviewPage({
       const gudangFilter = profile?.gudangList.length ? profile.gudangList : undefined;
       docs = await listOcrDocumentsFromSheet(500, gudangFilter);
     } catch {
-      return <SpreadsheetModePage title="Tinjauan Surat Jalan" />;
+      return <SpreadsheetModePage title="Review Surat Jalan" />;
     }
 
     const years = collectDistinctSjYears(docs.map((d) => d.tanggal));
@@ -46,7 +46,7 @@ export default async function OcrReviewPage({
 
     return (
       <ModuleListPage
-        title="Tinjauan Surat Jalan"
+        title="Review Surat Jalan"
         description="Daftar upload supplier — filter sesuai gudang di profil Anda. Buka detail untuk meninjau dan verifikasi."
       >
         <Suspense
@@ -73,7 +73,7 @@ export default async function OcrReviewPage({
     orderBy: { updatedAt: "desc" },
   });
   return (
-    <ModuleListPage title="OCR Review Queue" description="Koreksi hasil OCR — raw output tetap tersimpan terpisah.">
+    <ModuleListPage title="Review Surat Jalan" description="Koreksi hasil OCR — raw output tetap tersimpan terpisah.">
       <ul className="space-y-3">
         {docs.map((d) => {
           const demo = (d.ocrJobs[0]?.structuredOutput as { isDemo?: boolean } | null)?.isDemo;

@@ -16,7 +16,7 @@ export default async function MasterMappingPage({
   const initialOcr = String(query.ocr ?? "").trim();
 
   if (!spreadsheetModeActive()) {
-    return <SpreadsheetModePage title="Master Mapping" />;
+    return <SpreadsheetModePage title="Mapping Produk" />;
   }
 
   const session = await getSession();
@@ -25,9 +25,9 @@ export default async function MasterMappingPage({
     : false;
   if (!canView) {
     return (
-      <ModuleListPage title="Master Mapping" description="Kelola alias SKU untuk nama barang OCR.">
+      <ModuleListPage title="Mapping Produk" description="Kelola alias SKU untuk nama barang OCR.">
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Anda tidak punya akses modul <strong>Master Mapping</strong>. Minta Super Admin mencentang halaman ini di User
+          Anda tidak punya akses modul <strong>Mapping Produk</strong>. Minta Super Admin mencentang halaman ini di User
           &amp; Role Management.
         </p>
       </ModuleListPage>
@@ -40,7 +40,7 @@ export default async function MasterMappingPage({
 
   return (
     <ModuleListPage
-      title="Master Mapping"
+      title="Mapping Produk"
       description="Petakan nama barang dari OCR ke SKU master — dipakai saat tidak ada match otomatis di REKAP SKUL."
     >
       <p className="mb-4 text-sm text-slate-600">
