@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { SkuMasterCodeOption } from "@/lib/sku-master/types";
+import { resolveSub1ForCategoryTab } from "@/lib/sku-master/sub1-for-tab";
 import { SkuMasterListTabs } from "@/components/master-mapping/sku-master-list-tabs";
 
 const SUB_KEYS = ["sub1", "sub2", "sub3", "sub4", "sub5", "sub6", "sub7", "sub8", "sub9"] as const;
@@ -74,6 +75,11 @@ export function SkuMasterProductPanel({ canEdit }: { canEdit: boolean }) {
   useEffect(() => {
     void loadAllCodes();
   }, [loadAllCodes]);
+
+  useEffect(() => {
+    const sub1 = resolveSub1ForCategoryTab(categoryTab, codeOptions[1] ?? []);
+    setSubs((s) => (s.sub1 === sub1 ? s : { ...s, sub1 }));
+  }, [categoryTab, codeOptions]);
 
   const [syncCooldownUntil, setSyncCooldownUntil] = useState(0);
 
@@ -154,7 +160,7 @@ export function SkuMasterProductPanel({ canEdit }: { canEdit: boolean }) {
       setNamaProdukAcuan("");
       setNamaInternalAccurate("");
       setSubs({
-        sub1: "",
+        sub1: resolveSub1ForCategoryTab(categoryTab, codeOptions[1] ?? []),
         sub2: "",
         sub3: "",
         sub4: "",
@@ -252,6 +258,23 @@ export function SkuMasterProductPanel({ canEdit }: { canEdit: boolean }) {
                 const subIndex = idx + 1;
                 const options = codeOptions[subIndex] ?? [];
                 const label = subLabels[idx] ?? `Sub ${subIndex}`;
+                const isSub1 = subIndex === 1;
+                const sub1Value = subs.sub1;
+                const sub1Label =
+                  options.find((o) => o.code === sub1Value)?.label ?? sub1Value ?? categoryTab;
+                if (isSub1) {
+                  return (
+                    <label key={key} className="flex flex-col gap-1">
+                      <span className="text-xs font-medium text-slate-600">
+                        {label}{" "}
+                        <span className="font-normal text-slate-500">(mengikuti tab {categoryTab})</span>
+                      </span>
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-2 text-sm text-slate-800">
+                        {loadingCodes ? "Memuat…" : `${sub1Value || "…"} — ${sub1Label}`}
+                      </div>
+                    </label>
+                  );
+                }
                 return (
                   <label key={key} className="flex flex-col gap-1">
                     <span className="text-xs font-medium text-slate-600">{label}</span>
@@ -330,7 +353,12 @@ export function SkuMasterProductPanel({ canEdit }: { canEdit: boolean }) {
       ) : null}
 
       {generatorTabs.length > 0 ? (
-        <SkuMasterListTabs generatorTabs={generatorTabs} refreshKey={listRefreshKey} />
+        <SkuMasterListTabs
+          generatorTabs={generatorTabs}
+          refreshKey={listRefreshKey}
+          canEdit={canEdit}
+          onRowEdited={() => setListRefreshKey((k) => k + 1)}
+        />
       ) : null}
     </div>
   );

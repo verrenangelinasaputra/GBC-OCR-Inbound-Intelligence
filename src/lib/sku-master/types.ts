@@ -19,6 +19,11 @@ export type SkuMasterProductInput = {
   sub9: string;
 };
 
+export type SkuMasterProductUpdateInput = SkuMasterProductInput & {
+  sheetRow: number;
+  oldSkuLengkap?: string;
+};
+
 export type SkuMasterProductResult = {
   categoryTab: string;
   sheetRow: number;

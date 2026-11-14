@@ -13,10 +13,12 @@ import {
   columnIndexToA1,
 } from "@/lib/sku-master/sheet-layout";
 import { isGeneratorCategoryTab } from "@/lib/sku-master/category-tabs";
+import { resolveSub1ForCategoryTab } from "@/lib/sku-master/sub1-for-tab";
 import type {
   SkuMasterCodeOption,
   SkuMasterProductInput,
   SkuMasterProductResult,
+  SkuMasterProductUpdateInput,
   SkuMasterRekapSkulRow,
   SkuMasterRekapSkusRow,
   SkuMasterTableRow,
@@ -466,10 +468,14 @@ async function createSkuMasterProductInner(
     throw new Error("Nama produk acuan dan nama internal wajib");
   }
 
-  const { sheets, spreadsheetId } = sheetsClient();
-  const sheetGid = await getTabSheetId(sheets, spreadsheetId, input.categoryTab);
+  const codesBySub = await loadSkuMasterCodesForTab(input.categoryTab);
+  const sub1Resolved = input.sub1.trim() || resolveSub1ForCategoryTab(input.categoryTab, codesBySub[1] ?? []);
+  const normalizedInput: SkuMasterProductInput = { ...input, sub1: sub1Resolved };
 
-  const lastRow = await findLastTableDataRow(sheets, spreadsheetId, input.categoryTab);
+  const { sheets, spreadsheetId } = sheetsClient();
+  const sheetGid = await getTabSheetId(sheets, spreadsheetId, normalizedInput.categoryTab);
+
+  const lastRow = await findLastTableDataRow(sheets, spreadsheetId, normalizedInput.categoryTab);
   const newRow = lastRow + 1;
   const templateRowIndex = TABEL_TEMPLATE_DATA_ROW - 1;
 
@@ -500,38 +506,38 @@ async function createSkuMasterProductInner(
     },
   });
 
-  const prevRow = await readTableRow(sheets, spreadsheetId, input.categoryTab, lastRow);
+  const prevRow = await readTableRow(sheets, spreadsheetId, normalizedInput.categoryTab, lastRow);
   const prevNo = Number(String(prevRow[0] ?? "0").replace(/\D/g, "")) || 0;
   const nextNo = String(prevNo + 1 || newRow - TABEL_FIRST_DATA_ROW + 1);
 
   const subs = [
-    input.sub1,
-    input.sub2,
-    input.sub3,
-    input.sub4,
-    input.sub5,
-    input.sub6,
-    input.sub7,
-    input.sub8,
-    input.sub9,
+    normalizedInput.sub1,
+    normalizedInput.sub2,
+    normalizedInput.sub3,
+    normalizedInput.sub4,
+    normalizedInput.sub5,
+    normalizedInput.sub6,
+    normalizedInput.sub7,
+    normalizedInput.sub8,
+    normalizedInput.sub9,
   ].map((s) => String(s ?? "").trim());
 
   const valuesRow: string[] = [];
   valuesRow[0] = nextNo;
-  valuesRow[1] = input.namaProdukAcuan.trim();
-  valuesRow[2] = input.namaInternalAccurate.trim();
+  valuesRow[1] = normalizedInput.namaProdukAcuan.trim();
+  valuesRow[2] = normalizedInput.namaInternalAccurate.trim();
   for (let i = 0; i < 9; i += 1) valuesRow[3 + i] = subs[i] ?? "";
 
   const start = columnIndexToA1(COL.TABEL_NO, newRow);
   const end = columnIndexToA1(COL.TABEL_SUB9, newRow);
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `${quoteTab(input.categoryTab)}!${start}:${end}`,
+    range: `${quoteTab(normalizedInput.categoryTab)}!${start}:${end}`,
     valueInputOption: "USER_ENTERED",
     requestBody: { values: [valuesRow] },
   });
 
-  const filled = await readTableRow(sheets, spreadsheetId, input.categoryTab, newRow);
+  const filled = await readTableRow(sheets, spreadsheetId, normalizedInput.categoryTab, newRow);
   const skuLengkap = String(filled[COL.TABEL_SKU_LENGKAP - COL.TABEL_NO] ?? "").trim();
   const barcode = String(filled[COL.TABEL_BARCODE - COL.TABEL_NO] ?? "").trim();
   const barcodeDisplay = String(filled[COL.TABEL_BARCODE_DISPLAY - COL.TABEL_NO] ?? "").trim();
@@ -543,42 +549,230 @@ async function createSkuMasterProductInner(
     );
   }
 
-  const kategoriUtama = subs[0] || input.categoryTab;
+  const kategoriUtama = subs[0] || normalizedInput.categoryTab;
 
   const rekap = await appendRekapSkulRow(sheets, spreadsheetId, {
     skuLengkap,
-    namaInternalAccurate: input.namaInternalAccurate.trim(),
-    namaProdukAcuan: input.namaProdukAcuan.trim(),
+    namaInternalAccurate: normalizedInput.namaInternalAccurate.trim(),
+    namaProdukAcuan: normalizedInput.namaProdukAcuan.trim(),
     kategoriUtama,
     skus,
     barcode,
-    sumberLembar: input.categoryTab,
+    sumberLembar: normalizedInput.categoryTab,
   });
 
   const rekapSkusUpdated = await upsertRekapSkusFamily(
     sheets,
     spreadsheetId,
     skus,
-    input.namaInternalAccurate.trim(),
-    input.categoryTab
+    normalizedInput.namaInternalAccurate.trim(),
+    normalizedInput.categoryTab
   );
 
   invalidateSkuRekapCatalogCache();
-  invalidateSkuMasterListCaches(input.categoryTab);
+  invalidateSkuMasterListCaches(normalizedInput.categoryTab);
 
   return {
-    categoryTab: input.categoryTab,
+    categoryTab: normalizedInput.categoryTab,
     sheetRow: newRow,
     rowNo: rekap.rowNo,
     skuLengkap,
     skus,
     barcode,
     barcodeDisplay,
-    namaProdukAcuan: input.namaProdukAcuan.trim(),
-    namaInternalAccurate: input.namaInternalAccurate.trim(),
+    namaProdukAcuan: normalizedInput.namaProdukAcuan.trim(),
+    namaInternalAccurate: normalizedInput.namaInternalAccurate.trim(),
     kategoriUtama,
     rekapSkulRow: rekap.sheetRow,
     rekapSkusUpdated,
+  };
+}
+
+async function syncRekapSkulAfterTableEdit(
+  sheets: ReturnType<typeof google.sheets>,
+  spreadsheetId: string,
+  lookup: {
+    oldSkuLengkap: string;
+    namaProdukAcuan: string;
+    sourceTab: string;
+  },
+  line: {
+    skuLengkap: string;
+    namaInternalAccurate: string;
+    namaProdukAcuan: string;
+    kategoriUtama: string;
+    skus: string;
+    barcode: string;
+  }
+): Promise<void> {
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${quoteTab(REKAP_SKUL_TAB)}!A:H`,
+  });
+  const rows = res.data.values ?? [];
+  let targetRow = 0;
+  const oldSku = lookup.oldSkuLengkap.trim();
+
+  for (let i = 1; i < rows.length; i += 1) {
+    const row = rows[i] ?? [];
+    const sku = String(row[1] ?? "").trim();
+    const nama = String(row[3] ?? "").trim();
+    const sumber = String(row[7] ?? "").trim();
+    if (oldSku && sku === oldSku) {
+      targetRow = i + 1;
+      break;
+    }
+    if (!targetRow && nama === lookup.namaProdukAcuan.trim() && sumber === lookup.sourceTab) {
+      targetRow = i + 1;
+    }
+  }
+
+  const values = [
+    line.skuLengkap,
+    line.namaInternalAccurate,
+    line.namaProdukAcuan,
+    line.kategoriUtama,
+    line.skus,
+    line.barcode,
+    lookup.sourceTab,
+  ];
+
+  if (targetRow > 0) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${quoteTab(REKAP_SKUL_TAB)}!B${targetRow}:H${targetRow}`,
+      valueInputOption: "RAW",
+      requestBody: { values: [values] },
+    });
+    return;
+  }
+
+  await appendRekapSkulRow(sheets, spreadsheetId, {
+    skuLengkap: line.skuLengkap,
+    namaInternalAccurate: line.namaInternalAccurate,
+    namaProdukAcuan: line.namaProdukAcuan,
+    kategoriUtama: line.kategoriUtama,
+    skus: line.skus,
+    barcode: line.barcode,
+    sumberLembar: lookup.sourceTab,
+  });
+}
+
+export async function updateSkuMasterProduct(
+  input: SkuMasterProductUpdateInput
+): Promise<SkuMasterProductResult> {
+  try {
+    return await updateSkuMasterProductInner(input);
+  } catch (e) {
+    throw mapSheetApiError(e);
+  }
+}
+
+async function updateSkuMasterProductInner(
+  input: SkuMasterProductUpdateInput
+): Promise<SkuMasterProductResult> {
+  if (!isGeneratorCategoryTab(input.categoryTab)) {
+    throw new Error(`Kategori tidak valid: ${input.categoryTab}`);
+  }
+  if (input.sheetRow < TABEL_FIRST_DATA_ROW) {
+    throw new Error("Baris sheet tidak valid");
+  }
+  if (!input.namaProdukAcuan.trim() || !input.namaInternalAccurate.trim()) {
+    throw new Error("Nama produk acuan dan nama internal wajib");
+  }
+
+  const codesBySub = await loadSkuMasterCodesForTab(input.categoryTab);
+  const sub1Resolved = input.sub1.trim() || resolveSub1ForCategoryTab(input.categoryTab, codesBySub[1] ?? []);
+  const normalizedInput: SkuMasterProductUpdateInput = { ...input, sub1: sub1Resolved };
+
+  const { sheets, spreadsheetId } = sheetsClient();
+  const existing = await readTableRow(
+    sheets,
+    spreadsheetId,
+    normalizedInput.categoryTab,
+    normalizedInput.sheetRow
+  );
+  const oldSku =
+    normalizedInput.oldSkuLengkap?.trim() ||
+    String(existing[COL.TABEL_SKU_LENGKAP - COL.TABEL_NO] ?? "").trim();
+
+  const subs = [
+    normalizedInput.sub1,
+    normalizedInput.sub2,
+    normalizedInput.sub3,
+    normalizedInput.sub4,
+    normalizedInput.sub5,
+    normalizedInput.sub6,
+    normalizedInput.sub7,
+    normalizedInput.sub8,
+    normalizedInput.sub9,
+  ].map((s) => String(s ?? "").trim());
+
+  const valuesRow: string[] = [];
+  valuesRow[0] = String(existing[0] ?? normalizedInput.sheetRow - TABEL_FIRST_DATA_ROW + 1);
+  valuesRow[1] = normalizedInput.namaProdukAcuan.trim();
+  valuesRow[2] = normalizedInput.namaInternalAccurate.trim();
+  for (let i = 0; i < 9; i += 1) valuesRow[3 + i] = subs[i] ?? "";
+
+  const start = columnIndexToA1(COL.TABEL_NO, normalizedInput.sheetRow);
+  const end = columnIndexToA1(COL.TABEL_SUB9, normalizedInput.sheetRow);
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${quoteTab(normalizedInput.categoryTab)}!${start}:${end}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [valuesRow] },
+  });
+
+  const filled = await readTableRow(
+    sheets,
+    spreadsheetId,
+    normalizedInput.categoryTab,
+    normalizedInput.sheetRow
+  );
+  const skuLengkap = String(filled[COL.TABEL_SKU_LENGKAP - COL.TABEL_NO] ?? "").trim();
+  const barcode = String(filled[COL.TABEL_BARCODE - COL.TABEL_NO] ?? "").trim();
+  const barcodeDisplay = String(filled[COL.TABEL_BARCODE_DISPLAY - COL.TABEL_NO] ?? "").trim();
+  const skus = String(filled[COL.TABEL_SKUS - COL.TABEL_NO] ?? "").trim();
+
+  if (!skuLengkap) {
+    throw new Error("SKU tidak ter-generate setelah edit. Periksa Sub 1–9.");
+  }
+
+  const kategoriUtama = subs[0] || normalizedInput.categoryTab;
+
+  await syncRekapSkulAfterTableEdit(
+    sheets,
+    spreadsheetId,
+    {
+      oldSkuLengkap: oldSku,
+      namaProdukAcuan: normalizedInput.namaProdukAcuan.trim(),
+      sourceTab: normalizedInput.categoryTab,
+    },
+    {
+      skuLengkap,
+      namaInternalAccurate: normalizedInput.namaInternalAccurate.trim(),
+      namaProdukAcuan: normalizedInput.namaProdukAcuan.trim(),
+      kategoriUtama,
+      skus,
+      barcode,
+    }
+  );
+
+  invalidateSkuRekapCatalogCache();
+  invalidateSkuMasterListCaches(normalizedInput.categoryTab);
+
+  return {
+    categoryTab: normalizedInput.categoryTab,
+    sheetRow: normalizedInput.sheetRow,
+    rowNo: valuesRow[0] ?? "",
+    skuLengkap,
+    skus,
+    barcode,
+    barcodeDisplay,
+    namaProdukAcuan: normalizedInput.namaProdukAcuan.trim(),
+    namaInternalAccurate: normalizedInput.namaInternalAccurate.trim(),
+    kategoriUtama,
+    rekapSkusUpdated: false,
   };
 }
 

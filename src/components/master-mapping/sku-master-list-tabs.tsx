@@ -6,16 +6,21 @@ import type {
   SkuMasterRekapSkusRow,
   SkuMasterTableRow,
 } from "@/lib/sku-master/types";
+import { SKU_SUB_SHORT_LABELS } from "@/lib/sku-master/sub-labels";
+import { SkuMasterRowEditDialog } from "@/components/master-mapping/sku-master-row-edit-dialog";
 
 type ListTabId = string;
 
 export function SkuMasterListTabs({
   generatorTabs,
   refreshKey = 0,
+  canEdit = false,
+  onRowEdited,
 }: {
   generatorTabs: string[];
-  /** Naikkan setelah sync / simpan produk agar tab aktif dimuat ulang */
   refreshKey?: number;
+  canEdit?: boolean;
+  onRowEdited?: () => void;
 }) {
   const listTabs = useMemo(
     (): ListTabId[] => [...generatorTabs, "REKAP SKUL", "REKAP SKUS"],
@@ -27,6 +32,7 @@ export function SkuMasterListTabs({
   const [tableRows, setTableRows] = useState<SkuMasterTableRow[]>([]);
   const [rekapSkulRows, setRekapSkulRows] = useState<SkuMasterRekapSkulRow[]>([]);
   const [rekapSkusRows, setRekapSkusRows] = useState<SkuMasterRekapSkusRow[]>([]);
+  const [editRow, setEditRow] = useState<SkuMasterTableRow | null>(null);
 
   useEffect(() => {
     if (!active && listTabs.length > 0) setActive(listTabs[0]!);
@@ -46,6 +52,7 @@ export function SkuMasterListTabs({
       } else {
         url = `/api/sku-master/list?view=table&tab=${encodeURIComponent(active)}${refresh}`;
       }
+
       const res = await fetch(url);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Gagal memuat daftar");
@@ -104,14 +111,37 @@ export function SkuMasterListTabs({
         ) : active === "REKAP SKUS" ? (
           <RekapSkusTable rows={rekapSkusRows} />
         ) : (
-          <CategoryTable rows={tableRows} />
+          <CategoryTable rows={tableRows} canEdit={canEdit} onEdit={setEditRow} />
         )}
       </div>
+
+      {editRow ? (
+        <SkuMasterRowEditDialog
+          row={editRow}
+          onClose={() => setEditRow(null)}
+          onSaved={() => {
+            void loadActive(true);
+            onRowEdited?.();
+          }}
+        />
+      ) : null}
     </section>
   );
 }
 
-function CategoryTable({ rows }: { rows: SkuMasterTableRow[] }) {
+function SubCell({ value }: { value: string }) {
+  return <td className="whitespace-nowrap px-1.5 py-2 font-mono text-[10px]">{value || "—"}</td>;
+}
+
+function CategoryTable({
+  rows,
+  canEdit,
+  onEdit,
+}: {
+  rows: SkuMasterTableRow[];
+  canEdit: boolean;
+  onEdit: (row: SkuMasterTableRow) => void;
+}) {
   if (rows.length === 0) {
     return (
       <p className="px-4 py-8 text-center text-sm text-slate-500">
@@ -120,14 +150,18 @@ function CategoryTable({ rows }: { rows: SkuMasterTableRow[] }) {
     );
   }
   return (
-    <table className="min-w-[960px] w-full text-left text-xs">
+    <table className="min-w-[1400px] w-full text-left text-xs">
       <thead className="bg-slate-50 text-slate-600">
         <tr>
+          <th className="sticky left-0 z-10 bg-slate-50 px-2 py-2">Aksi</th>
           <th className="px-2 py-2">No</th>
-          <th className="px-2 py-2">Nama produk acuan</th>
-          <th className="px-2 py-2">Internal Accurate</th>
-          <th className="px-2 py-2">Sub 1–6</th>
-          <th className="px-2 py-2">Sub 7–9</th>
+          <th className="min-w-[140px] px-2 py-2">Nama produk acuan</th>
+          <th className="min-w-[120px] px-2 py-2">Internal</th>
+          {SKU_SUB_SHORT_LABELS.map((h) => (
+            <th key={h} className="px-1.5 py-2 font-mono text-[10px]">
+              {h}
+            </th>
+          ))}
           <th className="px-2 py-2">SKU lengkap</th>
           <th className="px-2 py-2">SKUS</th>
         </tr>
@@ -135,17 +169,33 @@ function CategoryTable({ rows }: { rows: SkuMasterTableRow[] }) {
       <tbody className="divide-y divide-slate-100">
         {rows.map((r) => (
           <tr key={`${r.categoryTab}-${r.sheetRow}`} className="text-slate-800">
+            <td className="sticky left-0 z-10 bg-white px-2 py-2">
+              {canEdit ? (
+                <button
+                  type="button"
+                  onClick={() => onEdit(r)}
+                  className="rounded border border-slate-200 px-2 py-1 text-[11px] font-medium text-blue-700 hover:bg-blue-50"
+                >
+                  Edit
+                </button>
+              ) : (
+                <span className="text-slate-400">—</span>
+              )}
+            </td>
             <td className="px-2 py-2">{r.no || r.sheetRow}</td>
-            <td className="max-w-[200px] px-2 py-2 font-medium">{r.namaProdukAcuan}</td>
-            <td className="max-w-[180px] px-2 py-2">{r.namaInternalAccurate}</td>
-            <td className="px-2 py-2 font-mono text-[10px]">
-              {[r.sub1, r.sub2, r.sub3, r.sub4, r.sub5, r.sub6].filter(Boolean).join(" · ") || "—"}
-            </td>
-            <td className="px-2 py-2 font-mono text-[10px]">
-              {[r.sub7, r.sub8, r.sub9].filter(Boolean).join(" · ") || "—"}
-            </td>
-            <td className="px-2 py-2 font-mono">{r.skuLengkap || "—"}</td>
-            <td className="px-2 py-2 font-mono">{r.skus || "—"}</td>
+            <td className="px-2 py-2 font-medium">{r.namaProdukAcuan}</td>
+            <td className="px-2 py-2">{r.namaInternalAccurate}</td>
+            <SubCell value={r.sub1} />
+            <SubCell value={r.sub2} />
+            <SubCell value={r.sub3} />
+            <SubCell value={r.sub4} />
+            <SubCell value={r.sub5} />
+            <SubCell value={r.sub6} />
+            <SubCell value={r.sub7} />
+            <SubCell value={r.sub8} />
+            <SubCell value={r.sub9} />
+            <td className="px-2 py-2 font-mono text-[10px]">{r.skuLengkap || "—"}</td>
+            <td className="px-2 py-2 font-mono text-[10px]">{r.skus || "—"}</td>
           </tr>
         ))}
       </tbody>
