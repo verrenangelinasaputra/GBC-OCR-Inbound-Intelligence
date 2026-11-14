@@ -16,6 +16,7 @@ import {
 } from "@/lib/providers/google-workspace";
 import { resolveSupplierUploadMapping } from "@/lib/services/supplier-upload-mapping";
 import { notifySupplierUploadTelegram } from "@/lib/services/supplier-upload-telegram-notify";
+import { formatTelegramBarangLines } from "@/lib/services/telegram-upload-message";
 
 export type SheetOnlyUploadResult = {
   submissionRef: string;
@@ -223,14 +224,16 @@ export async function processSheetOnlyUpload(params: {
   };
 
   if (gudangLabel) {
-    void notifySupplierUploadTelegram({
-      gudang: gudangLabel,
-      supplierName: supplierName || params.supplierName?.trim() || "Unverified",
-      fileName: params.file.name,
-      result: uploadResult,
-    }).catch((err) => {
+    try {
+      await notifySupplierUploadTelegram({
+        gudang: gudangLabel,
+        supplierName: supplierName || params.supplierName?.trim() || "Unverified",
+        result: uploadResult,
+        barangLines: formatTelegramBarangLines(payload),
+      });
+    } catch (err) {
       console.error("[telegram] notifySupplierUploadTelegram", err);
-    });
+    }
   }
 
   return uploadResult;
