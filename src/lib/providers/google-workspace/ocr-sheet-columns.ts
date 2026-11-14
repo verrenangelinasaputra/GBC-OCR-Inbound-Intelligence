@@ -64,8 +64,6 @@ export function ocrSheetFullColumnsRange(sheetTab: string): string {
   return `'${sheetTab.replace(/'/g, "''")}'!A:${OCR_SHEET_RANGE_COL}`;
 }
 
-const DATE_CELL = /^\d{1,2}\/\d{1,2}\/\d{4}$/;
-
 function rowHasGudangPrefix(row: string[]): boolean {
   return /^gudang\b/i.test(String(row[0] ?? "").trim());
 }
