@@ -31,6 +31,19 @@ describe("buildSuratJalanFileName", () => {
     ).toBe("SJ_20261109_PT Maju Jaya_SJ00123_Gudang Karanggan.jpg");
   });
 
+  it("includes supplier code when mapped", () => {
+    expect(
+      buildSuratJalanFileName({
+        tanggal: "09/11/2026",
+        noSuratJalan: "SJ00123",
+        ext: ".jpg",
+        supplierName: "Testing",
+        supplierCode: "SS",
+        gudang: "Gudang Karanggan",
+      })
+    ).toBe("SJ_20261109_SS_Testing_SJ00123_Gudang Karanggan.jpg");
+  });
+
   it("appends batch index when multiple images in one submit", () => {
     expect(
       buildSuratJalanFileName({

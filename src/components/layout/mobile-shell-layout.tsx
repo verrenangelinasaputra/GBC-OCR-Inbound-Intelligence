@@ -49,7 +49,8 @@ export function MobileShellLayout({
 
       <div
         className={clsx(
-          "fixed inset-y-0 left-0 z-40 max-w-[min(100vw,20rem)] lg:static lg:z-auto lg:max-w-none lg:shrink-0",
+          "fixed inset-y-0 left-0 z-40 h-svh max-w-[min(100vw,20rem)] shrink-0",
+          "lg:inset-auto lg:sticky lg:top-0 lg:z-auto lg:h-svh lg:max-w-none lg:self-start",
           "transition-transform duration-200 ease-out lg:translate-x-0",
           navOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}

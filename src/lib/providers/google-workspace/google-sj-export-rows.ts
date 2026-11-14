@@ -121,6 +121,8 @@ export function buildSuratJalanFileName(params: {
   noSuratJalan: string;
   ext: string;
   supplierName?: string;
+  /** Kode dari Master Data Supplier (mis. SS) — optional, fallback tanpa segmen ini. */
+  supplierCode?: string;
   gudang?: string;
   /** Urutan gambar dalam satu submit (1-based). Dipakai bila `batchTotal` > 1. */
   batchIndex?: number;
@@ -137,7 +139,10 @@ export function buildSuratJalanFileName(params: {
     const datePart = tanggalToYyyyMmDd(params.tanggal) || "unknown";
     const supplier = sanitizeDriveFileSegment(params.supplierName);
     const gudang = sanitizeDriveFileSegment(params.gudang);
-    return `SJ_${datePart}_${supplier}_${noSj}_${gudang}${batchSuffix}${ext}`;
+    const codePart = params.supplierCode?.trim()
+      ? `${sanitizeSuratJalanToken(params.supplierCode)}_`
+      : "";
+    return `SJ_${datePart}_${codePart}${supplier}_${noSj}_${gudang}${batchSuffix}${ext}`;
   }
 
   const datePart = formatDateDdMmYyyy(params.tanggal).replace(/\//g, "-") || "unknown-date";

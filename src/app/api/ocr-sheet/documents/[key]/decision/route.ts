@@ -17,6 +17,7 @@ import {
 import { setOcrDocumentReviewStatus } from "@/lib/services/ocr-sheet-review";
 import { appendRevisionLink, parseRevisionLinks, revisionLinkCount } from "@/lib/surat-jalan/revision-links";
 import { mirrorRevisionToSupplierDrive } from "@/lib/surat-jalan/mirror-revision-drive";
+import { resolveSupplierUploadMapping } from "@/lib/services/supplier-upload-mapping";
 import { renderSuratJalanRevisionPng, revisionFileName } from "@/lib/surat-jalan/revision-image";
 
 function sheetReviewEnabled(): boolean {
@@ -57,10 +58,12 @@ export async function POST(request: Request, context: { params: Promise<{ key: s
     const nextSeq = revisionLinkCount(docBefore.linkRevisi) + 1;
     const png = await renderSuratJalanRevisionPng(docBefore, nextSeq);
     const fileName = revisionFileName(docBefore.fileName || `SuratJalan_${docBefore.noSuratJalan}.png`, nextSeq);
+    const supplierName = docBefore.supplier?.trim() || "";
+    const supplierMapping = await resolveSupplierUploadMapping({ supplierName });
     const subfolder = buildSuratJalanDriveSubfolderName({
       tanggal: docBefore.tanggal,
       noSuratJalan: docBefore.noSuratJalan,
-      supplierName: docBefore.supplier || "Supplier",
+      supplierName: supplierName || "Supplier",
     });
 
     const uploaded = await uploadSuratJalanToGudangDrive({
@@ -70,6 +73,7 @@ export async function POST(request: Request, context: { params: Promise<{ key: s
       mimeType: "image/png",
       gudang: docBefore.gudang,
       subfolderName: subfolder,
+      supplierFolderName: supplierMapping?.supplierFolderName,
     });
 
     let supplierMirrorWarning: string | undefined;

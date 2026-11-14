@@ -10,6 +10,7 @@ import {
   Link2,
   Package,
   Tags,
+  Truck,
   Users,
   ChevronLeft,
   ChevronRight,
@@ -24,6 +25,7 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   "/ocr-review": ScanLine,
   "/sku-mapping": Link2,
   "/master-mapping": Tags,
+  "/supplier-data-mapping": Truck,
   "/data-barang-masuk": Package,
   "/users": Users,
 };
@@ -73,7 +75,7 @@ export function AppSidebar({
   return (
     <aside
       className={clsx(
-        "flex h-full min-h-screen max-h-screen w-full flex-col overflow-hidden border-r border-slate-200 bg-slate-950 text-slate-100 transition-[width]",
+        "flex h-full min-h-0 w-full flex-col overflow-hidden border-r border-slate-200 bg-slate-950 text-slate-100 transition-[width]",
         collapsed ? "w-[72px] max-w-[72px]" : "w-64 max-w-[16rem]"
       )}
     >

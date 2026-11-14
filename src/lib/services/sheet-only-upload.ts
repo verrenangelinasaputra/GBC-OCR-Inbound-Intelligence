@@ -14,6 +14,7 @@ import {
   uploadFileToDrive,
   uploadSuratJalanToGudangDrive,
 } from "@/lib/providers/google-workspace";
+import { resolveSupplierUploadMapping } from "@/lib/services/supplier-upload-mapping";
 
 export type SheetOnlyUploadResult = {
   submissionRef: string;
@@ -83,11 +84,16 @@ export async function processSheetOnlyUpload(params: {
   const ext = params.file.name.match(/\.[a-z0-9]+$/i)?.[0] || ".jpeg";
   const gudangLabel = params.gudang?.trim() ?? "";
   const supplierName = params.supplierName?.trim() ?? "";
+  const supplierMapping = await resolveSupplierUploadMapping({
+    supplierName,
+    supplierUsername: params.supplierUsername,
+  });
   const fileName = buildSuratJalanFileName({
     tanggal: tanggalForName,
     noSuratJalan: noSj,
     ext,
     supplierName: supplierName || undefined,
+    supplierCode: supplierMapping?.kode,
     gudang: gudangLabel || undefined,
     batchIndex: params.batchIndex,
     batchTotal: params.batchTotal,
@@ -120,6 +126,7 @@ export async function processSheetOnlyUpload(params: {
             mimeType: params.file.mimeType || "image/jpeg",
             gudang: gudangLabel,
             subfolderName: driveSubfolder,
+            supplierFolderName: supplierMapping?.supplierFolderName,
           })
         : await uploadFileToDrive({
             config,
@@ -128,6 +135,12 @@ export async function processSheetOnlyUpload(params: {
             mimeType: params.file.mimeType || "image/jpeg",
           });
     fileUrl = uploaded.fileUrl;
+
+    if (!supplierMapping && supplierName) {
+      const mappingHint =
+        "Master supplier: nama upload belum cocok dengan sheet Mapping Data Supplier — folder/file tanpa kode (format lama).";
+      driveWarning = driveWarning ? `${driveWarning} | ${mappingHint}` : mappingHint;
+    }
 
     const mirrorUser = params.supplierUsername?.trim().toLowerCase();
     if (
@@ -147,6 +160,7 @@ export async function processSheetOnlyUpload(params: {
             mimeType: params.file.mimeType || "image/jpeg",
             gudang: gudangLabel,
             subfolderName: driveSubfolder,
+            supplierFolderName: supplierMapping?.supplierFolderName,
           });
         }
       } catch (mirrorErr) {

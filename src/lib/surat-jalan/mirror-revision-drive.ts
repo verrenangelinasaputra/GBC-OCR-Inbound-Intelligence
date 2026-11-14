@@ -1,5 +1,6 @@
 import type { GoogleExportConfig } from "@/lib/providers/google-workspace/config";
 import { buildSuratJalanDriveSubfolderName, uploadSuratJalanToGudangDrive } from "@/lib/providers/google-workspace";
+import { resolveSupplierUploadMapping } from "@/lib/services/supplier-upload-mapping";
 import { isSupplierMasterUsername } from "@/lib/supplier-auth/master-admin";
 import { resolveSupplierUsername } from "@/lib/supplier-auth/resolve-username";
 import { getSupplierDriveSettings } from "@/lib/supplier-auth/supplier-drive-settings";
@@ -17,10 +18,12 @@ export async function mirrorRevisionToSupplierDrive(params: {
   const settings = await getSupplierDriveSettings(user);
   if (!settings?.mirrorEnabled || !settings.driveRootFolderId) return undefined;
 
+  const supplierName = params.doc.supplier?.trim() || "";
+  const supplierMapping = await resolveSupplierUploadMapping({ supplierName });
   const subfolder = buildSuratJalanDriveSubfolderName({
     tanggal: params.doc.tanggal,
     noSuratJalan: params.doc.noSuratJalan,
-    supplierName: params.doc.supplier || "Supplier",
+    supplierName: supplierName || "Supplier",
   });
 
   await uploadSuratJalanToGudangDrive({
@@ -31,6 +34,7 @@ export async function mirrorRevisionToSupplierDrive(params: {
     mimeType: "image/png",
     gudang: params.doc.gudang,
     subfolderName: subfolder,
+    supplierFolderName: supplierMapping?.supplierFolderName,
   });
   return user;
 }

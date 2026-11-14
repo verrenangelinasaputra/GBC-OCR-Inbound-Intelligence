@@ -117,6 +117,7 @@ Lihat [.env.example](./.env.example).
 7. Setelah upload supplier + OCR Gemini: **baris per item** di sheet + **foto** di Drive dengan struktur:
    - `[GOOGLE_DRIVE_FOLDER_ID]/Gudang <nama>/YYYY-MM-DD - <No SJ> - <Nama Supplier>/`
    - File: `SJ_YYYYMMDD_<Nama Supplier>_<No SJ>_<Nama Gudang>.jpg` — upload banyak file: sufiks ` (2)`, ` (3)`, … sebelum ekstensi.
+   - **Mapping Data Supplier** (sidebar): bila nama upload cocok alias di sheet **[OCR] Master Data Supplier** (`SUPPLIER_MASTER_DATA_SHEET_ID`), struktur menjadi `Gudang/<Kode - Nama kanonik>/YYYY-MM-DD - NoSJ - nama/` dan file `SJ_YYYYMMDD_<kode>_<nama upload>_...`. Banyak baris dengan **kode sama** = alias (Opsi A). Tanpa match → format lama tetap dipakai.
 
 **Kalau upload sukses tapi sheet target kosong:** cek env `GOOGLE_SHEET_ID` di Vercel — jika masih ID lama `1XDSWH-...`, data masuk spreadsheet **salah**. Gunakan `1o2No4lV_...` atau hapus variable itu (default kode + deploy terbaru mengabaikan ID legacy). Setelah submit, portal supplier menampilkan link **Buka spreadsheet hasil OCR**.
 

@@ -25,7 +25,7 @@ export function SupplierSidebar({ isMasterAdmin = false }: { isMasterAdmin?: boo
   return (
     <aside
       className={clsx(
-        "flex h-full min-h-screen max-h-screen w-full flex-col overflow-hidden border-r border-slate-200 bg-white transition-[width] print:hidden",
+        "flex h-full min-h-0 w-full flex-col overflow-hidden border-r border-slate-200 bg-white transition-[width] print:hidden",
         collapsed ? "w-[72px] max-w-[72px]" : "w-60 max-w-[15rem]"
       )}
     >

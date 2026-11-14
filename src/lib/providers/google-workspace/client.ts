@@ -379,6 +379,8 @@ export async function uploadSuratJalanToGudangDrive(params: {
   mimeType: string;
   gudang: string;
   subfolderName: string;
+  /** Folder `KODE - Nama` di dalam gudang (opsional). */
+  supplierFolderName?: string;
   /** Root folder (GBC atau folder supplier) — default `config.driveFolderId`. */
   rootFolderId?: string;
 }): Promise<{ fileId: string; fileUrl: string }> {
@@ -388,9 +390,18 @@ export async function uploadSuratJalanToGudangDrive(params: {
     parentId: rootId,
     folderName: params.gudang.trim(),
   });
+  let parentForSj = gudangFolderId;
+  const supplierFolder = params.supplierFolderName?.trim();
+  if (supplierFolder) {
+    parentForSj = await findOrCreateDriveFolder({
+      config: params.config,
+      parentId: gudangFolderId,
+      folderName: supplierFolder,
+    });
+  }
   const batchFolderId = await findOrCreateDriveFolder({
     config: params.config,
-    parentId: gudangFolderId,
+    parentId: parentForSj,
     folderName: params.subfolderName.trim(),
   });
   return uploadFileToDrive({

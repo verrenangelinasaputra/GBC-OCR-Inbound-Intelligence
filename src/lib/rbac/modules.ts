@@ -5,6 +5,7 @@ export const MODULES = [
   "ocr_review",
   "sku_mapping",
   "master_mapping",
+  "supplier_data_mapping",
   "data_barang_masuk",
   "purchase_orders",
   "goods_receiving",
