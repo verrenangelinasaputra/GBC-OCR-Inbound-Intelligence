@@ -17,6 +17,7 @@ export default async function SupplierPortalLayout({ children }: { children: Rea
     <MobileShellLayout
       title={title}
       subtitle="GBC Inbound Intelligence · Portal Surat Jalan"
+      desktopMainInsetClass="lg:pl-60"
       sidebar={<SupplierSidebar isMasterAdmin={isMasterAdmin} />}
     >
       {children}

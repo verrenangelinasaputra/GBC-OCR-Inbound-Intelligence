@@ -5,6 +5,7 @@ import { Menu } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 
+/** Satu-satunya shell navigasi — internal & supplier; sidebar desktop fixed + inset konten. */
 export function MobileShellLayout({
   sidebar,
   title,
@@ -12,6 +13,8 @@ export function MobileShellLayout({
   headerEnd,
   children,
   headerClassName = "border-b border-slate-200 bg-white",
+  /** Padding kiri konten di desktop — sesuaikan lebar sidebar (internal 16rem, supplier 15rem). */
+  desktopMainInsetClass = "lg:pl-64",
 }: {
   sidebar: ReactNode;
   title: string;
@@ -19,6 +22,7 @@ export function MobileShellLayout({
   headerEnd?: ReactNode;
   children: ReactNode;
   headerClassName?: string;
+  desktopMainInsetClass?: string;
 }) {
   const pathname = usePathname();
   const [navOpen, setNavOpen] = useState(false);
@@ -50,7 +54,7 @@ export function MobileShellLayout({
       <div
         className={clsx(
           "fixed inset-y-0 left-0 z-40 flex h-svh max-w-[min(100vw,20rem)] shrink-0 flex-col",
-          "lg:relative lg:sticky lg:top-0 lg:z-auto lg:max-w-none",
+          "lg:z-30 lg:max-w-none",
           "transition-transform duration-200 ease-out lg:translate-x-0",
           navOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
@@ -58,7 +62,7 @@ export function MobileShellLayout({
         {sidebar}
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className={clsx("flex min-w-0 flex-1 flex-col", desktopMainInsetClass)}>
         <header
           className={clsx(
             "sticky top-0 z-20 px-4 py-3 shadow-sm sm:px-6 sm:py-4",

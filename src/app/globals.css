@@ -13,13 +13,14 @@
 }
 
 html {
-  overflow-x: hidden;
+  /* clip — hindari overflow-x:hidden yang sering mematikan position:sticky di body */
+  overflow-x: clip;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
-  overflow-x: hidden;
+  overflow-x: clip;
   max-width: 100%;
 }
