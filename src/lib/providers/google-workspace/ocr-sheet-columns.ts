@@ -53,7 +53,19 @@ function v3Col(row: string[], col: number): number {
 
 export const OCR_SHEET_COLUMN_COUNT = OCR_SHEET_HEADERS.length;
 
-export const OCR_SHEET_RANGE_COL = "AA";
+/** Huruf kolom terakhir (mis. 28 kolom → AB). */
+export function ocrSheetLastColumnA1(columnCount = OCR_SHEET_COLUMN_COUNT): string {
+  let n = columnCount;
+  let letters = "";
+  while (n > 0) {
+    const rem = (n - 1) % 26;
+    letters = String.fromCharCode(65 + rem) + letters;
+    n = Math.floor((n - 1) / 26);
+  }
+  return letters;
+}
+
+export const OCR_SHEET_RANGE_COL = ocrSheetLastColumnA1();
 
 export function ocrSheetRowRange(sheetTab: string, startRow: number, endRow?: number): string {
   const end = endRow ?? startRow;
