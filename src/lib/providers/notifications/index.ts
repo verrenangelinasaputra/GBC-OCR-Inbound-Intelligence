@@ -29,19 +29,18 @@ class InAppNotificationProvider implements NotificationProvider {
 }
 
 class TelegramNotificationProvider implements NotificationProvider {
-  async send() {
-    const token = process.env.TELEGRAM_BOT_TOKEN;
-    const chatId = process.env.TELEGRAM_CHAT_ID;
-    if (!token || !chatId) return false;
-    // Placeholder: integrasi nyata memerlukan verifikasi API
-    return false;
+  async send(params: { title: string; body: string; link?: string }) {
+    const { sendTelegramMessage } = await import("@/lib/providers/notifications/telegram-api");
+    const chatId = process.env.TELEGRAM_CHAT_ID?.trim();
+    if (!chatId) return false;
+    const text = params.link ? `${params.title}\n\n${params.body}\n\n${params.link}` : `${params.title}\n\n${params.body}`;
+    const result = await sendTelegramMessage({ chatId, text });
+    return result.ok;
   }
 
   async getHealth() {
-    if (!process.env.TELEGRAM_BOT_TOKEN || !process.env.TELEGRAM_CHAT_ID) {
-      return { status: "NOT_CONFIGURED", message: "Telegram belum dikonfigurasi" };
-    }
-    return { status: "CONFIGURATION_REQUIRED", message: "Token ada — test connection belum diimplementasi" };
+    const { getTelegramBotHealth } = await import("@/lib/providers/notifications/telegram-api");
+    return getTelegramBotHealth();
   }
 }
 

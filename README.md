@@ -147,7 +147,8 @@ Shared Drive + service account **Content manager**, atau `GOOGLE_WORKSPACE_DELEG
 |-----------|-----------|
 | OCR Gemini Vision | **Live** jika `GEMINI_API_KEY` + `OCR_PROVIDER=gemini` |
 | OCR demo | Aktif hanya jika `OCR_PROVIDER=demo` dan key kosong |
-| Telegram / WhatsApp | **Not configured** — in-app notifications aktif |
+| Telegram upload notify | **Live** jika `TELEGRAM_BOT_TOKEN` + `TELEGRAM_GUDANG_CHAT_IDS` — notif per foto SJ setelah sheet & Drive |
+| WhatsApp | **Not configured** |
 | Accurate API | **Export CSV PP** — bukan sync/API claim |
 | Google Drive + Sheets | **Live** jika `GOOGLE_EXPORT_ENABLED=true` + service account (export otomatis setelah OCR) |
 

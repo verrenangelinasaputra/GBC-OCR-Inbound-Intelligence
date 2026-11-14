@@ -15,6 +15,7 @@ import {
   uploadSuratJalanToGudangDrive,
 } from "@/lib/providers/google-workspace";
 import { resolveSupplierUploadMapping } from "@/lib/services/supplier-upload-mapping";
+import { notifySupplierUploadTelegram } from "@/lib/services/supplier-upload-telegram-notify";
 
 export type SheetOnlyUploadResult = {
   submissionRef: string;
@@ -208,7 +209,7 @@ export async function processSheetOnlyUpload(params: {
       : "Selesai — data tersimpan di spreadsheet"
   );
 
-  return {
+  const uploadResult: SheetOnlyUploadResult = {
     submissionRef,
     suratJalanNumber: result.suratJalanNumber,
     sheetRowCount: rows.length,
@@ -220,4 +221,18 @@ export async function processSheetOnlyUpload(params: {
     driveWarning,
     ocrWarnings: result.warnings,
   };
+
+  const gudangLabel = params.gudang?.trim();
+  if (gudangLabel) {
+    void notifySupplierUploadTelegram({
+      gudang: gudangLabel,
+      supplierName: supplierName || params.supplierName?.trim() || "Unverified",
+      fileName: params.file.name,
+      result: uploadResult,
+    }).catch((err) => {
+      console.error("[telegram] notifySupplierUploadTelegram", err);
+    });
+  }
+
+  return uploadResult;
 }
