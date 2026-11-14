@@ -9,7 +9,7 @@ export const PORTAL_NAV_MODULES: {
   { module: "dashboard", label: "Dashboard", href: "/dashboard" },
   { module: "ocr_review", label: "Review Surat Jalan", href: "/ocr-review" },
   { module: "sku_mapping", label: "Product SKU Mapping", href: "/sku-mapping" },
-  { module: "master_mapping", label: "Mapping Produk", href: "/master-mapping" },
+  { module: "master_mapping", label: "Generator SKU", href: "/master-mapping" },
   {
     module: "supplier_data_mapping",
     label: "Mapping Data Supplier",

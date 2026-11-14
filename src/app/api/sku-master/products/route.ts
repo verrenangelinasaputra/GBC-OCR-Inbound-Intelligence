@@ -1,7 +1,11 @@
 import { jsonError, requireApiSession } from "@/lib/api/auth-context";
 import { hasPermission } from "@/lib/rbac/permissions";
 import { skuMasterApiEnabled } from "@/lib/sku-master/api-enabled";
-import { createSkuMasterProduct, updateSkuMasterProduct } from "@/lib/services/sku-master-sheet";
+import {
+  createSkuMasterProduct,
+  deleteSkuMasterProduct,
+  updateSkuMasterProduct,
+} from "@/lib/services/sku-master-sheet";
 import type { SkuMasterProductUpdateInput } from "@/lib/sku-master/types";
 import type { SkuMasterProductInput } from "@/lib/sku-master/types";
 import { SHEET_QUOTA_USER_MESSAGE } from "@/lib/google-sheets/sheet-values";
@@ -75,6 +79,34 @@ export async function PATCH(request: Request) {
 
     const result = await updateSkuMasterProduct(input);
     return Response.json({ ok: true, product: result });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Unknown";
+    if (message === SHEET_QUOTA_USER_MESSAGE) {
+      return Response.json({ error: message }, { status: 429 });
+    }
+    return jsonError(e);
+  }
+}
+
+export async function DELETE(request: Request) {
+  if (!skuMasterApiEnabled()) return jsonError(new Error("Mode spreadsheet tidak aktif"), 404);
+  try {
+    const session = await requireApiSession();
+    const canWrite =
+      hasPermission(session.roles, "master_mapping", "CREATE", session.allowedModules) ||
+      hasPermission(session.roles, "master_mapping", "EDIT", session.allowedModules);
+    if (!canWrite) return jsonError(new Error("FORBIDDEN"), 403);
+
+    const url = new URL(request.url);
+    const categoryTab = String(url.searchParams.get("tab") ?? "").trim();
+    const sheetRow = Number(url.searchParams.get("sheetRow") ?? 0);
+    const skuLengkap = String(url.searchParams.get("skuLengkap") ?? "").trim();
+    if (!categoryTab || !sheetRow) {
+      return jsonError(new Error("tab dan sheetRow wajib"), 400);
+    }
+
+    const result = await deleteSkuMasterProduct({ categoryTab, sheetRow, skuLengkap });
+    return Response.json({ ok: true, deleted: result });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Unknown";
     if (message === SHEET_QUOTA_USER_MESSAGE) {

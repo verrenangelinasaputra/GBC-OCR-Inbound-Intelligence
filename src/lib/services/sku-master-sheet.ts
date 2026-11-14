@@ -19,6 +19,7 @@ import type {
   SkuMasterCodeOption,
   SkuMasterProductInput,
   SkuMasterProductResult,
+  SkuMasterProductDeleteInput,
   SkuMasterProductUpdateInput,
   SkuMasterRekapSkulRow,
   SkuMasterRekapSkusRow,
@@ -785,6 +786,160 @@ async function updateSkuMasterProductInner(
     kategoriUtama,
     rekapSkusUpdated: false,
   };
+}
+
+async function deleteSpreadsheetRow(
+  sheets: ReturnType<typeof google.sheets>,
+  spreadsheetId: string,
+  tabTitle: string,
+  rowOneBased: number
+): Promise<void> {
+  const sheetId = await getTabSheetId(sheets, spreadsheetId, tabTitle);
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [
+        {
+          deleteDimension: {
+            range: {
+              sheetId,
+              dimension: "ROWS",
+              startIndex: rowOneBased - 1,
+              endIndex: rowOneBased,
+            },
+          },
+        },
+      ],
+    },
+  });
+}
+
+async function findRekapSkulDataRow(
+  sheets: ReturnType<typeof google.sheets>,
+  spreadsheetId: string,
+  skuLengkap: string,
+  sourceTab: string
+): Promise<number> {
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${quoteTab(REKAP_SKUL_TAB)}!A:H`,
+  });
+  const rows = res.data.values ?? [];
+  const skuKey = skuLengkap.trim();
+  const tabKey = sourceTab.trim();
+
+  for (let i = 1; i < rows.length; i += 1) {
+    const row = rows[i] ?? [];
+    const sku = String(row[1] ?? "").trim();
+    const sumber = String(row[7] ?? "").trim();
+    if (skuKey && sku === skuKey) return i + 1;
+    if (!skuKey && tabKey) {
+      const nama = String(row[3] ?? "").trim();
+      if (sumber === tabKey && nama) return i + 1;
+    }
+  }
+  return 0;
+}
+
+async function reconcileRekapSkusAfterSkulChange(
+  sheets: ReturnType<typeof google.sheets>,
+  spreadsheetId: string,
+  skus: string
+): Promise<void> {
+  const skusKey = skus.trim();
+  if (!skusKey) return;
+
+  const skulRows = await fetchRekapSkulRows();
+  let variantCount = 0;
+  for (let i = 1; i < skulRows.length; i += 1) {
+    const row = skulRows[i] ?? [];
+    const family = String(row[5] ?? "").trim();
+    if (family.toLowerCase() === skusKey.toLowerCase()) variantCount += 1;
+  }
+
+  const skusMatrix = await fetchRekapSkusRows();
+  let targetRow = 0;
+  for (let i = 1; i < skusMatrix.length; i += 1) {
+    const row = skusMatrix[i] ?? [];
+    const family = String(row[1] ?? "").trim();
+    if (family.toLowerCase() === skusKey.toLowerCase()) {
+      targetRow = i + 1;
+      break;
+    }
+  }
+
+  if (targetRow === 0) return;
+
+  if (variantCount <= 0) {
+    await deleteSpreadsheetRow(sheets, spreadsheetId, REKAP_SKUS_TAB, targetRow);
+    return;
+  }
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${quoteTab(REKAP_SKUS_TAB)}!D${targetRow}`,
+    valueInputOption: "RAW",
+    requestBody: { values: [[String(variantCount)]] },
+  });
+}
+
+export async function deleteSkuMasterProduct(
+  input: SkuMasterProductDeleteInput
+): Promise<{ skuLengkap: string; skus: string }> {
+  try {
+    return await deleteSkuMasterProductInner(input);
+  } catch (e) {
+    throw mapSheetApiError(e);
+  }
+}
+
+async function deleteSkuMasterProductInner(
+  input: SkuMasterProductDeleteInput
+): Promise<{ skuLengkap: string; skus: string }> {
+  if (!isGeneratorCategoryTab(input.categoryTab)) {
+    throw new Error(`Kategori tidak valid: ${input.categoryTab}`);
+  }
+  if (input.sheetRow < TABEL_FIRST_DATA_ROW) {
+    throw new Error("Baris sheet tidak valid");
+  }
+  if (input.sheetRow === TABEL_TEMPLATE_DATA_ROW) {
+    throw new Error("Baris template tidak boleh dihapus");
+  }
+
+  const { sheets, spreadsheetId } = sheetsClient();
+  const existing = await readTableRow(
+    sheets,
+    spreadsheetId,
+    input.categoryTab,
+    input.sheetRow
+  );
+  const skuLengkap =
+    input.skuLengkap?.trim() ||
+    String(existing[COL.TABEL_SKU_LENGKAP - COL.TABEL_NO] ?? "").trim();
+  const skus = String(existing[COL.TABEL_SKUS - COL.TABEL_NO] ?? "").trim();
+  const nama = String(existing[COL.TABEL_NAMA_PRODUK_ACUAN - COL.TABEL_NO] ?? "").trim();
+  if (!nama && !skuLengkap) {
+    throw new Error("Baris kosong — tidak ada yang dihapus");
+  }
+
+  const rekapSkulRow = await findRekapSkulDataRow(
+    sheets,
+    spreadsheetId,
+    skuLengkap,
+    input.categoryTab
+  );
+  if (rekapSkulRow > 0) {
+    await deleteSpreadsheetRow(sheets, spreadsheetId, REKAP_SKUL_TAB, rekapSkulRow);
+  }
+
+  await deleteSpreadsheetRow(sheets, spreadsheetId, input.categoryTab, input.sheetRow);
+
+  await reconcileRekapSkusAfterSkulChange(sheets, spreadsheetId, skus);
+
+  invalidateSkuRekapCatalogCache();
+  invalidateSkuMasterListCaches(input.categoryTab);
+
+  return { skuLengkap, skus };
 }
 
 export async function fetchRekapSkulRows(): Promise<string[][]> {

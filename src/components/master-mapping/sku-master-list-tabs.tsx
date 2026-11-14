@@ -33,6 +33,7 @@ export function SkuMasterListTabs({
   const [rekapSkulRows, setRekapSkulRows] = useState<SkuMasterRekapSkulRow[]>([]);
   const [rekapSkusRows, setRekapSkusRows] = useState<SkuMasterRekapSkusRow[]>([]);
   const [editRow, setEditRow] = useState<SkuMasterTableRow | null>(null);
+  const [deletingKey, setDeletingKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (!active && listTabs.length > 0) setActive(listTabs[0]!);
@@ -79,6 +80,35 @@ export function SkuMasterListTabs({
     if (refreshKey > 0) void loadActive(true);
   }, [refreshKey, loadActive]);
 
+  async function onDeleteRow(row: SkuMasterTableRow) {
+    if (!canEdit) return;
+    const label = row.namaProdukAcuan || row.skuLengkap || `baris ${row.sheetRow}`;
+    const ok = window.confirm(
+      `Hapus "${label}" dari tab ${row.categoryTab}?\n\nBaris TABEL, entri REKAP SKUL terkait, dan hitungan REKAP SKUS akan disesuaikan.`
+    );
+    if (!ok) return;
+
+    const key = `${row.categoryTab}-${row.sheetRow}`;
+    setDeletingKey(key);
+    setError(null);
+    try {
+      const qs = new URLSearchParams({
+        tab: row.categoryTab,
+        sheetRow: String(row.sheetRow),
+        skuLengkap: row.skuLengkap || "",
+      });
+      const res = await fetch(`/api/sku-master/products?${qs.toString()}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal menghapus");
+      await loadActive(true);
+      onRowEdited?.();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Gagal menghapus");
+    } finally {
+      setDeletingKey(null);
+    }
+  }
+
   return (
     <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-100 px-3 py-2">
@@ -111,7 +141,13 @@ export function SkuMasterListTabs({
         ) : active === "REKAP SKUS" ? (
           <RekapSkusTable rows={rekapSkusRows} />
         ) : (
-          <CategoryTable rows={tableRows} canEdit={canEdit} onEdit={setEditRow} />
+          <CategoryTable
+            rows={tableRows}
+            canEdit={canEdit}
+            deletingKey={deletingKey}
+            onEdit={setEditRow}
+            onDelete={onDeleteRow}
+          />
         )}
       </div>
 
@@ -136,11 +172,15 @@ function SubCell({ value }: { value: string }) {
 function CategoryTable({
   rows,
   canEdit,
+  deletingKey,
   onEdit,
+  onDelete,
 }: {
   rows: SkuMasterTableRow[];
   canEdit: boolean;
+  deletingKey: string | null;
   onEdit: (row: SkuMasterTableRow) => void;
+  onDelete: (row: SkuMasterTableRow) => void;
 }) {
   if (rows.length === 0) {
     return (
@@ -167,17 +207,31 @@ function CategoryTable({
         </tr>
       </thead>
       <tbody className="divide-y divide-slate-100">
-        {rows.map((r, index) => (
-          <tr key={`${r.categoryTab}-${r.sheetRow}`} className="text-slate-800">
+        {rows.map((r, index) => {
+          const rowKey = `${r.categoryTab}-${r.sheetRow}`;
+          const isDeleting = deletingKey === rowKey;
+          return (
+          <tr key={rowKey} className="text-slate-800">
             <td className="sticky left-0 z-10 bg-white px-2 py-2">
               {canEdit ? (
-                <button
-                  type="button"
-                  onClick={() => onEdit(r)}
-                  className="rounded border border-slate-200 px-2 py-1 text-[11px] font-medium text-blue-700 hover:bg-blue-50"
-                >
-                  Edit
-                </button>
+                <div className="flex flex-wrap gap-1">
+                  <button
+                    type="button"
+                    onClick={() => onEdit(r)}
+                    disabled={isDeleting}
+                    className="rounded border border-slate-200 px-2 py-1 text-[11px] font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void onDelete(r)}
+                    disabled={isDeleting}
+                    className="rounded border border-red-200 px-2 py-1 text-[11px] font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+                  >
+                    {isDeleting ? "…" : "Hapus"}
+                  </button>
+                </div>
               ) : (
                 <span className="text-slate-400">—</span>
               )}
@@ -197,7 +251,8 @@ function CategoryTable({
             <td className="px-2 py-2 font-mono text-[10px]">{r.skuLengkap || "—"}</td>
             <td className="px-2 py-2 font-mono text-[10px]">{r.skus || "—"}</td>
           </tr>
-        ))}
+          );
+        })}
       </tbody>
     </table>
   );

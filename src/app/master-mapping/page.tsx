@@ -17,7 +17,7 @@ export default async function MasterMappingPage({
   const initialOcr = String(query.ocr ?? "").trim();
 
   if (!spreadsheetModeActive()) {
-    return <SpreadsheetModePage title="Mapping Produk" />;
+    return <SpreadsheetModePage title="Generator SKU" />;
   }
 
   const session = await getSession();
@@ -26,9 +26,9 @@ export default async function MasterMappingPage({
     : false;
   if (!canView) {
     return (
-      <ModuleListPage title="Mapping Produk" description="Kelola alias SKU untuk nama barang OCR.">
+      <ModuleListPage title="Generator SKU" description="Generator master SKU dan alias nama OCR.">
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Anda tidak punya akses modul <strong>Mapping Produk</strong>. Minta Super Admin mencentang halaman ini di User
+          Anda tidak punya akses modul <strong>Generator SKU</strong>. Minta Super Admin mencentang halaman ini di User
           &amp; Role Management.
         </p>
       </ModuleListPage>
@@ -41,11 +41,11 @@ export default async function MasterMappingPage({
 
   return (
     <ModuleListPage
-      title="Mapping Produk"
-      description="Master produk (TABEL → REKAP SKUL) dan alias nama OCR untuk SKU Mapping."
+      title="Generator SKU"
+      description="Master SKU (TABEL → REKAP SKUL/SKUS) dan alias nama OCR untuk SKU Mapping."
     >
       <p className="mb-4 text-sm text-slate-600">
-        Generator produk menulis ke tab kategori lalu <strong>REKAP SKUL</strong> / <strong>REKAP SKUS</strong> pada{" "}
+        Generator SKU menulis ke tab kategori lalu <strong>REKAP SKUL</strong> / <strong>REKAP SKUS</strong> pada{" "}
         <a
           href={`https://docs.google.com/spreadsheets/d/${getSkuMasterSheetId()}/edit`}
           target="_blank"
@@ -55,8 +55,9 @@ export default async function MasterMappingPage({
           spreadsheet master v2
         </a>
         . Alias OCR tetap di tab <strong>Master Mapping</strong> pada spreadsheet yang sama. Service account perlu{" "}
-        <strong>Editor</strong>. Untuk <Link href="/sku-mapping" className="text-blue-600 hover:underline">SKU Mapping</Link>, set{" "}
-        <code className="text-xs">SKU_REKAP_SHEET_ID</code> ke ID spreadsheet v2 jika katalog harus sama.
+        <strong>Editor</strong>. <Link href="/sku-mapping" className="text-blue-600 hover:underline">SKU Mapping</Link> membaca{" "}
+        <strong>REKAP SKUL</strong> dari file yang sama (env <code className="text-xs">SKU_MASTER_SHEET_ID</code> /{" "}
+        <code className="text-xs">SKU_REKAP_SHEET_ID</code>).
       </p>
       <MasterMappingWorkspace canEdit={canEdit} initialOcrName={initialOcr} />
     </ModuleListPage>

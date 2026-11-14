@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { MasterMappingPanel } from "@/components/master-mapping/master-mapping-panel";
-import { SkuMasterProductPanel } from "@/components/master-mapping/sku-master-product-panel";
+import { SkuMasterWorkspace } from "@/components/master-mapping/sku-master-workspace";
 
-type TabId = "produk" | "alias";
+type TabId = "master-sku" | "alias";
 
 export function MasterMappingWorkspace({
   canEdit,
@@ -13,19 +13,19 @@ export function MasterMappingWorkspace({
   canEdit: boolean;
   initialOcrName?: string;
 }) {
-  const [tab, setTab] = useState<TabId>(initialOcrName ? "alias" : "produk");
+  const [tab, setTab] = useState<TabId>(initialOcrName ? "alias" : "master-sku");
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-2">
         <button
           type="button"
-          onClick={() => setTab("produk")}
+          onClick={() => setTab("master-sku")}
           className={`rounded-lg px-4 py-2 text-sm font-medium ${
-            tab === "produk" ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+            tab === "master-sku" ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
           }`}
         >
-          Master produk (generator)
+          Master SKU
         </button>
         <button
           type="button"
@@ -38,7 +38,7 @@ export function MasterMappingWorkspace({
         </button>
       </div>
 
-      {tab === "produk" ? <SkuMasterProductPanel canEdit={canEdit} /> : null}
+      {tab === "master-sku" ? <SkuMasterWorkspace canEdit={canEdit} /> : null}
       {tab === "alias" ? <MasterMappingPanel canEdit={canEdit} initialOcrName={initialOcrName} /> : null}
     </div>
   );

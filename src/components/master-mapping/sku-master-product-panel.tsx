@@ -7,8 +7,6 @@ import {
   resolveSub1ForCategoryTab,
   sub1FieldMode,
 } from "@/lib/sku-master/sub1-for-tab";
-import { SkuMasterListTabs } from "@/components/master-mapping/sku-master-list-tabs";
-
 const SUB_KEYS = ["sub1", "sub2", "sub3", "sub4", "sub5", "sub6", "sub7", "sub8", "sub9"] as const;
 
 type SubKey = (typeof SUB_KEYS)[number];
@@ -18,10 +16,19 @@ const fieldClass =
 const selectClass = `${fieldClass} pr-9`;
 const labelClass = "text-xs font-semibold uppercase tracking-wide text-slate-500";
 
-export function SkuMasterProductPanel({ canEdit }: { canEdit: boolean }) {
-  const [generatorTabs, setGeneratorTabs] = useState<string[]>([]);
-  const [subLabels, setSubLabels] = useState<string[]>([]);
-  const [spreadsheetUrl, setSpreadsheetUrl] = useState("");
+export function SkuMasterProductPanel({
+  canEdit,
+  generatorTabs,
+  subLabels,
+  spreadsheetUrl,
+  onDataChanged,
+}: {
+  canEdit: boolean;
+  generatorTabs: string[];
+  subLabels: string[];
+  spreadsheetUrl: string;
+  onDataChanged?: () => void;
+}) {
   const [categoryTab, setCategoryTab] = useState("PET");
   const [namaProdukAcuan, setNamaProdukAcuan] = useState("");
   const [subs, setSubs] = useState<Record<SubKey, string>>({
@@ -45,19 +52,11 @@ export function SkuMasterProductPanel({ canEdit }: { canEdit: boolean }) {
   const [newCodeSub, setNewCodeSub] = useState(1);
   const [newCode, setNewCode] = useState("");
   const [newLabel, setNewLabel] = useState("");
-  const [listRefreshKey, setListRefreshKey] = useState(0);
-
-  const loadMeta = useCallback(async () => {
-    const res = await fetch("/api/sku-master/meta");
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Gagal memuat meta");
-    setGeneratorTabs(data.generatorTabs ?? []);
-    setSubLabels(data.subLabels ?? []);
-    setSpreadsheetUrl(data.spreadsheetUrl ?? "");
-    if (data.generatorTabs?.length && !data.generatorTabs.includes(categoryTab)) {
-      setCategoryTab(data.generatorTabs[0]);
+  useEffect(() => {
+    if (generatorTabs.length > 0 && !generatorTabs.includes(categoryTab)) {
+      setCategoryTab(generatorTabs[0]!);
     }
-  }, [categoryTab]);
+  }, [generatorTabs, categoryTab]);
 
   const loadAllCodes = useCallback(async () => {
     setLoadingCodes(true);
@@ -75,10 +74,6 @@ export function SkuMasterProductPanel({ canEdit }: { canEdit: boolean }) {
       setLoadingCodes(false);
     }
   }, [categoryTab]);
-
-  useEffect(() => {
-    void loadMeta().catch((e) => setError(e instanceof Error ? e.message : "Gagal memuat"));
-  }, [loadMeta]);
 
   useEffect(() => {
     void loadAllCodes();
@@ -114,7 +109,7 @@ export function SkuMasterProductPanel({ canEdit }: { canEdit: boolean }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Sync gagal");
       setSyncCooldownUntil(Date.now() + 90_000);
-      setListRefreshKey((k) => k + 1);
+      onDataChanged?.();
       setMessage(
         `Mirror selesai — kode: ${data.summary?.codes ?? 0}, REKAP SKUL: ${data.summary?.rekapSkul ?? 0}, REKAP SKUS: ${data.summary?.rekapSkus ?? 0}${data.summary?.dbPersisted ? " (tersimpan di DB)" : ""}. Jangan spam sync — tunggu 1–2 menit jika kuota habis.`
       );
@@ -192,7 +187,7 @@ export function SkuMasterProductPanel({ canEdit }: { canEdit: boolean }) {
         sub8: "",
         sub9: "",
       });
-      setListRefreshKey((k) => k + 1);
+      onDataChanged?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal simpan produk");
     } finally {
@@ -203,7 +198,7 @@ export function SkuMasterProductPanel({ canEdit }: { canEdit: boolean }) {
   return (
     <div className="space-y-6">
       <p className="text-sm text-slate-600">
-        Generator master produk → tab <strong>TABEL 1</strong> ({categoryTab}) → <strong>REKAP SKUL</strong> /{" "}
+        Generator SKU → tab <strong>TABEL 1</strong> ({categoryTab}) → <strong>REKAP SKUL</strong> /{" "}
         <strong>REKAP SKUS</strong> di{" "}
         {spreadsheetUrl ? (
           <a href={spreadsheetUrl} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
@@ -427,14 +422,6 @@ export function SkuMasterProductPanel({ canEdit }: { canEdit: boolean }) {
         </section>
       ) : null}
 
-      {generatorTabs.length > 0 ? (
-        <SkuMasterListTabs
-          generatorTabs={generatorTabs}
-          refreshKey={listRefreshKey}
-          canEdit={canEdit}
-          onRowEdited={() => setListRefreshKey((k) => k + 1)}
-        />
-      ) : null}
     </div>
   );
 }

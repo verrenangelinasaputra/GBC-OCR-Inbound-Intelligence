@@ -1,13 +1,13 @@
-/** Spreadsheet master rekap SKU (tab REKAP SKUL) — legacy file. */
-export const SKU_REKAP_SHEET_ID = "1QePx5At4B0SiDfeLU9s5N7vsz394Z7K1kElSPxxJmYE";
+/** Spreadsheet legacy (hanya jika masih perlu baca file lama via env). */
+export const SKU_REKAP_SHEET_ID_LEGACY = "1QePx5At4B0SiDfeLU9s5N7vsz394Z7K1kElSPxxJmYE";
 
-/** Spreadsheet generator SKU v2 (operasional baru) — dipakai jika env kosong di production v2. */
+/** Spreadsheet generator SKU v2 — sumber tunggal TABEL + REKAP SKUL/SKUS. */
 export const SKU_MASTER_SHEET_ID_DEFAULT = "1vbCQDgMRfUb8YKZ_E6DVHSa-lS7iWUAhylwImnJGJsw";
 
 export const SKU_REKAP_TAB_NAME = "REKAP SKUL";
 
-/** Google Sheets tab id for REKAP SKUL (gid in spreadsheet URL). */
-export const SKU_REKAP_GID = 1147104169;
+/** Google Sheets tab id REKAP SKUL pada spreadsheet v2. */
+export const SKU_REKAP_GID = 1147104168;
 
 /** Alias OCR → SKU (jika tidak match fuzzy ke REKAP). */
 export const MASTER_MAPPING_TAB_NAME = "Master Mapping";
@@ -17,13 +17,19 @@ export const DBM_INBOUND_SHEET_ID = "1QEXrV23W2xZnjrmaw8MJbJmfvprv5c4NoTZksTM91T
 
 export const DBM_INBOUND_TAB_NAME = "Data Barang Masuk";
 
-export function getSkuRekapSheetId(): string {
-  return process.env.SKU_REKAP_SHEET_ID?.trim() || SKU_REKAP_SHEET_ID;
-}
-
-/** Modul master produk — default spreadsheet v2; tidak mengubah default katalog lama. */
+/** Modul master produk — default spreadsheet v2. */
 export function getSkuMasterSheetId(): string {
   return process.env.SKU_MASTER_SHEET_ID?.trim() || SKU_MASTER_SHEET_ID_DEFAULT;
+}
+
+/**
+ * Katalog REKAP SKUL untuk `/sku-mapping` — default sama dengan master v2.
+ * Set `SKU_REKAP_SHEET_ID` hanya jika katalog masih di file legacy.
+ */
+export function getSkuRekapSheetId(): string {
+  const fromEnv = process.env.SKU_REKAP_SHEET_ID?.trim();
+  if (fromEnv) return fromEnv;
+  return getSkuMasterSheetId();
 }
 
 export function getSkuRekapTabName(): string {

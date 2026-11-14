@@ -24,6 +24,12 @@ export type SkuMasterProductUpdateInput = SkuMasterProductInput & {
   oldSkuLengkap?: string;
 };
 
+export type SkuMasterProductDeleteInput = {
+  categoryTab: string;
+  sheetRow: number;
+  skuLengkap?: string;
+};
+
 export type SkuMasterProductResult = {
   categoryTab: string;
   sheetRow: number;
