@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { revisionFileName } from "./revision-image";
+import { revisionFileName, revisionTableDataRowY } from "./revision-image";
 
 describe("revisionFileName", () => {
   it("numbered prefix and .png", () => {
@@ -11,5 +11,12 @@ describe("revisionFileName", () => {
 
   it("strips old revision tags from base name", () => {
     expect(revisionFileName("[REVISI 2] SJ_x.png", 4)).toBe("[REVISI 4] SJ_x.png");
+  });
+});
+
+describe("revisionTableDataRowY", () => {
+  it("first body row uses index 0 (not 1)", () => {
+    expect(revisionTableDataRowY(0)).toBeLessThan(revisionTableDataRowY(1));
+    expect(revisionTableDataRowY(0)).toBe(255 + 44 + 40 * 0.72);
   });
 });

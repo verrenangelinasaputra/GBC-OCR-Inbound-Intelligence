@@ -89,6 +89,11 @@ function cellTextY(rowIndex: number, inHeader = false): number {
   return base;
 }
 
+/** Vertical anchor for data row `i` (0 = first row below header). */
+export function revisionTableDataRowY(rowIndex: number): number {
+  return cellTextY(rowIndex);
+}
+
 function buildTableGrid(rowCount: number): string {
   const bodyH = rowCount * TABLE.rowH;
   const totalH = TABLE.headerH + bodyH;
@@ -142,14 +147,14 @@ export function buildSuratJalanRevisionSvg(doc: OcrSheetDocumentDetail, revision
     keterangan: "",
   }])
     .map((line, i) => {
-      const row = i + 1;
+      const y = cellTextY(i);
       return [
-        svgText(cellMidX(0), cellTextY(row), String(row), 11, { anchor: "middle" }),
-        svgText(cellMidX(1), cellTextY(row), line.banyaknya, 11, { anchor: "middle" }),
-        svgText(cellMidX(2), cellTextY(row), line.isi, 11, { anchor: "middle" }),
-        svgText(COL_X[3] + 8, cellTextY(row), line.namaBarang, 10),
-        svgText(cellMidX(4), cellTextY(row), line.jumlah, 11, { anchor: "middle" }),
-        svgText(COL_X[5] + 6, cellTextY(row), line.keterangan, 10),
+        svgText(cellMidX(0), y, String(i + 1), 11, { anchor: "middle" }),
+        svgText(cellMidX(1), y, line.banyaknya, 11, { anchor: "middle" }),
+        svgText(cellMidX(2), y, line.isi, 11, { anchor: "middle" }),
+        svgText(COL_X[3] + 8, y, line.namaBarang, 10),
+        svgText(cellMidX(4), y, line.jumlah, 11, { anchor: "middle" }),
+        svgText(COL_X[5] + 6, y, line.keterangan, 10),
       ].join("\n");
     })
     .join("\n");
