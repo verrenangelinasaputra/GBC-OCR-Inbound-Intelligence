@@ -140,11 +140,14 @@ export function SkuMasterRowEditDialog({
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-slate-600">Nama internal Accurate</span>
+            <span className="text-xs font-medium text-slate-600">
+              Nama internal Accurate{" "}
+              <span className="font-normal text-slate-400">(opsional)</span>
+            </span>
             <input
-              required
               value={namaInternalAccurate}
               onChange={(e) => setNamaInternalAccurate(e.target.value)}
+              placeholder="Kosongkan jika belum ada di Accurate"
               className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
             />
           </label>

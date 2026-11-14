@@ -471,8 +471,8 @@ async function createSkuMasterProductInner(
   if (!isGeneratorCategoryTab(input.categoryTab)) {
     throw new Error(`Kategori tidak valid: ${input.categoryTab}`);
   }
-  if (!input.namaProdukAcuan.trim() || !input.namaInternalAccurate.trim()) {
-    throw new Error("Nama produk acuan dan nama internal wajib");
+  if (!input.namaProdukAcuan.trim()) {
+    throw new Error("Nama produk acuan wajib");
   }
 
   const codesBySub = await loadSkuMasterCodesForTab(input.categoryTab);
@@ -686,8 +686,8 @@ async function updateSkuMasterProductInner(
   if (input.sheetRow < TABEL_FIRST_DATA_ROW) {
     throw new Error("Baris sheet tidak valid");
   }
-  if (!input.namaProdukAcuan.trim() || !input.namaInternalAccurate.trim()) {
-    throw new Error("Nama produk acuan dan nama internal wajib");
+  if (!input.namaProdukAcuan.trim()) {
+    throw new Error("Nama produk acuan wajib");
   }
 
   const codesBySub = await loadSkuMasterCodesForTab(input.categoryTab);
@@ -720,7 +720,9 @@ async function updateSkuMasterProductInner(
   const valuesRow: string[] = [];
   valuesRow[0] = String(existing[0] ?? normalizedInput.sheetRow - TABEL_FIRST_DATA_ROW + 1);
   valuesRow[1] = normalizedInput.namaProdukAcuan.trim();
-  valuesRow[2] = normalizedInput.namaInternalAccurate.trim();
+  valuesRow[2] =
+    normalizedInput.namaInternalAccurate.trim() ||
+    String(existing[COL.TABEL_NAMA_INTERNAL - COL.TABEL_NO] ?? "").trim();
   for (let i = 0; i < 9; i += 1) valuesRow[3 + i] = subs[i] ?? "";
 
   const start = columnIndexToA1(COL.TABEL_NO, normalizedInput.sheetRow);

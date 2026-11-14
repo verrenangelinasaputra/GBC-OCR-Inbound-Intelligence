@@ -13,13 +13,17 @@ const SUB_KEYS = ["sub1", "sub2", "sub3", "sub4", "sub5", "sub6", "sub7", "sub8"
 
 type SubKey = (typeof SUB_KEYS)[number];
 
+const fieldClass =
+  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm transition placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20";
+const selectClass = `${fieldClass} pr-9`;
+const labelClass = "text-xs font-semibold uppercase tracking-wide text-slate-500";
+
 export function SkuMasterProductPanel({ canEdit }: { canEdit: boolean }) {
   const [generatorTabs, setGeneratorTabs] = useState<string[]>([]);
   const [subLabels, setSubLabels] = useState<string[]>([]);
   const [spreadsheetUrl, setSpreadsheetUrl] = useState("");
   const [categoryTab, setCategoryTab] = useState("PET");
   const [namaProdukAcuan, setNamaProdukAcuan] = useState("");
-  const [namaInternalAccurate, setNamaInternalAccurate] = useState("");
   const [subs, setSubs] = useState<Record<SubKey, string>>({
     sub1: "",
     sub2: "",
@@ -160,7 +164,7 @@ export function SkuMasterProductPanel({ canEdit }: { canEdit: boolean }) {
         body: JSON.stringify({
           categoryTab,
           namaProdukAcuan,
-          namaInternalAccurate,
+          namaInternalAccurate: "",
           ...subs,
         }),
       });
@@ -171,7 +175,6 @@ export function SkuMasterProductPanel({ canEdit }: { canEdit: boolean }) {
         `Produk tersimpan — SKU: ${p?.skuLengkap ?? "?"}, SKUS: ${p?.skus ?? "?"}. REKAP SKUL & spreadsheet ter-update.`
       );
       setNamaProdukAcuan("");
-      setNamaInternalAccurate("");
       const sub1Default = (() => {
         const opts = codeOptions[1] ?? [];
         return sub1FieldMode(opts) === "dropdown"
@@ -230,132 +233,151 @@ export function SkuMasterProductPanel({ canEdit }: { canEdit: boolean }) {
         </button>
       </div>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="text-base font-semibold text-slate-900">Tambah produk master</h2>
-        {!canEdit ? (
-          <p className="mt-2 text-sm text-amber-800">Anda hanya bisa melihat.</p>
-        ) : (
-          <form onSubmit={(e) => void onSubmitProduct(e)} className="mt-4 space-y-4">
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-slate-600">Tab kategori</span>
-              <select
-                value={categoryTab}
-                onChange={(e) => setCategoryTab(e.target.value)}
-                className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              >
-                {generatorTabs.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </label>
+      <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm ring-1 ring-slate-900/5">
+        <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white px-6 py-5">
+          <h2 className="text-lg font-semibold tracking-tight text-slate-900">Tambah produk master</h2>
+          <p className="mt-1 max-w-2xl text-sm text-slate-600">
+            Isi nama dari SJ/OCR dan pilih kode Sub — SKU &amp; REKAP terisi otomatis di spreadsheet.{" "}
+            <span className="text-slate-500">Nama internal Accurate bisa ditambah nanti lewat Edit.</span>
+          </p>
+        </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="flex flex-col gap-1 sm:col-span-2">
-                <span className="text-xs font-medium text-slate-600">Nama produk acuan (SJ / OCR)</span>
+        {!canEdit ? (
+          <p className="px-6 py-8 text-sm text-amber-800">Anda hanya bisa melihat.</p>
+        ) : (
+          <form onSubmit={(e) => void onSubmitProduct(e)} className="space-y-0">
+            <div className="space-y-5 border-b border-slate-100 px-6 py-6">
+              <div>
+                <p className={labelClass}>Kategori</p>
+                <p className="mt-2 text-sm text-slate-600">Tab lembar TABEL 1 tempat baris baru ditulis.</p>
+                <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Tab kategori">
+                  {generatorTabs.map((t) => {
+                    const active = categoryTab === t;
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setCategoryTab(t)}
+                        className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                          active
+                            ? "bg-slate-900 text-white shadow-md shadow-slate-900/20"
+                            : "border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                        }`}
+                      >
+                        {t}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <label className="block">
+                <span className={labelClass}>Nama produk acuan</span>
+                <span className="mt-1 block text-sm text-slate-500">Teks yang muncul di surat jalan / hasil OCR</span>
                 <input
                   required
                   value={namaProdukAcuan}
                   onChange={(e) => setNamaProdukAcuan(e.target.value)}
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                />
-              </label>
-              <label className="flex flex-col gap-1 sm:col-span-2">
-                <span className="text-xs font-medium text-slate-600">Nama internal Accurate</span>
-                <input
-                  required
-                  value={namaInternalAccurate}
-                  onChange={(e) => setNamaInternalAccurate(e.target.value)}
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  placeholder="Contoh: BOTOL PET 600ML CLEAR"
+                  className={`mt-2 ${fieldClass}`}
                 />
               </label>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {SUB_KEYS.map((key, idx) => {
-                const subIndex = idx + 1;
-                const options = codeOptions[subIndex] ?? [];
-                const label = subLabels[idx] ?? `Sub ${subIndex}`;
-                if (subIndex === 1) {
-                  const mode = sub1FieldMode(options);
-                  if (mode === "dropdown") {
-                    return (
-                      <label key={key} className="flex flex-col gap-1 sm:col-span-2">
-                        <span className="text-xs font-medium text-slate-600">
-                          {label}{" "}
-                          <span className="font-normal text-slate-500">
-                            (tab {categoryTabDisplayName(categoryTab)} — {options.length} pilihan)
+            <div className="bg-slate-50/80 px-6 py-6">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                <p className={labelClass}>Spesifikasi (Sub 1–9)</p>
+                {loadingCodes ? (
+                  <span className="text-xs text-slate-500">Memuat kamus kode…</span>
+                ) : (
+                  <span className="rounded-full bg-white px-2.5 py-0.5 text-xs text-slate-600 ring-1 ring-slate-200">
+                    Tab {categoryTabDisplayName(categoryTab)}
+                  </span>
+                )}
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {SUB_KEYS.map((key, idx) => {
+                  const subIndex = idx + 1;
+                  const options = codeOptions[subIndex] ?? [];
+                  const label = subLabels[idx] ?? `Sub ${subIndex}`;
+                  if (subIndex === 1) {
+                    const mode = sub1FieldMode(options);
+                    if (mode === "dropdown") {
+                      return (
+                        <label key={key} className="flex flex-col gap-1.5 sm:col-span-2 lg:col-span-3">
+                          <span className="text-sm font-medium text-slate-800">{label}</span>
+                          <span className="text-xs text-slate-500">
+                            {options.length} pilihan untuk kategori ini
                           </span>
-                        </span>
-                        <select
-                          required
-                          value={subs.sub1}
-                          onChange={(e) => setSubs((s) => ({ ...s, sub1: e.target.value }))}
-                          className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm"
-                          disabled={loadingCodes}
-                        >
-                          {options.length > 1 ? (
-                            <option value="">— pilih kode Sub 1 —</option>
-                          ) : null}
-                          {options.map((o) => (
-                            <option key={o.code} value={o.code}>
-                              {o.code} — {o.label}
-                            </option>
-                          ))}
-                        </select>
+                          <select
+                            required
+                            value={subs.sub1}
+                            onChange={(e) => setSubs((s) => ({ ...s, sub1: e.target.value }))}
+                            className={selectClass}
+                            disabled={loadingCodes}
+                          >
+                            {options.length > 1 ? <option value="">— pilih kode Sub 1 —</option> : null}
+                            {options.map((o) => (
+                              <option key={o.code} value={o.code}>
+                                {o.code} — {o.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      );
+                    }
+                    const sub1Value = resolveSub1ForCategoryTab(categoryTab, options);
+                    return (
+                      <label key={key} className="flex flex-col gap-1.5 sm:col-span-2 lg:col-span-3">
+                        <span className="text-sm font-medium text-slate-800">{label}</span>
+                        <span className="text-xs text-amber-800">Kamus kosong — memakai default tab</span>
+                        <input
+                          readOnly
+                          value={
+                            loadingCodes
+                              ? "Memuat…"
+                              : `${categoryTabDisplayName(categoryTab)} → ${sub1Value || "—"}`
+                          }
+                          className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2.5 text-sm text-amber-950"
+                        />
                       </label>
                     );
                   }
-                  const sub1Value = resolveSub1ForCategoryTab(categoryTab, options);
                   return (
-                    <label key={key} className="flex flex-col gap-1 sm:col-span-2">
-                      <span className="text-xs font-medium text-slate-600">
-                        {label}{" "}
-                        <span className="font-normal text-amber-700">
-                          (kamus kosong — pakai default tab {categoryTabDisplayName(categoryTab)})
-                        </span>
-                      </span>
-                      <input
-                        readOnly
-                        value={
-                          loadingCodes
-                            ? "Memuat…"
-                            : `${categoryTabDisplayName(categoryTab)} → ${sub1Value || "—"}`
-                        }
-                        className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-2 text-sm"
-                      />
+                    <label key={key} className="flex flex-col gap-1.5">
+                      <span className="text-sm font-medium text-slate-800">{label}</span>
+                      <select
+                        value={subs[key]}
+                        onChange={(e) => setSubs((s) => ({ ...s, [key]: e.target.value }))}
+                        className={selectClass}
+                        disabled={loadingCodes}
+                      >
+                        <option value="">— opsional —</option>
+                        {options.map((o) => (
+                          <option key={o.code} value={o.code}>
+                            {o.code} — {o.label}
+                          </option>
+                        ))}
+                      </select>
                     </label>
                   );
-                }
-                return (
-                  <label key={key} className="flex flex-col gap-1">
-                    <span className="text-xs font-medium text-slate-600">{label}</span>
-                    <select
-                      value={subs[key]}
-                      onChange={(e) => setSubs((s) => ({ ...s, [key]: e.target.value }))}
-                      className="rounded-lg border border-slate-200 px-2 py-2 text-sm"
-                      disabled={loadingCodes}
-                    >
-                      <option value="">—</option>
-                      {options.map((o) => (
-                        <option key={o.code} value={o.code}>
-                          {o.code} — {o.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                );
-              })}
+                })}
+              </div>
             </div>
 
-            <button
-              type="submit"
-              disabled={saving || loadingCodes}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-            >
-              {saving ? "Menyimpan ke spreadsheet…" : "Simpan → TABEL & REKAP"}
-            </button>
+            <div className="flex flex-col gap-3 border-t border-slate-100 bg-white px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs leading-relaxed text-slate-500">
+                SKUS dari Sub 1–6 · SKU lengkap dari Sub 1–9 · sinkron ke REKAP SKUL &amp; SKUS
+              </p>
+              <button
+                type="submit"
+                disabled={saving || loadingCodes}
+                className="inline-flex shrink-0 items-center justify-center rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/25 transition hover:bg-blue-700 disabled:opacity-50"
+              >
+                {saving ? "Menyimpan…" : "Simpan ke TABEL & REKAP"}
+              </button>
+            </div>
           </form>
         )}
       </section>
