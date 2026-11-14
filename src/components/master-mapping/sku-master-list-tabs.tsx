@@ -167,7 +167,7 @@ function CategoryTable({
         </tr>
       </thead>
       <tbody className="divide-y divide-slate-100">
-        {rows.map((r) => (
+        {rows.map((r, index) => (
           <tr key={`${r.categoryTab}-${r.sheetRow}`} className="text-slate-800">
             <td className="sticky left-0 z-10 bg-white px-2 py-2">
               {canEdit ? (
@@ -182,7 +182,7 @@ function CategoryTable({
                 <span className="text-slate-400">—</span>
               )}
             </td>
-            <td className="px-2 py-2">{r.no || r.sheetRow}</td>
+            <td className="px-2 py-2 tabular-nums">{index + 1}</td>
             <td className="px-2 py-2 font-medium">{r.namaProdukAcuan}</td>
             <td className="px-2 py-2">{r.namaInternalAccurate}</td>
             <SubCell value={r.sub1} />
@@ -219,9 +219,9 @@ function RekapSkulTable({ rows }: { rows: SkuMasterRekapSkulRow[] }) {
         </tr>
       </thead>
       <tbody className="divide-y divide-slate-100">
-        {rows.map((r) => (
+        {rows.map((r, index) => (
           <tr key={`${r.rowNo}-${r.skuLengkap}`}>
-            <td className="px-2 py-2">{r.rowNo}</td>
+            <td className="px-2 py-2 tabular-nums">{index + 1}</td>
             <td className="px-2 py-2 font-mono">{r.skuLengkap}</td>
             <td className="px-2 py-2">{r.namaProdukAcuan}</td>
             <td className="px-2 py-2 font-mono">{r.skus}</td>
@@ -249,9 +249,9 @@ function RekapSkusTable({ rows }: { rows: SkuMasterRekapSkusRow[] }) {
         </tr>
       </thead>
       <tbody className="divide-y divide-slate-100">
-        {rows.map((r) => (
+        {rows.map((r, index) => (
           <tr key={`${r.rowNo}-${r.skus}`}>
-            <td className="px-2 py-2">{r.rowNo}</td>
+            <td className="px-2 py-2 tabular-nums">{index + 1}</td>
             <td className="px-2 py-2 font-mono">{r.skus}</td>
             <td className="px-2 py-2">{r.namaInternal}</td>
             <td className="px-2 py-2 text-center">{r.variantCount}</td>

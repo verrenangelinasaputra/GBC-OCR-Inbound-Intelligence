@@ -14,6 +14,7 @@ import {
 } from "@/lib/sku-master/sheet-layout";
 import { isGeneratorCategoryTab } from "@/lib/sku-master/category-tabs";
 import { resolveSub1ForSave } from "@/lib/sku-master/sub1-for-tab";
+import { nextAutoIncrementNo, parseSheetNoCell } from "@/lib/sku-master/row-number";
 import type {
   SkuMasterCodeOption,
   SkuMasterProductInput,
@@ -320,18 +321,25 @@ async function findLastTableDataRow(
   sheets: ReturnType<typeof google.sheets>,
   spreadsheetId: string,
   categoryTab: string
-): Promise<number> {
+): Promise<{ lastRow: number; maxNo: number; dataCount: number }> {
   const noCol = columnIndexToA1(COL.TABEL_NO, TABEL_FIRST_DATA_ROW);
   const range = `${quoteTab(categoryTab)}!${noCol}:${columnIndexToA1(COL.TABEL_SKUS, 5000)}`;
   const res = await sheets.spreadsheets.values.get({ spreadsheetId, range });
   const rows = res.data.values ?? [];
   let last = TABEL_FIRST_DATA_ROW - 1;
+  let maxNo = 0;
+  let dataCount = 0;
   for (let i = 0; i < rows.length; i += 1) {
     const no = String(rows[i]?.[0] ?? "").trim();
-  const nama = String(rows[i]?.[COL.TABEL_NAMA_PRODUK_ACUAN - COL.TABEL_NO] ?? "").trim();
-    if (no || nama) last = TABEL_FIRST_DATA_ROW + i;
+    const nama = String(rows[i]?.[COL.TABEL_NAMA_PRODUK_ACUAN - COL.TABEL_NO] ?? "").trim();
+  if (no || nama) {
+      last = TABEL_FIRST_DATA_ROW + i;
+      dataCount += 1;
+      maxNo = Math.max(maxNo, parseSheetNoCell(no));
+    }
   }
-  return Math.max(last, TABEL_FIRST_DATA_ROW);
+  const lastRow = Math.max(last, TABEL_FIRST_DATA_ROW);
+  return { lastRow, maxNo, dataCount };
 }
 
 async function readTableRow(
@@ -367,8 +375,7 @@ async function appendRekapSkulRow(
     range: `${quoteTab(REKAP_SKUL_TAB)}!A:A`,
   });
   const rows = res.data.values ?? [];
-  const nextNo = rows.length;
-  const rowNo = String(nextNo);
+  const rowNo = nextAutoIncrementNo(rows, 0, 1);
 
   const appendRes = await sheets.spreadsheets.values.append({
     spreadsheetId,
@@ -435,14 +442,14 @@ async function upsertRekapSkusFamily(
     return true;
   }
 
-  const nextNo = rows.length;
+  const rowNo = nextAutoIncrementNo(rows, 0, 1);
   await sheets.spreadsheets.values.append({
     spreadsheetId,
     range: `${quoteTab(REKAP_SKUS_TAB)}!A:E`,
     valueInputOption: "RAW",
     insertDataOption: "INSERT_ROWS",
     requestBody: {
-      values: [[String(nextNo), skus, namaInternalHint, "1", sourceTab]],
+      values: [[rowNo, skus, namaInternalHint, "1", sourceTab]],
     },
   });
   return true;
@@ -475,7 +482,11 @@ async function createSkuMasterProductInner(
   const { sheets, spreadsheetId } = sheetsClient();
   const sheetGid = await getTabSheetId(sheets, spreadsheetId, normalizedInput.categoryTab);
 
-  const lastRow = await findLastTableDataRow(sheets, spreadsheetId, normalizedInput.categoryTab);
+  const { lastRow, maxNo, dataCount } = await findLastTableDataRow(
+    sheets,
+    spreadsheetId,
+    normalizedInput.categoryTab
+  );
   const newRow = lastRow + 1;
   const templateRowIndex = TABEL_TEMPLATE_DATA_ROW - 1;
 
@@ -506,9 +517,7 @@ async function createSkuMasterProductInner(
     },
   });
 
-  const prevRow = await readTableRow(sheets, spreadsheetId, normalizedInput.categoryTab, lastRow);
-  const prevNo = Number(String(prevRow[0] ?? "0").replace(/\D/g, "")) || 0;
-  const nextNo = String(prevNo + 1 || newRow - TABEL_FIRST_DATA_ROW + 1);
+  const nextNo = maxNo > 0 ? String(maxNo + 1) : String(dataCount + 1);
 
   const subs = [
     normalizedInput.sub1,
