@@ -33,26 +33,31 @@ function masterMappingMatches(
 
 const MIN_MATCH_SCORE = 0.35;
 
+/** Pencocokan utama: kolom C REKAP — Nama Internal Accurate (lalu acuan, SKU). */
 function bestFieldSimilarity(
   query: string,
-  fields: string[]
-): { score: number; matchType: "exact" | "fuzzy" } {
+  entry: Pick<SkuRekapEntry, "namaInternalAccurate" | "namaProdukAcuan" | "skuLengkap">
+): { score: number; matchType: "exact" | "fuzzy"; internalScore: number } {
   const nq = normalizeProductName(query);
-  if (!nq) return { score: 0, matchType: "fuzzy" };
+  if (!nq) return { score: 0, matchType: "fuzzy", internalScore: 0 };
 
-  let best = 0;
-  let exact = false;
-  for (const field of fields) {
-    const text = coerceSheetCell(field);
-    if (!text) continue;
-    if (normalizeProductName(text) === nq) {
-      return { score: 1, matchType: "exact" };
-    }
-    best = Math.max(best, productNameSimilarity(query, text));
+  const internal = coerceSheetCell(entry.namaInternalAccurate);
+  const acuan = coerceSheetCell(entry.namaProdukAcuan);
+  const sku = coerceSheetCell(entry.skuLengkap);
+
+  if (internal && normalizeProductName(internal) === nq) {
+    return { score: 1, matchType: "exact", internalScore: 1 };
   }
 
-  if (best >= 0.95) exact = true;
-  return { score: best, matchType: exact ? "exact" : "fuzzy" };
+  const internalScore = internal ? productNameSimilarity(query, internal) : 0;
+  const acuanScore = acuan ? productNameSimilarity(query, acuan) : 0;
+  const skuScore = sku ? productNameSimilarity(query, sku) : 0;
+
+  const score = Math.max(internalScore, acuanScore, skuScore * 0.75);
+  const matchType: "exact" | "fuzzy" =
+    score >= 0.95 || internalScore >= 0.95 ? "exact" : "fuzzy";
+
+  return { score, matchType, internalScore };
 }
 
 export function findTopRekapSkuMatches(
@@ -79,7 +84,7 @@ export function findTopRekapSkuMatches(
     const sku = coerceSheetCell(entry.skuLengkap);
     if (!acuan && !internal && !sku) continue;
 
-    const { score, matchType } = bestFieldSimilarity(query, [acuan, internal, sku]);
+    const { score, matchType } = bestFieldSimilarity(query, entry);
     if (score < MIN_MATCH_SCORE) continue;
 
     scored.push({

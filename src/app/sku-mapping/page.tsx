@@ -101,7 +101,8 @@ export default async function SkuMappingPage() {
           >
             REKAP SKUL
           </a>{" "}
-          ({catalogSize.toLocaleString("id-ID")} produk, kolom <em>Nama Produk Acuan</em>). Final DBM → tab{" "}
+          ({catalogSize.toLocaleString("id-ID")} produk — cocokkan OCR ke kolom <em>Nama Internal Accurate</em>{" "}
+          + baris tab TABEL Generator). Final DBM → tab{" "}
           <strong>{getDbmInboundTabName()}</strong> pada{" "}
           <a
             href={`https://docs.google.com/spreadsheets/d/${DBM_INBOUND_SHEET_ID}/edit`}

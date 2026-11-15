@@ -144,9 +144,14 @@ export function SkuMappingWorkbench({
                               className="mt-1"
                             />
                             <span className="text-xs leading-snug">
-                              <span className="font-medium">{s.namaProdukAcuan}</span>
+                              <span className="font-medium">
+                                {s.namaInternalAccurate || s.namaProdukAcuan}
+                              </span>
                               <span className="block text-slate-500">
                                 {Math.round(s.score * 100)}% · {s.skuLengkap}
+                                {s.namaProdukAcuan && s.namaInternalAccurate
+                                  ? ` · acuan: ${s.namaProdukAcuan}`
+                                  : ""}
                               </span>
                             </span>
                           </label>

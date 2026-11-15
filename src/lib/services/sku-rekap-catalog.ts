@@ -5,6 +5,10 @@ import { createGoogleSheetsAuthClient } from "@/lib/providers/google-workspace/c
 import { getGoogleExportConfigOptional, type GoogleExportConfig } from "@/lib/providers/google-workspace/config";
 import { getSkuRekapSheetId, getSkuRekapTabName } from "@/lib/config/sku-mapping-sheets";
 import { coerceSheetCell } from "@/lib/sku-matching/coerce-string";
+import {
+  parseRekapSkulDataRow,
+  rekapSkulColumnMap,
+} from "@/lib/sku-matching/rekap-skul-columns";
 import type { SkuRekapEntry } from "@/lib/sku-matching/sku-rekap-types";
 
 const CACHE_MS = 10 * 60 * 1000;
@@ -18,29 +22,39 @@ function quoteTab(tab: string): string {
   return `'${tab.replace(/'/g, "''")}'`;
 }
 
-function parseRekapRow(row: string[], rowIndex: number): SkuRekapEntry | null {
-  const [
-    rowNo,
-    skuLengkap,
-    namaInternalAccurate,
-    namaProdukAcuan,
-    kategoriUtama,
-    skus,
-    barcode,
-    sumberLembar,
-  ] = row.map((c) => String(c ?? "").trim());
+async function mergeGeneratorTableRows(entries: SkuRekapEntry[]): Promise<SkuRekapEntry[]> {
+  const bySku = new Map<string, SkuRekapEntry>();
+  for (const e of entries) {
+    const skuKey = e.skuLengkap.trim().toLowerCase();
+    if (skuKey) bySku.set(skuKey, e);
+  }
 
-  if (!namaProdukAcuan && !skuLengkap) return null;
-  return {
-    rowNo: rowNo || String(rowIndex),
-    skuLengkap: coerceSheetCell(skuLengkap),
-    namaInternalAccurate: coerceSheetCell(namaInternalAccurate),
-    namaProdukAcuan: coerceSheetCell(namaProdukAcuan),
-    kategoriUtama: coerceSheetCell(kategoriUtama),
-    skus: coerceSheetCell(skus),
-    barcode: coerceSheetCell(barcode),
-    sumberLembar: coerceSheetCell(sumberLembar),
-  };
+  const { listSkuMasterTableRows } = await import("@/lib/services/sku-master-sheet");
+  const { SKU_GENERATOR_CATEGORY_TABS } = await import("@/lib/sku-master/category-tabs");
+
+  for (const tab of SKU_GENERATOR_CATEGORY_TABS) {
+    try {
+      const tableRows = await listSkuMasterTableRows(tab);
+      for (const t of tableRows) {
+        const skuKey = t.skuLengkap.trim().toLowerCase();
+        if (!skuKey || bySku.has(skuKey)) continue;
+        bySku.set(skuKey, {
+          rowNo: `T-${tab}-${t.sheetRow}`,
+          skuLengkap: coerceSheetCell(t.skuLengkap),
+          namaInternalAccurate: coerceSheetCell(t.namaInternalAccurate),
+          namaProdukAcuan: coerceSheetCell(t.namaProdukAcuan),
+          kategoriUtama: tab,
+          skus: coerceSheetCell(t.skus),
+          barcode: coerceSheetCell(t.barcode),
+          sumberLembar: tab,
+        });
+      }
+    } catch {
+      // tab belum ada di spreadsheet
+    }
+  }
+
+  return [...bySku.values()];
 }
 
 export async function loadSkuRekapCatalog(force = false): Promise<SkuRekapEntry[]> {
@@ -61,15 +75,18 @@ export async function loadSkuRekapCatalog(force = false): Promise<SkuRekapEntry[
   });
 
   const rows = res.data.values ?? [];
+  const header = rows[0] ?? [];
+  const cols = rekapSkulColumnMap(header);
   const entries: SkuRekapEntry[] = [];
 
   for (let i = 1; i < rows.length; i += 1) {
-    const parsed = parseRekapRow(rows[i] ?? [], i + 1);
+    const parsed = parseRekapSkulDataRow(rows[i] ?? [], i + 1, cols);
     if (parsed) entries.push(parsed);
   }
 
-  cache = { at: now, entries };
-  return entries;
+  const merged = await mergeGeneratorTableRows(entries);
+  cache = { at: now, entries: merged };
+  return merged;
 }
 
 export function getCatalogEntryByRowNo(catalog: SkuRekapEntry[], rowNo: string): SkuRekapEntry | null {
