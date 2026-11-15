@@ -1,7 +1,13 @@
 import { GeminiOCRProvider } from "@/lib/providers/ocr/gemini-ocr";
 import type { GeminiSJPayload } from "@/lib/providers/ocr/gemini-surat-jalan";
-import { ocrExportSheetUrl } from "@/lib/config/ocr-export-target";
-import { isDriveOAuthConfigured } from "@/lib/providers/google-workspace/drive-oauth";
+import {
+  getOcrExportCustomerDriveFolderId,
+  ocrExportSheetUrl,
+} from "@/lib/config/ocr-export-target";
+import {
+  driveOAuthRefreshHint,
+  isDriveOAuthConfigured,
+} from "@/lib/providers/google-workspace/drive-oauth";
 import { getSupplierDriveSettings } from "@/lib/supplier-auth/supplier-drive-settings";
 import { isSupplierMasterUsername } from "@/lib/supplier-auth/master-admin";
 import {
@@ -205,9 +211,19 @@ export async function processSheetOnlyUpload(params: {
       process.env.VERCEL === "1" && !isDriveOAuthConfigured()
         ? " Di Vercel: tambahkan GOOGLE_DRIVE_OAUTH_CLIENT_ID, GOOGLE_DRIVE_OAUTH_CLIENT_SECRET, GOOGLE_DRIVE_OAUTH_REFRESH_TOKEN (dari npm run drive:oauth-setup), lalu redeploy."
         : "";
-    driveWarning = raw.includes("storage quota") || raw.includes("Service Accounts")
-      ? `Upload Drive gagal (service account).${vercelHint || " Pastikan OAuth Drive sudah di env production."} Spreadsheet tetap terisi.`
-      : `${raw}${vercelHint}`;
+    const customerRoot = getOcrExportCustomerDriveFolderId();
+    const oauthGrantHint = driveOAuthRefreshHint(raw);
+    const customerPathHint =
+      isCustomerDestination(gudangLabel) && customerLabel
+        ? customerRoot
+          ? ` Target Customer: folder ${customerRoot} → ${customerLabel}/Surat Jalan/. Pastikan akun OAuth/SA punya Editor di folder itu.`
+          : " Target Customer: [GOOGLE_DRIVE_FOLDER_ID]/Customer/… — jangan set GOOGLE_DRIVE_FOLDER_ID ke folder Customer; pakai GOOGLE_DRIVE_CUSTOMER_FOLDER_ID untuk folder Customer yang sudah ada."
+        : "";
+    driveWarning = oauthGrantHint
+      ? `${oauthGrantHint}${customerPathHint}`
+      : raw.includes("storage quota") || raw.includes("Service Accounts")
+        ? `Upload Drive gagal (service account).${vercelHint || " Pastikan OAuth Drive sudah di env production."}${customerPathHint} Spreadsheet tetap terisi.`
+        : `${raw}${vercelHint}${customerPathHint}`;
     fileUrl = "";
   }
 

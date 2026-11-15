@@ -32,13 +32,27 @@ async function main() {
     scope: SCOPES,
   });
 
-  console.log("\n1. Buka URL ini (login akun yang punya folder Drive GBC):\n");
+  console.log("\n=== LANGKAH 1 (browser) — jangan tempel ini ke terminal ===\n");
+  console.log("Copy baris URL di bawah, buka di Chrome, login Gmail pemilik folder Drive:\n");
   console.log(url);
-  console.log("\n2. Setuju akses, salin kode dari Google.\n");
+  console.log(
+    "\n=== LANGKAH 2 (browser) ===\n" +
+      "Setelah 'Allow', Google menampilkan halaman dengan KODE PENDEK (bukan URL lagi).\n" +
+      "Contoh kode: 4/0AeanS... atau 4/0Ad...  (beberapa puluh karakter, satu baris).\n" +
+      "\n=== LANGKAH 3 (terminal) ===\n" +
+      "Tempel HANYA kode pendek itu (bukan link https://accounts.google.com/...).\n"
+  );
 
   const rl = readline.createInterface({ input, output });
-  const code = (await rl.question("Tempel kode di sini: ")).trim();
+  const code = (await rl.question("Tempel KODE dari Google (bukan URL): ")).trim();
   rl.close();
+
+  if (/^https?:\/\//i.test(code) || code.includes("accounts.google.com")) {
+    console.error(
+      "\nItu URL, bukan kode. Ulangi: buka URL di browser → Allow → salin kode pendek di halaman Google.\n"
+    );
+    process.exit(1);
+  }
 
   const { tokens } = await oauth2.getToken(code);
   if (!tokens.refresh_token) {

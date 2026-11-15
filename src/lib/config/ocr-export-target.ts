@@ -28,6 +28,16 @@ export function getOcrExportDriveFolderId(): string {
   return fromEnv;
 }
 
+/**
+ * Folder induk khusus alur **Customer** (isi: `{Nama Customer}/Surat Jalan/…`).
+ * Jika tidak di-set, app membuat subfolder `Customer` di bawah `GOOGLE_DRIVE_FOLDER_ID`.
+ */
+export function getOcrExportCustomerDriveFolderId(): string | null {
+  const fromEnv = process.env.GOOGLE_DRIVE_CUSTOMER_FOLDER_ID?.trim();
+  if (!fromEnv || LEGACY_DRIVE_FOLDER_IDS.has(fromEnv)) return null;
+  return fromEnv;
+}
+
 export function ocrExportSheetUrl(sheetId = getOcrExportSheetId()): string {
   return `https://docs.google.com/spreadsheets/d/${sheetId}/edit`;
 }

@@ -16,7 +16,10 @@ import { isTabSetupCached, markTabSetupCached, tabSetupCacheKey } from "@/lib/go
 import { SHEET_QUOTA_USER_MESSAGE, sheetQuotaError } from "@/lib/google-sheets/sheet-values";
 import { applyOcrSheetFormatting } from "./ocr-sheet-format";
 import { ensureInboundMonitoringWorkbook } from "./inbound-monitoring-layout";
-import { DATA_COMPILATION_TAB_NAME } from "@/lib/config/ocr-export-target";
+import {
+  DATA_COMPILATION_TAB_NAME,
+  getOcrExportCustomerDriveFolderId,
+} from "@/lib/config/ocr-export-target";
 
 const resolvedOcrTabBySpreadsheet = new Map<string, string>();
 
@@ -374,7 +377,12 @@ export async function findOrCreateDriveFolder(params: {
 const CUSTOMER_DRIVE_SEGMENT = "Customer";
 const CUSTOMER_SURAT_JALAN_FOLDER = "Surat Jalan";
 
-/** `Customer / {nama customer} / Surat Jalan / [tanggal] - no - supplier /` file. */
+/**
+ * GBC (default): `[GOOGLE_DRIVE_FOLDER_ID]/Customer/{nama}/Surat Jalan/…`
+ * Opsional: `GOOGLE_DRIVE_CUSTOMER_FOLDER_ID` = folder Customer yang sudah ada
+ * → `{folder}/{nama}/Surat Jalan/…` (tanpa subfolder `Customer` lagi).
+ * Mirror supplier: `{drive_root_folder_id}/Customer/{nama}/…` kecuali root mirror = customer folder khusus.
+ */
 export async function uploadSuratJalanToCustomerDrive(params: {
   config: GoogleExportConfig;
   buffer: Buffer;
@@ -384,15 +392,28 @@ export async function uploadSuratJalanToCustomerDrive(params: {
   subfolderName: string;
   rootFolderId?: string;
 }): Promise<{ fileId: string; fileUrl: string }> {
-  const rootId = params.rootFolderId?.trim() || params.config.driveFolderId;
-  const customerRootId = await findOrCreateDriveFolder({
-    config: params.config,
-    parentId: rootId,
-    folderName: CUSTOMER_DRIVE_SEGMENT,
-  });
+  const gbcRootId = params.config.driveFolderId;
+  const mirrorRootId = params.rootFolderId?.trim() || "";
+  const dedicatedCustomerRoot = getOcrExportCustomerDriveFolderId();
+  const uploadViaGbcRoot = !mirrorRootId || mirrorRootId === gbcRootId;
+
+  let customerContainerId: string;
+  if (uploadViaGbcRoot && dedicatedCustomerRoot) {
+    customerContainerId = dedicatedCustomerRoot;
+  } else if (!uploadViaGbcRoot && dedicatedCustomerRoot && mirrorRootId === dedicatedCustomerRoot) {
+    customerContainerId = dedicatedCustomerRoot;
+  } else {
+    const rootId = mirrorRootId || gbcRootId;
+    customerContainerId = await findOrCreateDriveFolder({
+      config: params.config,
+      parentId: rootId,
+      folderName: CUSTOMER_DRIVE_SEGMENT,
+    });
+  }
+
   const clientFolderId = await findOrCreateDriveFolder({
     config: params.config,
-    parentId: customerRootId,
+    parentId: customerContainerId,
     folderName: params.customerName.trim(),
   });
   const sjTypeFolderId = await findOrCreateDriveFolder({

@@ -31,6 +31,30 @@ function masterMappingMatches(
   return hits;
 }
 
+const MIN_MATCH_SCORE = 0.35;
+
+function bestFieldSimilarity(
+  query: string,
+  fields: string[]
+): { score: number; matchType: "exact" | "fuzzy" } {
+  const nq = normalizeProductName(query);
+  if (!nq) return { score: 0, matchType: "fuzzy" };
+
+  let best = 0;
+  let exact = false;
+  for (const field of fields) {
+    const text = coerceSheetCell(field);
+    if (!text) continue;
+    if (normalizeProductName(text) === nq) {
+      return { score: 1, matchType: "exact" };
+    }
+    best = Math.max(best, productNameSimilarity(query, text));
+  }
+
+  if (best >= 0.95) exact = true;
+  return { score: best, matchType: exact ? "exact" : "fuzzy" };
+}
+
 export function findTopRekapSkuMatches(
   namaBarangOcr: string,
   catalog: SkuRekapEntry[],
@@ -51,32 +75,18 @@ export function findTopRekapSkuMatches(
 
   for (const entry of catalog) {
     const acuan = coerceSheetCell(entry.namaProdukAcuan);
-    if (!acuan) continue;
+    const internal = coerceSheetCell(entry.namaInternalAccurate);
+    const sku = coerceSheetCell(entry.skuLengkap);
+    if (!acuan && !internal && !sku) continue;
 
-    const nq = normalizeProductName(query);
-    const na = normalizeProductName(acuan);
-
-    let score = productNameSimilarity(query, acuan);
-    let matchType: "exact" | "fuzzy" = score >= 0.95 ? "exact" : "fuzzy";
-
-    if (nq === na) {
-      score = 1;
-      matchType = "exact";
-    } else if (
-      entry.skuLengkap &&
-      normalizeProductName(entry.skuLengkap) === nq
-    ) {
-      score = 1;
-      matchType = "exact";
-    }
-
-    if (score < 0.35) continue;
+    const { score, matchType } = bestFieldSimilarity(query, [acuan, internal, sku]);
+    if (score < MIN_MATCH_SCORE) continue;
 
     scored.push({
       rowNo: coerceSheetCell(entry.rowNo),
-      skuLengkap: coerceSheetCell(entry.skuLengkap),
-      namaInternalAccurate: coerceSheetCell(entry.namaInternalAccurate),
-      namaProdukAcuan: acuan,
+      skuLengkap: sku,
+      namaInternalAccurate: internal,
+      namaProdukAcuan: acuan || internal || sku,
       kategoriUtama: coerceSheetCell(entry.kategoriUtama),
       skus: coerceSheetCell(entry.skus),
       barcode: coerceSheetCell(entry.barcode),
@@ -86,11 +96,15 @@ export function findTopRekapSkuMatches(
     });
   }
 
+  const tieDetail = (item: SkuMatchSuggestion) =>
+    productNameSimilarity(query, item.namaInternalAccurate || item.namaProdukAcuan);
+
   return scored
     .sort(
       (a, b) =>
         b.score - a.score ||
-        coerceSheetCell(a.namaProdukAcuan).localeCompare(coerceSheetCell(b.namaProdukAcuan), "id")
+        tieDetail(b) - tieDetail(a) ||
+        normalizeProductName(b.namaProdukAcuan).length - normalizeProductName(a.namaProdukAcuan).length
     )
     .slice(0, limit);
 }
