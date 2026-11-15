@@ -1,7 +1,19 @@
 import { coerceSheetCell } from "@/lib/sku-matching/coerce-string";
 
+/** Indeks kolom 0-based pada satu baris REKAP SKUL. */
+export type RekapSkulColMap = {
+  rowNo: number;
+  skuLengkap: number;
+  namaInternalAccurate: number;
+  namaProdukAcuan: number;
+  kategoriUtama: number;
+  skus: number;
+  barcode: number;
+  sumberLembar: number;
+};
+
 /** Layout default REKAP SKUL v2: A No, B SKU Lengkap, C Nama Internal Accurate, D Nama Produk Acuan, … */
-export const REKAP_SKUL_DEFAULT_COL = {
+export const REKAP_SKUL_DEFAULT_COL: RekapSkulColMap = {
   rowNo: 0,
   skuLengkap: 1,
   namaInternalAccurate: 2,
@@ -10,9 +22,7 @@ export const REKAP_SKUL_DEFAULT_COL = {
   skus: 5,
   barcode: 6,
   sumberLembar: 7,
-} as const;
-
-export type RekapSkulColMap = typeof REKAP_SKUL_DEFAULT_COL;
+};
 
 function headerNorm(cell: string): string {
   return String(cell ?? "")
