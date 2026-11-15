@@ -25,6 +25,11 @@ function parseGudangChatIdMap(): Map<string, string> {
     if (fromEnv) map.set(gudang, fromEnv);
   }
 
+  if (!map.has(SUPPLIER_CUSTOMER_DESTINATION)) {
+    const customerChat = process.env.TELEGRAM_CUSTOMER_CHAT_ID?.trim();
+    if (customerChat) map.set(SUPPLIER_CUSTOMER_DESTINATION, customerChat);
+  }
+
   return map;
 }
 
@@ -53,7 +58,11 @@ export function resolveTelegramChatIdForGudang(gudang: string): string | null {
   if (map.has(label)) return map.get(label)!;
   const legacy = process.env.TELEGRAM_CHAT_ID?.trim();
   if (label === SUPPLIER_CUSTOMER_DESTINATION) {
-    return map.get(SUPPLIER_CUSTOMER_DESTINATION) ?? null;
+    return (
+      map.get(SUPPLIER_CUSTOMER_DESTINATION) ??
+      process.env.TELEGRAM_CUSTOMER_CHAT_ID?.trim() ??
+      null
+    );
   }
   if (legacy && SUPPLIER_GUDANG_WAREHOUSE_OPTIONS.includes(label as (typeof SUPPLIER_GUDANG_WAREHOUSE_OPTIONS)[number])) {
     return legacy;

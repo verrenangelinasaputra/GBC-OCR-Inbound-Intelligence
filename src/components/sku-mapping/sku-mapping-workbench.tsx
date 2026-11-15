@@ -30,6 +30,7 @@ export function SkuMappingWorkbench({
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [confirmKey, setConfirmKey] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [messageTone, setMessageTone] = useState<"ok" | "err">("ok");
   const [removed, setRemoved] = useState<Set<string>>(new Set());
   const reviewBase = ocrReviewBaseFromPathname(usePathname());
 
@@ -58,15 +59,22 @@ export function SkuMappingWorkbench({
     try {
       const res = await fetch("/api/sku-mapping/finalize", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(reviewBase.startsWith("/customer")
+            ? { "X-Gbc-Audience": "customer" }
+            : {}),
+        },
         body: JSON.stringify({ rowKey, catalogRowNo }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Gagal simpan final DBM");
       setRemoved((prev) => new Set(prev).add(rowKey));
       setConfirmKey(null);
+      setMessageTone("ok");
       setMessage("Baris tersimpan ke tab Data Barang Masuk.");
     } catch (e) {
+      setMessageTone("err");
       setMessage(e instanceof Error ? e.message : "Gagal simpan");
     } finally {
       setBusyKey(null);
@@ -76,7 +84,13 @@ export function SkuMappingWorkbench({
   return (
     <div className="space-y-4">
       {message ? (
-        <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-900">
+        <p
+          className={
+            messageTone === "ok"
+              ? "rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-900"
+              : "rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-900"
+          }
+        >
           {message}
         </p>
       ) : null}

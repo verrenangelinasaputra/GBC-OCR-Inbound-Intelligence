@@ -21,9 +21,6 @@ export function resolveGudangFilterForAudience(
   const customer = SUPPLIER_CUSTOMER_DESTINATION;
 
   if (audience === "customer") {
-    if (profileGudangs?.length) {
-      return profileGudangs.includes(customer) ? [customer] : [];
-    }
     return [customer];
   }
 

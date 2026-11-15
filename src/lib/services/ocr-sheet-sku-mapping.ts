@@ -70,7 +70,7 @@ export async function listSelesaiSkuMappingLines(
     }
   }
 
-  const gudangSet = gudangFilter?.length ? new Set(gudangFilter) : null;
+  const gudangSet = gudangFilter === undefined ? null : new Set(gudangFilter);
   const out: SkuMappingLineRow[] = [];
 
   for (const group of groups.values()) {

@@ -45,4 +45,24 @@ describe("telegram upload message", () => {
     expect(text).toContain("TEH PUCUK");
     expect(text).not.toContain("Spreadsheet:");
   });
+
+  it("includes customer name for Customer destination", () => {
+    const text = buildTelegramUploadMessageText({
+      gudang: "Customer",
+      customerName: "PT ABC Retail",
+      supplierName: "PT Supplier X",
+      result: {
+        submissionRef: "SJ-1",
+        sheetRowCount: 1,
+        sheetId: "x",
+        sheetTab: "Customer",
+        sheetUrl: "https://example.com",
+        ocrWarnings: [],
+      },
+      barangLines: ["1. TEH — 10 PCS"],
+    });
+    expect(text).toContain("Tujuan: Customer");
+    expect(text).toContain("Nama Customer: PT ABC Retail");
+    expect(text).toContain("Barang:");
+  });
 });

@@ -277,6 +277,7 @@ export async function processSheetOnlyUpload(params: {
       await notifySupplierUploadTelegram({
         gudang: gudangLabel,
         supplierName: supplierName || params.supplierName?.trim() || "Unverified",
+        customerName: isCustomerDestination(gudangLabel) ? customerLabel : undefined,
         result: uploadResult,
         barangLines: formatTelegramBarangLines(payload),
       });

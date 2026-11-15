@@ -3,6 +3,7 @@ import {
   type GeminiSJItem,
   type GeminiSJPayload,
 } from "@/lib/providers/ocr/gemini-surat-jalan";
+import { SUPPLIER_CUSTOMER_DESTINATION } from "@/lib/config/supplier-gudang";
 import type { SheetOnlyUploadResult } from "@/lib/services/sheet-only-upload";
 
 export function formatTelegramBarangLines(payload: GeminiSJPayload, maxItems = 30): string[] {
@@ -50,6 +51,8 @@ function formatJumlah(item: GeminiSJItem): string {
 export type TelegramUploadMessageParams = {
   gudang: string;
   supplierName: string;
+  /** Diisi saat tujuan = Customer (nama customer dari supplier). */
+  customerName?: string;
   result: SheetOnlyUploadResult;
   barangLines?: string[];
 };
@@ -57,13 +60,17 @@ export type TelegramUploadMessageParams = {
 const TELEGRAM_TEXT_MAX = 4000;
 
 export function buildTelegramUploadMessageText(params: TelegramUploadMessageParams): string {
-  const { gudang, supplierName, result, barangLines } = params;
+  const { gudang, supplierName, customerName, result, barangLines } = params;
   const noSj = result.suratJalanNumber?.trim() || "— belum terbaca OCR —";
+  const isCustomer = gudang.trim() === SUPPLIER_CUSTOMER_DESTINATION;
 
   const lines = [
-    "📦 Surat Jalan baru (upload supplier)",
+    isCustomer ? "📦 Surat Jalan baru — Customer" : "📦 Surat Jalan baru (upload supplier)",
     "",
-    `Gudang: ${gudang}`,
+    isCustomer ? `Tujuan: ${SUPPLIER_CUSTOMER_DESTINATION}` : `Gudang: ${gudang}`,
+    ...(isCustomer
+      ? [`Nama Customer: ${customerName?.trim() || "— belum diisi supplier —"}`]
+      : []),
     `Supplier: ${supplierName || "—"}`,
     `No. SJ: ${noSj}`,
     `Ref: ${result.submissionRef}`,

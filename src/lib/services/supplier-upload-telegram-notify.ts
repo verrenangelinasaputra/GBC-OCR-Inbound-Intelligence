@@ -9,6 +9,7 @@ import { buildTelegramUploadMessageText } from "@/lib/services/telegram-upload-m
 export type SupplierUploadTelegramParams = {
   gudang: string;
   supplierName: string;
+  customerName?: string;
   result: SheetOnlyUploadResult;
   barangLines?: string[];
 };

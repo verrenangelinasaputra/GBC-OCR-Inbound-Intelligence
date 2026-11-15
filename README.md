@@ -149,7 +149,7 @@ Shared Drive + service account **Content manager**, atau `GOOGLE_WORKSPACE_DELEG
 |-----------|-----------|
 | OCR Gemini Vision | **Live** jika `GEMINI_API_KEY` + `OCR_PROVIDER=gemini` |
 | OCR demo | Aktif hanya jika `OCR_PROVIDER=demo` dan key kosong |
-| Telegram upload notify | **Live** jika `TELEGRAM_BOT_TOKEN` + `TELEGRAM_GUDANG_CHAT_IDS` — notif per foto SJ setelah sheet & Drive |
+| Telegram upload notify | **Live** jika `TELEGRAM_BOT_TOKEN` + `TELEGRAM_GUDANG_CHAT_IDS` — notif per foto SJ setelah sheet & Drive. Tujuan **Customer**: `TELEGRAM_CUSTOMER_CHAT_ID=-5495031107` (atau `"Customer"` di JSON map) — pesan menyertakan **Nama Customer** |
 | WhatsApp | **Not configured** |
 | Accurate API | **Export CSV PP** — bukan sync/API claim |
 | Google Drive + Sheets | **Live** jika `GOOGLE_EXPORT_ENABLED=true` + service account (export otomatis setelah OCR) |

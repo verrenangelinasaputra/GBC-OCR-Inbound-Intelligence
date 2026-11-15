@@ -1,8 +1,10 @@
-import { jsonError, requireApiSession } from "@/lib/api/auth-context";
+import { apiAllowedModules, jsonError, requireApiSession } from "@/lib/api/auth-context";
 import { hasPermission } from "@/lib/rbac/permissions";
 import { isSheetOnlyMode } from "@/lib/config/app-mode";
 import { hasDatabase } from "@/lib/db";
 import { getInternalUserProfile, userCanAccessGudang } from "@/lib/internal-auth/profile";
+import { resolveGudangFilterForAudience } from "@/lib/portal/audience";
+import { portalAudienceFromRequest } from "@/lib/portal/request-audience";
 import { findTopRekapSkuMatches } from "@/lib/sku-matching/match-rekap-sku";
 import type { SkuRekapEntry } from "@/lib/sku-matching/sku-rekap-types";
 import { appendDbmInboundRow, listDbmFinalizedRowKeys } from "@/lib/services/dbm-inbound-sheet";
@@ -21,15 +23,17 @@ export async function POST(request: Request) {
 
   try {
     const session = await requireApiSession();
+    const mods = await apiAllowedModules(session);
     const canApprove =
-      hasPermission(session.roles, "sku_mapping", "APPROVE", session.allowedModules) ||
-      hasPermission(session.roles, "sku_mapping", "EDIT", session.allowedModules);
+      hasPermission(session.roles, "sku_mapping", "APPROVE", mods) ||
+      hasPermission(session.roles, "sku_mapping", "EDIT", mods);
     if (!canApprove) {
       return jsonError(new Error("FORBIDDEN"), 403);
     }
 
+    const audience = portalAudienceFromRequest(request);
     const profile = await getInternalUserProfile(session.username);
-    const gudangFilter = profile?.gudangList.length ? profile.gudangList : undefined;
+    const gudangFilter = resolveGudangFilterForAudience(audience, profile?.gudangList);
 
     const body = await request.json();
     const rowKey = String(body.rowKey ?? "").trim();
