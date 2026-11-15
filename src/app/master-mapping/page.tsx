@@ -47,7 +47,7 @@ export default async function MasterMappingPage({
   return (
     <ModuleListPage
       title="Generator SKU"
-      description="Master SKU (TABEL → REKAP SKUL/SKUS) dan alias nama OCR untuk SKU Mapping."
+      description="Generator master SKU (TABEL → REKAP SKUL/SKUS) untuk SKU Mapping."
     >
       <PortalAudienceBanner audience={audience} />
       <p className="mb-4 text-sm text-slate-600">
@@ -60,7 +60,7 @@ export default async function MasterMappingPage({
         >
           spreadsheet master v2
         </a>
-        . Alias OCR tetap di tab <strong>Master Mapping</strong> pada spreadsheet yang sama. Service account perlu{" "}
+        . Service account perlu{" "}
         <strong>Editor</strong>. <Link href="/sku-mapping" className="text-blue-600 hover:underline">SKU Mapping</Link> membaca{" "}
         <strong>REKAP SKUL</strong> dari file yang sama (env <code className="text-xs">SKU_MASTER_SHEET_ID</code> /{" "}
         <code className="text-xs">SKU_REKAP_SHEET_ID</code>).
