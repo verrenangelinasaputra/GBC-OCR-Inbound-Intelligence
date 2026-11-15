@@ -1,13 +1,14 @@
 import "server-only";
 
-import { google } from "googleapis";
-import { createGoogleAuthClient, resolveSheetTabName } from "@/lib/providers/google-workspace/client";
 import { getGoogleExportConfigOptional } from "@/lib/providers/google-workspace/config";
 import {
   mapOcrSheetRow,
-  ocrSheetFullColumnsRange,
   type OcrSheetRowFields,
 } from "@/lib/providers/google-workspace/ocr-sheet-columns";
+import {
+  ocrReadTabTitlesForGudangFilter,
+  readOcrSheetTabs,
+} from "@/lib/services/ocr-sheet-matrix";
 import {
   docEligibleForSkuMapping,
   normalizeOcrReviewStatus,
@@ -40,38 +41,33 @@ export async function listSelesaiSkuMappingLines(
   const config = getGoogleExportConfigOptional();
   if (!config) return [];
 
-  const auth = createGoogleAuthClient(config);
-  const sheets = google.sheets({ version: "v4", auth });
-  const sheetTab = await resolveSheetTabName(config);
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: config.sheetId,
-    range: ocrSheetFullColumnsRange(sheetTab),
-  });
-
-  const rows = res.data.values ?? [];
+  const tabTitles = ocrReadTabTitlesForGudangFilter(gudangFilter);
+  const { rowsByTab } = await readOcrSheetTabs(config, tabTitles);
   const groups = new Map<string, DocGroup>();
 
-  for (let i = 1; i < rows.length; i += 1) {
-    const row = rows[i] ?? [];
-    if (!isMeaningfulOcrDataRow(row)) continue;
-    const fields = mapOcrSheetRow(row);
-    const rawKey = fields.fileName || `${fields.noSuratJalan}|${fields.tanggal}|${i}`;
-    const docKey = encodeOcrSheetDocKey(rawKey);
-    let group = groups.get(rawKey);
-    if (!group) {
-      group = {
-        docKey,
-        gudang: fields.gudang,
-        supplier: fields.supplier,
-        tanggal: fields.tanggal,
-        noSuratJalan: fields.noSuratJalan,
-        reviewStatuses: new Set(),
-        lines: [],
-      };
-      groups.set(rawKey, group);
+  for (const rows of rowsByTab.values()) {
+    for (let i = 1; i < rows.length; i += 1) {
+      const row = rows[i] ?? [];
+      if (!isMeaningfulOcrDataRow(row)) continue;
+      const fields = mapOcrSheetRow(row);
+      const rawKey = fields.fileName || `${fields.noSuratJalan}|${fields.tanggal}|${i}`;
+      const docKey = encodeOcrSheetDocKey(rawKey);
+      let group = groups.get(rawKey);
+      if (!group) {
+        group = {
+          docKey,
+          gudang: fields.gudang,
+          supplier: fields.supplier,
+          tanggal: fields.tanggal,
+          noSuratJalan: fields.noSuratJalan,
+          reviewStatuses: new Set(),
+          lines: [],
+        };
+        groups.set(rawKey, group);
+      }
+      group.lines.push(fields);
+      group.reviewStatuses.add(normalizeOcrReviewStatus(fields.statusReview));
     }
-    group.lines.push(fields);
-    group.reviewStatuses.add(normalizeOcrReviewStatus(fields.statusReview));
   }
 
   const gudangSet = gudangFilter?.length ? new Set(gudangFilter) : null;

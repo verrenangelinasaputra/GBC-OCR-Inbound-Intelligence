@@ -3,18 +3,30 @@ import { verifyPassword } from "@/lib/auth/password";
 import { createSessionToken, setSessionCookie } from "@/lib/auth/session";
 import { isInternalSheetAuthEnabled } from "@/lib/config/internal-sheet";
 import { loginInternalFromSheet } from "@/lib/internal-auth/login";
-import { ASSIGNABLE_NAV_MODULES } from "@/lib/rbac/nav-modules";
+import { ASSIGNABLE_NAV_MODULES, PORTAL_NAV_OPERATIONS } from "@/lib/rbac/nav-modules";
+import { portalModuleHref } from "@/lib/portal/paths";
 import { NO_MODULE_ACCESS_PATH, usesPerUserModuleAccess } from "@/lib/rbac/permissions";
 import type { AppModule } from "@/lib/rbac/modules";
+import type { PortalModuleAccess } from "@/lib/rbac/portal-module-access";
 import { writeAuditLog } from "@/lib/services/audit";
 import { SupplierAuthError } from "@/lib/supplier-auth/errors";
 
-function internalSheetRedirect(roles: string[], allowedModules: AppModule[]): string {
+function pickFirstHref(mods: AppModule[], audience: "gudang" | "customer"): string | null {
+  for (const op of PORTAL_NAV_OPERATIONS) {
+    if (mods.includes(op.module)) return portalModuleHref(audience, op.href);
+  }
+  return null;
+}
+
+function internalSheetRedirect(roles: string[], access: PortalModuleAccess): string {
   if (roles.includes("SUPPLIER_USER") && !roles.includes("SUPER_ADMIN")) return "/supplier";
   if (usesPerUserModuleAccess(roles)) {
-    if (!allowedModules.length) return NO_MODULE_ACCESS_PATH;
-    if (allowedModules.includes("dashboard")) return "/dashboard";
-    const first = ASSIGNABLE_NAV_MODULES.find((m) => allowedModules.includes(m.module));
+    if (!access.union.length) return NO_MODULE_ACCESS_PATH;
+    const gudang = pickFirstHref(access.gudang, "gudang");
+    if (gudang) return gudang;
+    const customer = pickFirstHref(access.customer, "customer");
+    if (customer) return customer;
+    const first = ASSIGNABLE_NAV_MODULES.find((m) => access.union.includes(m.module));
     return first?.href ?? NO_MODULE_ACCESS_PATH;
   }
   return "/dashboard";
@@ -35,9 +47,15 @@ export async function POST(request: Request) {
         roles,
         supplierId: null,
         allowedModules: account.allowedModules,
+        allowedModulesGudang: account.allowedModulesGudang,
+        allowedModulesCustomer: account.allowedModulesCustomer,
       });
       await setSessionCookie(token);
-      const redirect = internalSheetRedirect(roles, account.allowedModules);
+      const redirect = internalSheetRedirect(roles, {
+        gudang: account.allowedModulesGudang,
+        customer: account.allowedModulesCustomer,
+        union: account.allowedModules,
+      });
       return Response.json({ ok: true, redirect, roles, auth: "internal-sheet" });
     }
 

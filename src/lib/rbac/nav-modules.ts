@@ -19,8 +19,38 @@ export const PORTAL_NAV_MODULES: {
   { module: "users", label: "User & Role Management", href: "/users" },
 ];
 
+/** Modul operasional (tanpa admin user). */
+export const PORTAL_NAV_OPERATIONS = PORTAL_NAV_MODULES.filter((m) => m.module !== "users");
+
+export function customerPortalHref(baseHref: string): string {
+  if (baseHref.startsWith("/customer/")) return baseHref;
+  return `/customer${baseHref}`;
+}
+
+export const PORTAL_NAV_SECTIONS = [
+  {
+    id: "gudang" as const,
+    title: "Gudang",
+    items: PORTAL_NAV_OPERATIONS,
+  },
+  {
+    id: "customer" as const,
+    title: "Customer",
+    items: PORTAL_NAV_OPERATIONS.map((m) => ({ ...m, href: customerPortalHref(m.href) })),
+  },
+  {
+    id: "admin" as const,
+    title: "Admin",
+    items: PORTAL_NAV_MODULES.filter((m) => m.module === "users"),
+  },
+];
+
 /** Alias untuk UI admin (centang halaman per user). */
 export const ASSIGNABLE_NAV_MODULES = PORTAL_NAV_MODULES;
+
+/** Halaman operasional per section (tanpa User & Role Management). */
+export const ASSIGNABLE_GUDANG_MODULES = PORTAL_NAV_OPERATIONS;
+export const ASSIGNABLE_CUSTOMER_MODULES = PORTAL_NAV_OPERATIONS;
 
 /** Route lama — tidak tampil di sidebar; dipakai agar middleware bisa menolak akses langsung via URL. */
 const RETIRED_PORTAL_ROUTES: { module: AppModule; href: string }[] = [
@@ -47,8 +77,12 @@ export function isActivePortalModule(mod: AppModule): boolean {
 }
 
 export function pathnameToModule(pathname: string): AppModule | null {
+  const normalized =
+    pathname === "/customer" || pathname.startsWith("/customer/")
+      ? pathname.replace(/^\/customer/, "") || "/dashboard"
+      : pathname;
   const entry = ROUTE_CATALOG.find(
-    (n) => pathname === n.href || pathname.startsWith(`${n.href}/`)
+    (n) => normalized === n.href || normalized.startsWith(`${n.href}/`)
   );
   return entry?.module ?? null;
 }

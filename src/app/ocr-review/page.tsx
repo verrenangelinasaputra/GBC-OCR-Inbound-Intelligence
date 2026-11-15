@@ -12,6 +12,8 @@ import { filterOcrReviewDocs, parseMonthFilter, parseYearFilter } from "@/lib/oc
 import { collectDistinctSjYears } from "@/lib/surat-jalan/tanggal-sj";
 import Link from "next/link";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { getPortalAudience, resolveGudangFilterForAudience } from "@/lib/portal/audience";
+import { PortalAudienceBanner } from "@/components/layout/portal-audience-banner";
 
 type SearchParams = { gudang?: string; status?: string; year?: string; month?: string };
 
@@ -21,6 +23,7 @@ export default async function OcrReviewPage({
   searchParams: Promise<SearchParams>;
 }) {
   const query = await searchParams;
+  const audience = await getPortalAudience();
   const gudangFilterParam = query.gudang?.trim();
   const statusBucket = parseDashboardBucketFilter(query.status);
   const yearFilter = parseYearFilter(query.year);
@@ -30,7 +33,7 @@ export default async function OcrReviewPage({
     try {
       const session = await getSession();
       const profile = session ? await getInternalUserProfile(session.username) : null;
-      const gudangFilter = profile?.gudangList.length ? profile.gudangList : undefined;
+      const gudangFilter = resolveGudangFilterForAudience(audience, profile?.gudangList);
       docs = await listOcrDocumentsFromSheet(500, gudangFilter);
     } catch {
       return <SpreadsheetModePage title="Review Surat Jalan" />;
@@ -49,6 +52,7 @@ export default async function OcrReviewPage({
         title="Review Surat Jalan"
         description="Daftar upload supplier — filter sesuai gudang di profil Anda. Buka detail untuk meninjau dan verifikasi."
       >
+        <PortalAudienceBanner audience={audience} />
         <Suspense
           fallback={
             <div className="mb-4 h-20 animate-pulse rounded-xl border border-slate-200 bg-slate-50" />

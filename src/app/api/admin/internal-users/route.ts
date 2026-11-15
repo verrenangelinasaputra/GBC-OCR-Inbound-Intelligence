@@ -3,7 +3,8 @@ import { isSheetOnlyMode } from "@/lib/config/app-mode";
 import { hasDatabase } from "@/lib/db";
 import { deleteInternalUser, listInternalUsers, updateInternalUserAdmin } from "@/lib/internal-auth/directory";
 import type { AppModule } from "@/lib/rbac/modules";
-import { normalizeGudangSelection } from "@/lib/config/supplier-gudang";
+import { normalizeWarehouseGudangSelection } from "@/lib/config/supplier-gudang";
+import { formatAllowedModulesCell } from "@/lib/rbac/nav-modules";
 
 function sheetAdminEnabled(): boolean {
   return isSheetOnlyMode() || !hasDatabase();
@@ -25,6 +26,8 @@ export async function GET() {
       roles: u.roles,
       status: u.status,
       allowedModules: u.allowedModules,
+      allowedModulesGudang: u.allowedModulesGudang,
+      allowedModulesCustomer: u.allowedModulesCustomer,
       createdAt: u.createdAt,
     }));
     return Response.json({ users: safe });
@@ -45,9 +48,17 @@ export async function PATCH(request: Request) {
 
     const status = body.status !== undefined ? String(body.status).trim().toUpperCase() : undefined;
     let gudang: string | undefined;
+    const gudangModules = Array.isArray(body.allowedModulesGudang)
+      ? (body.allowedModulesGudang as unknown[]).map((m) => String(m).trim())
+      : undefined;
+    const customerModules = Array.isArray(body.allowedModulesCustomer)
+      ? (body.allowedModulesCustomer as unknown[]).map((m) => String(m).trim())
+      : undefined;
+
     if (body.gudang !== undefined) {
       try {
-        gudang = normalizeGudangSelection(body.gudang);
+        const needsGudang = gudangModules === undefined ? true : gudangModules.length > 0;
+        gudang = normalizeWarehouseGudangSelection(body.gudang, { allowEmpty: !needsGudang });
       } catch (e) {
         return jsonError(e);
       }
@@ -61,11 +72,36 @@ export async function PATCH(request: Request) {
       allowedModules = body.allowedModules.map((m: unknown) => String(m).trim()) as AppModule[];
     }
 
+    let allowedModulesGudang: AppModule[] | undefined;
+    if (gudangModules) {
+      allowedModulesGudang = gudangModules as AppModule[];
+    }
+    let allowedModulesCustomer: AppModule[] | undefined;
+    if (customerModules) {
+      allowedModulesCustomer = customerModules as AppModule[];
+    }
+
+    if (allowedModulesGudang || allowedModulesCustomer) {
+      const g = allowedModulesGudang ?? [];
+      const c = allowedModulesCustomer ?? [];
+      if (!g.length && !c.length) {
+        return jsonError(new Error("Pilih minimal satu halaman di section Gudang atau Customer."), 400);
+      }
+      if (g.length && !gudang) {
+        return jsonError(new Error("Pilih minimal satu nama gudang untuk section Gudang."), 400);
+      }
+      allowedModules = formatAllowedModulesCell([...new Set([...g, ...c])])
+        .split(";")
+        .filter(Boolean) as AppModule[];
+    }
+
     const updated = await updateInternalUserAdmin(username, {
       status,
       gudang,
       roles,
       allowedModules,
+      allowedModulesGudang,
+      allowedModulesCustomer,
     });
 
     return Response.json({
@@ -76,6 +112,8 @@ export async function PATCH(request: Request) {
         gudang: updated.gudang,
         roles: updated.roles,
         allowedModules: updated.allowedModules,
+        allowedModulesGudang: updated.allowedModulesGudang,
+        allowedModulesCustomer: updated.allowedModulesCustomer,
       },
     });
   } catch (e) {

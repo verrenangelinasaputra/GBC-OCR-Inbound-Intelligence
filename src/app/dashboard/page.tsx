@@ -12,18 +12,23 @@ import {
   resolveDashboardGudangList,
 } from "@/lib/ocr-review/dashboard-bucket";
 import { getGoogleExportConfigOptional } from "@/lib/providers/google-workspace/config";
+import { getPortalAudience, resolveGudangFilterForAudience } from "@/lib/portal/audience";
+import { portalModuleHref } from "@/lib/portal/paths";
+import { PortalAudienceBanner } from "@/components/layout/portal-audience-banner";
 
 export default async function DashboardPage() {
+  const audience = await getPortalAudience();
   const spreadsheetMode = !hasDatabase();
   const session = await getSession();
   const profile = session ? await getInternalUserProfile(session.username) : null;
-  const gudangFilter = profile?.gudangList.length ? profile.gudangList : undefined;
+  const gudangFilter = resolveGudangFilterForAudience(audience, profile?.gudangList);
+  const ocrReviewBase = portalModuleHref(audience, "/ocr-review");
 
   let gudangSections: ReturnType<typeof countDocsByGudangAndBucket> = [];
   if (spreadsheetMode && getGoogleExportConfigOptional()) {
     try {
       const docs = await listOcrDocumentsFromSheet(undefined, gudangFilter);
-      const gudangList = resolveDashboardGudangList(profile?.gudangList, docs);
+      const gudangList = resolveDashboardGudangList(gudangFilter, docs);
       gudangSections = countDocsByGudangAndBucket(docs, gudangList);
     } catch {
       gudangSections = [];
@@ -47,6 +52,7 @@ export default async function DashboardPage() {
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <WarehouseProfileChip />
       </div>
+      <PortalAudienceBanner audience={audience} />
       {spreadsheetMode && (
         <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           Mode spreadsheet — ringkasan Surat Jalan per gudang dari spreadsheet OCR. Klik kartu untuk membuka{" "}
@@ -55,7 +61,7 @@ export default async function DashboardPage() {
       )}
 
       {spreadsheetMode ? (
-        <GudangReviewStatusCards sections={gudangSections} />
+        <GudangReviewStatusCards sections={gudangSections} ocrReviewBase={ocrReviewBase} />
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

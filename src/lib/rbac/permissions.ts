@@ -2,6 +2,8 @@ import { PermissionAction } from "@prisma/client";
 import { isSheetOnlyMode } from "@/lib/config/app-mode";
 import type { AppModule, RoleCode } from "./modules";
 import { isActivePortalModule, pathnameToModule } from "./nav-modules";
+import { allowedModulesForPathname } from "./portal-module-access";
+import type { SessionPayload } from "@/lib/auth/session";
 
 const SHEET_INTERNAL_ROLES: RoleCode[] = ["DBM_OPERATOR", "WAREHOUSE_OPERATOR", "MANAGEMENT_VIEWER"];
 
@@ -187,7 +189,8 @@ export function hasPermission(
 export function canAccessRoute(
   roles: string[],
   pathname: string,
-  allowedModules: AppModule[] | undefined | null
+  allowedModules: AppModule[] | undefined | null,
+  session?: Pick<SessionPayload, "allowedModulesGudang" | "allowedModulesCustomer"> | null
 ): boolean {
   if (
     pathname === NO_MODULE_ACCESS_PATH ||
@@ -201,7 +204,19 @@ export function canAccessRoute(
   }
   if (roles.includes("SUPER_ADMIN")) return true;
   if (!mod) return true;
-  return hasPermission(roles, mod, "VIEW", allowedModules);
+  const scoped =
+    session && usesPerUserModuleAccess(roles)
+      ? allowedModulesForPathname(
+          {
+            roles,
+            allowedModules: allowedModules ?? undefined,
+            allowedModulesGudang: session.allowedModulesGudang,
+            allowedModulesCustomer: session.allowedModulesCustomer,
+          },
+          pathname
+        )
+      : allowedModules;
+  return hasPermission(roles, mod, "VIEW", scoped);
 }
 
 export async function loadUserPermissions(userId: string): Promise<{

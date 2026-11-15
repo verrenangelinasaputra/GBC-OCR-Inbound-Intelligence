@@ -1,7 +1,10 @@
 import type { DbmInboundAggregate, DbmInboundRecord, DbmShipmentAttachment } from "@/lib/dbm/dbm-inbound-types";
 import { parseQuantityAmount } from "@/lib/dbm/parse-quantity";
 
-function shipmentFromRecord(r: DbmInboundRecord): DbmShipmentAttachment {
+function shipmentFromRecord(
+  r: DbmInboundRecord,
+  ocrReviewBase = "/ocr-review"
+): DbmShipmentAttachment {
   const q = parseQuantityAmount(r.jumlah);
   return {
     docKey: r.docKey,
@@ -14,7 +17,7 @@ function shipmentFromRecord(r: DbmInboundRecord): DbmShipmentAttachment {
     jumlahAmount: q.amount,
     jumlahUnit: q.unit,
     linkSjDrive: r.linkSjDrive,
-    ocrReviewPath: `/ocr-review/${encodeURIComponent(r.docKey)}`,
+    ocrReviewPath: `${ocrReviewBase}/${encodeURIComponent(r.docKey)}`,
   };
 }
 
@@ -29,12 +32,16 @@ function aggregateGroupKey(r: DbmInboundRecord): string {
   return `line:${r.rowKey}`;
 }
 
-export function aggregateDbmInboundRecords(records: DbmInboundRecord[]): DbmInboundAggregate[] {
+export function aggregateDbmInboundRecords(
+  records: DbmInboundRecord[],
+  options?: { ocrReviewBase?: string }
+): DbmInboundAggregate[] {
+  const ocrReviewBase = options?.ocrReviewBase ?? "/ocr-review";
   const map = new Map<string, DbmInboundAggregate>();
 
   for (const r of records) {
     const key = aggregateGroupKey(r);
-    const ship = shipmentFromRecord(r);
+    const ship = shipmentFromRecord(r, ocrReviewBase);
     let group = map.get(key);
     if (!group) {
       const q = parseQuantityAmount(r.jumlah);

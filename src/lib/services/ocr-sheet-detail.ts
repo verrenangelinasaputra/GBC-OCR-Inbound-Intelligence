@@ -1,14 +1,10 @@
-import { google } from "googleapis";
 import {
   appendRowsToSheet,
-  createGoogleAuthClient,
-  resolveSheetTabName,
 } from "@/lib/providers/google-workspace/client";
-import { getGoogleExportConfigOptional } from "@/lib/providers/google-workspace";
+import { readOcrSheetMatrixForDocKey } from "@/lib/services/ocr-sheet-matrix";
 import { recomputeOcrSheetLineStatus } from "@/lib/providers/google-workspace/google-sj-export-rows";
 import {
   mapOcrSheetRow,
-  ocrSheetFullColumnsRange,
   ocrSheetRowRange,
   ocrSheetRowToValues,
   type OcrSheetRowFields,
@@ -67,31 +63,9 @@ function rowFromLine(line: OcrSheetLine): string[] {
   return ocrSheetRowToValues({ ...line, status });
 }
 
-async function readSheetMatrix() {
-  const config = getGoogleExportConfigOptional();
-  if (!config) throw new Error("Google export tidak dikonfigurasi");
-
-  const auth = createGoogleAuthClient(config);
-  const sheets = google.sheets({ version: "v4", auth });
-  const sheetTab = await resolveSheetTabName(config);
-  const meta = await sheets.spreadsheets.get({
-    spreadsheetId: config.sheetId,
-    fields: "sheets.properties(sheetId,title)",
-  });
-  const sheetGridId = meta.data.sheets?.find((s) => s.properties?.title === sheetTab)?.properties
-    ?.sheetId;
-  if (sheetGridId == null) throw new Error("Tab spreadsheet tidak ditemukan");
-
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: config.sheetId,
-    range: ocrSheetFullColumnsRange(sheetTab),
-  });
-  return { config, sheets, sheetTab, sheetGridId, rows: res.data.values ?? [] };
-}
-
 export async function getOcrSheetDocumentDetail(docKey: string): Promise<OcrSheetDocumentDetail> {
   const rawKey = decodeOcrSheetDocKey(docKey);
-  const { rows } = await readSheetMatrix();
+  const { rows } = await readOcrSheetMatrixForDocKey(docKey);
   const lines: OcrSheetLine[] = [];
 
   for (let i = 0; i < rows.length; i += 1) {
@@ -180,7 +154,7 @@ export async function saveOcrSheetDocumentEdits(params: {
   deleteSheetRows?: number[];
 }): Promise<OcrSheetDocumentDetail> {
   const rawKey = decodeOcrSheetDocKey(params.docKey);
-  let { config, sheets, sheetTab, sheetGridId, rows } = await readSheetMatrix();
+  let { config, sheets, sheetTab, sheetGridId, rows } = await readOcrSheetMatrixForDocKey(params.docKey);
 
   const current = await getOcrSheetDocumentDetail(params.docKey);
   const docSheetRows = new Set(current.lines.map((l) => l.sheetRow));
@@ -207,7 +181,7 @@ export async function saveOcrSheetDocumentEdits(params: {
         })),
       },
     });
-    ({ config, sheets, sheetTab, sheetGridId, rows } = await readSheetMatrix());
+    ({ config, sheets, sheetTab, sheetGridId, rows } = await readOcrSheetMatrixForDocKey(params.docKey));
   }
 
   const refreshed = await getOcrSheetDocumentDetail(params.docKey);

@@ -1,6 +1,8 @@
+import { headers } from "next/headers";
 import { getSession } from "@/lib/auth/session";
 import { requirePermission } from "@/lib/rbac/permissions";
 import type { AppModule } from "@/lib/rbac/modules";
+import { allowedModulesForAudience } from "@/lib/rbac/portal-module-access";
 import { PermissionAction } from "@prisma/client";
 
 export async function requireApiSession() {
@@ -11,9 +13,18 @@ export async function requireApiSession() {
   return session;
 }
 
+export async function apiAllowedModules(session: Awaited<ReturnType<typeof requireApiSession>>) {
+  const h = await headers();
+  const audience = h.get("x-gbc-audience") === "customer" ? "customer" : "gudang";
+  return allowedModulesForAudience(session, audience);
+}
+
 export async function requireApiPermission(module: AppModule, action: PermissionAction) {
   const session = await requireApiSession();
-  requirePermission(session.roles, module, action, session.allowedModules);
+  const h = await headers();
+  const audience = h.get("x-gbc-audience") === "customer" ? "customer" : "gudang";
+  const mods = allowedModulesForAudience(session, audience);
+  requirePermission(session.roles, module, action, mods);
   return session;
 }
 

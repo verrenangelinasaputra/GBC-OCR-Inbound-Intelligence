@@ -17,8 +17,9 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { AppModule } from "@/lib/rbac/modules";
-import { PORTAL_NAV_MODULES } from "@/lib/rbac/nav-modules";
+import { PORTAL_NAV_SECTIONS } from "@/lib/rbac/nav-modules";
 import { usesPerUserModuleAccess } from "@/lib/rbac/permissions";
+import { portalAudienceFromPathname } from "@/lib/portal/paths";
 
 const NAV_ICONS: Record<string, LucideIcon> = {
   "/dashboard": LayoutDashboard,
@@ -30,47 +31,67 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   "/users": Users,
 };
 
-const NAV = PORTAL_NAV_MODULES.map((m) => ({
-  href: m.href,
-  label: m.label,
-  icon: NAV_ICONS[m.href] ?? LayoutDashboard,
-}));
+function iconForHref(href: string): LucideIcon {
+  const key = href.startsWith("/customer/") ? href.replace(/^\/customer/, "") : href;
+  return NAV_ICONS[key] ?? LayoutDashboard;
+}
+
+type NavItem = { href: string; label: string; icon: LucideIcon; module: AppModule };
 
 export function AppSidebar({
   roles,
-  allowedModules,
+  allowedModulesGudang,
+  allowedModulesCustomer,
 }: {
   roles: string[];
-  allowedModules?: AppModule[];
+  allowedModulesGudang?: AppModule[];
+  allowedModulesCustomer?: AppModule[];
 }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const isSuperAdmin = roles.includes("SUPER_ADMIN");
+  const activeAudience = portalAudienceFromPathname(pathname);
 
-  const navItems = useMemo(() => {
-    if (isSuperAdmin) return NAV;
-    if (usesPerUserModuleAccess(roles)) {
-      const mods = allowedModules ?? [];
-      return NAV.filter((item) => {
-        const entry = PORTAL_NAV_MODULES.find((m) => m.href === item.href);
-        if (!entry) return false;
-        return mods.includes(entry.module);
-      });
-    }
-    if (allowedModules?.length) {
-      return NAV.filter((item) => {
-        const entry = PORTAL_NAV_MODULES.find((m) => m.href === item.href);
-        if (!entry) return true;
-        return allowedModules.includes(entry.module);
-      });
-    }
-    return NAV;
-  }, [allowedModules, isSuperAdmin, roles]);
+  const filterItems = useMemo(() => {
+    return (
+      items: { href: string; label: string; module: AppModule }[],
+      sectionId: (typeof PORTAL_NAV_SECTIONS)[number]["id"]
+    ): NavItem[] => {
+      const mapped = items.map((m) => ({
+        href: m.href,
+        label: m.label,
+        module: m.module,
+        icon: iconForHref(m.href),
+      }));
+      if (isSuperAdmin) return mapped;
+      if (sectionId === "admin") {
+        return isSuperAdmin ? mapped : [];
+      }
+      const mods =
+        sectionId === "customer"
+          ? (allowedModulesCustomer ?? [])
+          : (allowedModulesGudang ?? []);
+      if (usesPerUserModuleAccess(roles)) {
+        return mapped.filter((item) => mods.includes(item.module));
+      }
+      if (mods.length) {
+        return mapped.filter((item) => mods.includes(item.module));
+      }
+      return mapped;
+    };
+  }, [allowedModulesCustomer, allowedModulesGudang, isSuperAdmin, roles]);
+
+  const sections = useMemo(() => {
+    return PORTAL_NAV_SECTIONS.map((section) => ({
+      ...section,
+      items: filterItems(section.items, section.id),
+    })).filter((s) => s.items.length > 0);
+  }, [filterItems]);
 
   const menuAwaitingAdmin =
     !isSuperAdmin &&
     usesPerUserModuleAccess(roles) &&
-    navItems.length === 0;
+  sections.every((s) => s.items.length === 0);
 
   return (
     <aside
@@ -101,24 +122,41 @@ export function AppSidebar({
             Tunggu sampai admin verifikasi dan mengaktifkan menu untuk akun Anda.
           </p>
         ) : null}
-        {navItems.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={clsx(
-                "mb-0.5 flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
-                active ? "bg-blue-600 text-white" : "text-slate-300 hover:bg-slate-800 hover:text-white"
-              )}
-              title={item.label}
-            >
-              <Icon size={18} className="shrink-0" />
-              {!collapsed && <span className="leading-tight">{item.label}</span>}
-            </Link>
-          );
-        })}
+        {sections.map((section) => (
+          <div key={section.id} className="mb-3">
+            {!collapsed ? (
+              <p
+                className={clsx(
+                  "mb-1 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider",
+                  section.id === activeAudience ||
+                  (activeAudience === "admin" && section.id === "admin")
+                    ? "text-blue-300"
+                    : "text-slate-500"
+                )}
+              >
+                {section.title}
+              </p>
+            ) : null}
+            {section.items.map((item) => {
+              const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={clsx(
+                    "mb-0.5 flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                    active ? "bg-blue-600 text-white" : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                  )}
+                  title={item.label}
+                >
+                  <Icon size={18} className="shrink-0" />
+                  {!collapsed && <span className="leading-tight">{item.label}</span>}
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </nav>
       <div className="border-t border-slate-800 p-3 text-xs text-slate-500">
         {!collapsed && <p>Internal portal — GBC</p>}

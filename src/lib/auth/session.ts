@@ -10,8 +10,12 @@ export type SessionPayload = {
   username: string;
   roles: string[];
   supplierId?: string | null;
-  /** Ops B: modul halaman yang boleh diakses (dari sheet `allowed_modules`). */
+  /** Ops B: modul halaman yang boleh diakses (gabungan; fallback). */
   allowedModules?: AppModule[];
+  /** Kolom `allowed_modules_gudang` */
+  allowedModulesGudang?: AppModule[];
+  /** Kolom `allowed_modules_customer` */
+  allowedModulesCustomer?: AppModule[];
 };
 
 function getSecret(): Uint8Array {

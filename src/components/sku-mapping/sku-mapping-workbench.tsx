@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
+import { ocrReviewBaseFromPathname } from "@/lib/portal/paths";
 import Link from "next/link";
 import { getSkuRekapSpreadsheetEditUrl } from "@/lib/config/sku-mapping-sheets";
 import type { SkuMappingWorkbenchRow } from "@/lib/sku-matching/sku-rekap-types";
@@ -29,6 +31,7 @@ export function SkuMappingWorkbench({
   const [confirmKey, setConfirmKey] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [removed, setRemoved] = useState<Set<string>>(new Set());
+  const reviewBase = ocrReviewBaseFromPathname(usePathname());
 
   const visible = useMemo(
     () => rows.filter((r) => !removed.has(r.line.rowKey)),
@@ -186,7 +189,7 @@ export function SkuMappingWorkbench({
                     )}
                   </td>
                   <td className="px-3 py-3 text-right">
-                    <Link href={`/ocr-review/${row.line.docKey}`} className="text-blue-600 hover:underline">
+                    <Link href={`${reviewBase}/${row.line.docKey}`} className="text-blue-600 hover:underline">
                       SJ
                     </Link>
                   </td>

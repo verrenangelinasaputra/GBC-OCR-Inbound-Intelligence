@@ -20,6 +20,8 @@ export const INTERNAL_USER_HEADERS = [
   "created_at",
   "last_login_at",
   "allowed_modules",
+  "allowed_modules_gudang",
+  "allowed_modules_customer",
 ] as const;
 
 export type InternalAccount = {
@@ -34,6 +36,8 @@ export type InternalAccount = {
   roles: string[];
   status: string;
   allowedModules: AppModule[];
+  allowedModulesGudang: AppModule[];
+  allowedModulesCustomer: AppModule[];
   createdAt: string;
 };
 
@@ -151,9 +155,11 @@ async function migrateLegacyInternalUsersTab(): Promise<void> {
       r[7] ?? "",
       r[8] ?? "",
       "",
+      "",
+      "",
     ]);
   }
-  await replaceSheetRows(sheets, sheetId, tab, next, "L", rows.length);
+  await replaceSheetRows(sheets, sheetId, tab, next, "N", rows.length);
 }
 
 async function ensureHeaders(): Promise<void> {
@@ -163,7 +169,7 @@ async function ensureHeaders(): Promise<void> {
   try {
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: a1(tab, "A1:L1"),
+      range: a1(tab, "A1:N1"),
     });
     const headerRow = res.data.values?.[0];
     const first = String(headerRow?.[0] ?? "").trim().toLowerCase();
@@ -176,12 +182,17 @@ async function ensureHeaders(): Promise<void> {
           500
         );
       }
-      if (String(headerRow?.[11] ?? "").trim().toLowerCase() !== "allowed_modules") {
+      const headersRow = Array.from(INTERNAL_USER_HEADERS);
+      const current = (headerRow ?? []).map((c) => String(c ?? "").trim().toLowerCase());
+      for (let i = 0; i < headersRow.length; i += 1) {
+        const want = headersRow[i]!.toLowerCase();
+        if (current[i] === want) continue;
+        const col = String.fromCharCode("A".charCodeAt(0) + i);
         await sheets.spreadsheets.values.update({
           spreadsheetId: sheetId,
-          range: a1(tab, "L1"),
+          range: a1(tab, `${col}1`),
           valueInputOption: "RAW",
-          requestBody: { values: [["allowed_modules"]] },
+          requestBody: { values: [[headersRow[i]]] },
         });
       }
       markTabSetupCached(cacheKey);
@@ -195,7 +206,7 @@ async function ensureHeaders(): Promise<void> {
     }
     await sheets.spreadsheets.values.update({
       spreadsheetId: sheetId,
-      range: a1(tab, "A1:L1"),
+      range: a1(tab, "A1:N1"),
       valueInputOption: "RAW",
       requestBody: { values: [Array.from(INTERNAL_USER_HEADERS)] },
     });
@@ -221,6 +232,8 @@ function accountFromRow(row: string[], rowNumber: number): InternalAccount {
       .trim()
       .toUpperCase() || "ACTIVE",
     allowedModules: legacy ? [] : parseAllowedModulesCell(row[11]),
+    allowedModulesGudang: legacy ? [] : parseAllowedModulesCell(row[12]),
+    allowedModulesCustomer: legacy ? [] : parseAllowedModulesCell(row[13]),
     createdAt: legacy ? "" : String(row[9] ?? ""),
   };
 }
@@ -232,7 +245,7 @@ export async function findInternalUserByUsername(username: string): Promise<Inte
     await ensureHeaders();
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: a1(tab, "A:L"),
+      range: a1(tab, "A:N"),
     });
     const rows = res.data.values ?? [];
     for (let index = 1; index < rows.length; index += 1) {
@@ -251,7 +264,7 @@ export async function listInternalUsers(): Promise<InternalAccount[]> {
     await ensureHeaders();
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: a1(tab, "A:L"),
+      range: a1(tab, "A:N"),
     });
     const rows = res.data.values ?? [];
     const accounts: InternalAccount[] = [];
@@ -271,6 +284,8 @@ export type InternalUserAdminPatch = {
   gudang?: string;
   roles?: string[];
   allowedModules?: AppModule[];
+  allowedModulesGudang?: AppModule[];
+  allowedModulesCustomer?: AppModule[];
 };
 
 export async function updateInternalUserAdmin(
@@ -284,7 +299,13 @@ export async function updateInternalUserAdmin(
   const status = (patch.status ?? account.status).trim().toUpperCase();
   const gudang = patch.gudang !== undefined ? patch.gudang : account.gudang;
   const roles = patch.roles ?? account.roles;
-  const allowedModules = patch.allowedModules ?? account.allowedModules;
+  const allowedModulesGudang = patch.allowedModulesGudang ?? account.allowedModulesGudang;
+  const allowedModulesCustomer = patch.allowedModulesCustomer ?? account.allowedModulesCustomer;
+  const allowedModules =
+    patch.allowedModules ??
+    account.allowedModules.length
+      ? account.allowedModules
+      : [...new Set([...allowedModulesGudang, ...allowedModulesCustomer])];
 
   const row = [
     account.userId,
@@ -299,12 +320,14 @@ export async function updateInternalUserAdmin(
     account.createdAt,
     "",
     formatAllowedModulesCell(allowedModules),
+    formatAllowedModulesCell(allowedModulesGudang),
+    formatAllowedModulesCell(allowedModulesCustomer),
   ];
 
   try {
     await sheets.spreadsheets.values.update({
       spreadsheetId: sheetId,
-      range: a1(tab, `A${account.rowNumber}:L${account.rowNumber}`),
+      range: a1(tab, `A${account.rowNumber}:N${account.rowNumber}`),
       valueInputOption: "RAW",
       requestBody: { values: [row] },
     });
@@ -350,12 +373,14 @@ export async function replaceRejectedInternalRegistration(params: {
     timestampJakarta(),
     "",
     "",
+    "",
+    "",
   ];
 
   try {
     await sheets.spreadsheets.values.update({
       spreadsheetId: sheetId,
-      range: a1(tab, `A${account.rowNumber}:L${account.rowNumber}`),
+      range: a1(tab, `A${account.rowNumber}:N${account.rowNumber}`),
       valueInputOption: "RAW",
       requestBody: { values: [row] },
     });
@@ -439,7 +464,7 @@ export async function appendInternalUser(row: {
     await ensureHeaders();
     await sheets.spreadsheets.values.append({
       spreadsheetId: sheetId,
-      range: a1(tab, "A:L"),
+      range: a1(tab, "A:N"),
       valueInputOption: "RAW",
       insertDataOption: "INSERT_ROWS",
       requestBody: {
@@ -455,6 +480,8 @@ export async function appendInternalUser(row: {
             row.roles.join(","),
             "PENDING_APPROVAL",
             now,
+            "",
+            "",
             "",
             "",
           ],

@@ -8,6 +8,8 @@ import {
   type OcrReviewDashboardBucket,
 } from "@/lib/ocr-review/workflow-status";
 import { SJ_MONTH_OPTIONS } from "@/lib/surat-jalan/tanggal-sj";
+import { usePathname } from "next/navigation";
+import { ocrReviewBaseFromPathname } from "@/lib/portal/paths";
 
 function selectClass() {
   return "rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400";
@@ -27,7 +29,9 @@ export function OcrReviewFilterBar({
   month?: number;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
+  const reviewBase = ocrReviewBaseFromPathname(pathname);
 
   const pushParams = useCallback(
     (updates: Record<string, string | undefined>) => {
@@ -37,9 +41,9 @@ export function OcrReviewFilterBar({
         else next.set(key, value);
       }
       const q = next.toString();
-      router.push(q ? `/ocr-review?${q}` : "/ocr-review");
+      router.push(q ? `${reviewBase}?${q}` : reviewBase);
     },
-    [router, searchParams]
+    [reviewBase, router, searchParams]
   );
 
   const hasFilter = useMemo(
@@ -111,7 +115,7 @@ export function OcrReviewFilterBar({
           <button
             type="button"
             className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-            onClick={() => router.push("/ocr-review")}
+            onClick={() => router.push(reviewBase)}
           >
             Reset filter
           </button>

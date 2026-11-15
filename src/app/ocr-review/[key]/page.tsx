@@ -4,18 +4,23 @@ import { SheetOcrReviewPanel } from "@/components/surat-jalan/sheet-ocr-review-p
 import { getOcrSheetDocumentDetail } from "@/lib/services/ocr-sheet-detail";
 import { markOcrDocumentOpened } from "@/lib/services/ocr-sheet-review";
 import Link from "next/link";
+import { getPortalAudience } from "@/lib/portal/audience";
+import { portalModuleHref } from "@/lib/portal/paths";
 
 export default async function OcrReviewSheetDetailPage({
   params,
 }: {
   params: Promise<{ key: string }>;
 }) {
+  const audience = await getPortalAudience();
+  const reviewListHref = portalModuleHref(audience, "/ocr-review");
+
   if (!spreadsheetModeActive()) {
     return (
       <AppShell title="OCR Review">
         <p className="text-slate-600">
           Detail mode spreadsheet hanya aktif tanpa database.{" "}
-          <Link href="/ocr-review" className="text-blue-600 hover:underline">
+          <Link href={reviewListHref} className="text-blue-600 hover:underline">
             Kembali
           </Link>
         </p>

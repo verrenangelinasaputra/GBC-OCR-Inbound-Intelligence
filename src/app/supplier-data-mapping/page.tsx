@@ -4,6 +4,9 @@ import { SupplierDataMappingPanel } from "@/components/supplier-data-mapping/sup
 import { getSession } from "@/lib/auth/session";
 import { getSupplierMasterDataSheetId } from "@/lib/config/supplier-master-data-sheet";
 import { hasPermission } from "@/lib/rbac/permissions";
+import { modulesForSession } from "@/lib/rbac/session-modules";
+import { getPortalAudience } from "@/lib/portal/audience";
+import { PortalAudienceBanner } from "@/components/layout/portal-audience-banner";
 
 type SearchParams = { nama?: string };
 
@@ -12,6 +15,7 @@ export default async function SupplierDataMappingPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  const audience = await getPortalAudience();
   const query = await searchParams;
   const initialNama = String(query.nama ?? "").trim();
   if (!spreadsheetModeActive()) {
@@ -19,8 +23,9 @@ export default async function SupplierDataMappingPage({
   }
 
   const session = await getSession();
+  const accessMods = modulesForSession(session, audience);
   const canView = session
-    ? hasPermission(session.roles, "supplier_data_mapping", "VIEW", session.allowedModules)
+    ? hasPermission(session.roles, "supplier_data_mapping", "VIEW", accessMods)
     : false;
   if (!canView) {
     return (
@@ -37,8 +42,8 @@ export default async function SupplierDataMappingPage({
   }
 
   const canEdit =
-    hasPermission(session!.roles, "supplier_data_mapping", "CREATE", session!.allowedModules) ||
-    hasPermission(session!.roles, "supplier_data_mapping", "EDIT", session!.allowedModules);
+    hasPermission(session!.roles, "supplier_data_mapping", "CREATE", accessMods) ||
+    hasPermission(session!.roles, "supplier_data_mapping", "EDIT", accessMods);
   const isSuperAdmin = session!.roles.includes("SUPER_ADMIN");
 
   return (
@@ -46,6 +51,7 @@ export default async function SupplierDataMappingPage({
       title="Mapping Data Supplier"
       description="Petakan nama supplier (alias) ke kode — mengatur folder Drive Gudang / Kode - Nama kanonik."
     >
+      <PortalAudienceBanner audience={audience} />
       <p className="mb-4 text-sm text-slate-600">
         Data disimpan di spreadsheet{" "}
         <a

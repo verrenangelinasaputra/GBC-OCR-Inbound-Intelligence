@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useMemo, useState } from "react";
+import { ocrReviewBaseFromPathname } from "@/lib/portal/paths";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import type { OcrSheetDocument } from "@/lib/services/ocr-sheet-list";
 import {
@@ -62,6 +64,8 @@ function SortableColumnHeader({
 }
 
 export function OcrReviewQueueTable({ docs }: { docs: OcrSheetDocument[] }) {
+  const pathname = usePathname();
+  const reviewBase = ocrReviewBaseFromPathname(pathname);
   const [sortKey, setSortKey] = useState<OcrReviewColumnSortKey>("wait_review");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -149,7 +153,7 @@ export function OcrReviewQueueTable({ docs }: { docs: OcrSheetDocument[] }) {
                 </td>
                 <td className="px-4 py-3 text-right">
                   <Link
-                    href={`/ocr-review/${d.docKey}`}
+                    href={`${reviewBase}/${d.docKey}`}
                     className="font-medium text-blue-600 hover:underline"
                   >
                     Detail

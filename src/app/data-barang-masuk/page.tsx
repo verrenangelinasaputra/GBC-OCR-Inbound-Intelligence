@@ -4,12 +4,17 @@ import { DataBarangMasukTable } from "@/components/data-barang-masuk/data-barang
 import { DataBarangMasukExportPanel } from "@/components/data-barang-masuk/data-barang-masuk-export-panel";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/rbac/permissions";
+import { modulesForSession } from "@/lib/rbac/session-modules";
 import { getInternalUserProfile } from "@/lib/internal-auth/profile";
 import { loadDataBarangMasukView } from "@/lib/services/data-barang-masuk";
 import { getGoogleExportConfigOptional } from "@/lib/providers/google-workspace/config";
 import { DBM_INBOUND_SHEET_ID, getDbmInboundTabName } from "@/lib/config/sku-mapping-sheets";
+import { getPortalAudience, resolveGudangFilterForAudience } from "@/lib/portal/audience";
+import { portalModuleHref } from "@/lib/portal/paths";
+import { PortalAudienceBanner } from "@/components/layout/portal-audience-banner";
 
 export default async function DataBarangMasukPage() {
+  const audience = await getPortalAudience();
   if (spreadsheetModeActive()) {
     if (!getGoogleExportConfigOptional()) {
       return <SpreadsheetModePage title="Data Barang Masuk" />;
@@ -23,11 +28,13 @@ export default async function DataBarangMasukPage() {
     let canExport = false;
     try {
       const session = await getSession();
+      const accessMods = modulesForSession(session, audience);
       const profile = session ? await getInternalUserProfile(session.username) : null;
-      const gudangFilter = profile?.gudangList.length ? profile.gudangList : undefined;
-      view = await loadDataBarangMasukView(gudangFilter);
+      const gudangFilter = resolveGudangFilterForAudience(audience, profile?.gudangList);
+      const ocrReviewBase = portalModuleHref(audience, "/ocr-review");
+      view = await loadDataBarangMasukView(gudangFilter, { ocrReviewBase });
       canExport = session
-        ? hasPermission(session.roles, "data_barang_masuk", "EXPORT", session.allowedModules)
+        ? hasPermission(session.roles, "data_barang_masuk", "EXPORT", accessMods)
         : false;
     } catch {
       return <SpreadsheetModePage title="Data Barang Masuk" />;
@@ -40,6 +47,7 @@ export default async function DataBarangMasukPage() {
         title="Data Barang Masuk"
         description="Rekap barang yang sudah final DBM — digabung otomatis jika match SKU 100%, dengan lampiran Surat Jalan per pengiriman."
       >
+        <PortalAudienceBanner audience={audience} />
         <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-xl border border-slate-200 bg-white p-4">
             <p className="text-xs text-slate-500">Baris final DBM</p>

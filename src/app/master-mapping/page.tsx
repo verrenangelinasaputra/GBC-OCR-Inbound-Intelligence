@@ -4,7 +4,10 @@ import { MasterMappingWorkspace } from "@/components/master-mapping/master-mappi
 import { getSkuMasterSheetId } from "@/lib/config/sku-mapping-sheets";
 import { getSession } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/rbac/permissions";
+import { modulesForSession } from "@/lib/rbac/session-modules";
 import Link from "next/link";
+import { getPortalAudience } from "@/lib/portal/audience";
+import { PortalAudienceBanner } from "@/components/layout/portal-audience-banner";
 
 type SearchParams = { ocr?: string };
 
@@ -13,6 +16,7 @@ export default async function MasterMappingPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  const audience = await getPortalAudience();
   const query = await searchParams;
   const initialOcr = String(query.ocr ?? "").trim();
 
@@ -21,8 +25,9 @@ export default async function MasterMappingPage({
   }
 
   const session = await getSession();
+  const accessMods = modulesForSession(session, audience);
   const canView = session
-    ? hasPermission(session.roles, "master_mapping", "VIEW", session.allowedModules)
+    ? hasPermission(session.roles, "master_mapping", "VIEW", accessMods)
     : false;
   if (!canView) {
     return (
@@ -36,14 +41,15 @@ export default async function MasterMappingPage({
   }
 
   const canEdit =
-    hasPermission(session!.roles, "master_mapping", "CREATE", session!.allowedModules) ||
-    hasPermission(session!.roles, "master_mapping", "EDIT", session!.allowedModules);
+    hasPermission(session!.roles, "master_mapping", "CREATE", accessMods) ||
+    hasPermission(session!.roles, "master_mapping", "EDIT", accessMods);
 
   return (
     <ModuleListPage
       title="Generator SKU"
       description="Master SKU (TABEL → REKAP SKUL/SKUS) dan alias nama OCR untuk SKU Mapping."
     >
+      <PortalAudienceBanner audience={audience} />
       <p className="mb-4 text-sm text-slate-600">
         Generator SKU menulis ke tab kategori lalu <strong>REKAP SKUL</strong> / <strong>REKAP SKUS</strong> pada{" "}
         <a

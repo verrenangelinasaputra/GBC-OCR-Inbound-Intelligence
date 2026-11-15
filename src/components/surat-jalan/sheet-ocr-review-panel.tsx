@@ -6,6 +6,8 @@ import { ReviewStatusBadge } from "@/components/ocr-review/review-status-badge";
 import { WarehouseWaitBadge, WorkflowTimelineCompact } from "@/components/ocr-review/workflow-timeline";
 import { StatusBadge } from "@/components/ui/status-badge";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { ocrReviewBaseFromPathname } from "@/lib/portal/paths";
 import { Download, Plus, Trash2 } from "lucide-react";
 import {
   SAMPLE_ITEM_TAG,
@@ -35,6 +37,7 @@ export function SheetOcrReviewPanel({
   docKey: string;
   initial: OcrSheetDocumentDetail;
 }) {
+  const reviewBase = ocrReviewBaseFromPathname(usePathname());
   const [doc, setDoc] = useState(initial);
   const [header, setHeader] = useState({
     tanggal: initial.tanggal,
@@ -295,7 +298,7 @@ export function SheetOcrReviewPanel({
           {lines.length} baris item · diekspor {doc.exportTimestamp || "—"}
         </span>
         <WarehouseWaitBadge fields={{ ...lines[0], statusReview: doc.statusReview }} />
-        <Link href="/ocr-review" className="text-sm text-blue-600 hover:underline">
+        <Link href={reviewBase} className="text-sm text-blue-600 hover:underline">
           ← Kembali ke queue
         </Link>
       </div>

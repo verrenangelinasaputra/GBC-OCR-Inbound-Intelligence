@@ -2,8 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { AppModule } from "@/lib/rbac/modules";
-import { ASSIGNABLE_NAV_MODULES } from "@/lib/rbac/nav-modules";
-import { SUPPLIER_GUDANG_OPTIONS } from "@/lib/config/supplier-gudang";
+import {
+  ASSIGNABLE_CUSTOMER_MODULES,
+  ASSIGNABLE_GUDANG_MODULES,
+} from "@/lib/rbac/nav-modules";
+import { portalModulesFromCells } from "@/lib/rbac/portal-module-access";
+import { SUPPLIER_GUDANG_WAREHOUSE_OPTIONS } from "@/lib/config/supplier-gudang";
 import { StatusBadge } from "@/components/ui/status-badge";
 
 type AdminUser = {
@@ -15,6 +19,8 @@ type AdminUser = {
   roles: string[];
   status: string;
   allowedModules: AppModule[];
+  allowedModulesGudang: AppModule[];
+  allowedModulesCustomer: AppModule[];
   createdAt: string;
 };
 
@@ -25,13 +31,22 @@ function parseGudangList(gudang: string): string[] {
     .filter(Boolean);
 }
 
+function userPortalAccess(u: AdminUser) {
+  return portalModulesFromCells({
+    legacy: u.allowedModules,
+    gudang: u.allowedModulesGudang,
+    customer: u.allowedModulesCustomer,
+  });
+}
+
 export function InternalUsersAdmin({ currentUsername = "" }: { currentUsername?: string }) {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [draftGudang, setDraftGudang] = useState<string[]>([]);
-  const [draftModules, setDraftModules] = useState<AppModule[]>([]);
+  const [draftGudangModules, setDraftGudangModules] = useState<AppModule[]>([]);
+  const [draftCustomerModules, setDraftCustomerModules] = useState<AppModule[]>([]);
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -55,7 +70,13 @@ export function InternalUsersAdmin({ currentUsername = "" }: { currentUsername?:
   function startEdit(u: AdminUser) {
     setEditing(u.username);
     setDraftGudang(parseGudangList(u.gudang));
-    setDraftModules(u.allowedModules.length ? [...u.allowedModules] : []);
+    const access = portalModulesFromCells({
+      legacy: u.allowedModules,
+      gudang: u.allowedModulesGudang,
+      customer: u.allowedModulesCustomer,
+    });
+    setDraftGudangModules(access.gudang.length ? [...access.gudang] : []);
+    setDraftCustomerModules(access.customer.length ? [...access.customer] : []);
     setMessage(null);
   }
 
@@ -189,12 +210,15 @@ export function InternalUsersAdmin({ currentUsername = "" }: { currentUsername?:
                 <th className="px-3 py-2">User</th>
                 <th className="px-3 py-2">Status</th>
                 <th className="px-3 py-2">Gudang</th>
-                <th className="px-3 py-2">Halaman</th>
+                <th className="px-3 py-2">Akses Gudang</th>
+                <th className="px-3 py-2">Akses Customer</th>
                 <th className="px-3 py-2" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {[...pending, ...others].map((u) => (
+              {[...pending, ...others].map((u) => {
+                const access = userPortalAccess(u);
+                return (
                 <tr key={u.username}>
                   <td className="px-3 py-2">
                     <p className="font-medium">{u.fullName}</p>
@@ -214,7 +238,10 @@ export function InternalUsersAdmin({ currentUsername = "" }: { currentUsername?:
                   </td>
                   <td className="px-3 py-2 text-xs">{u.gudang || "—"}</td>
                   <td className="px-3 py-2 text-xs text-slate-600">
-                    {u.allowedModules.length ? `${u.allowedModules.length} halaman` : "Belum ada halaman"}
+                    {access.gudang.length ? `${access.gudang.length} halaman` : "—"}
+                  </td>
+                  <td className="px-3 py-2 text-xs text-slate-600">
+                    {access.customer.length ? `${access.customer.length} halaman` : "—"}
                   </td>
                   <td className="px-3 py-2 text-right">
                     <div className="flex justify-end gap-3">
@@ -236,7 +263,8 @@ export function InternalUsersAdmin({ currentUsername = "" }: { currentUsername?:
                     </div>
                   </td>
                 </tr>
-              ))}
+              );
+              })}
             </tbody>
           </table>
         </div>
@@ -244,16 +272,18 @@ export function InternalUsersAdmin({ currentUsername = "" }: { currentUsername?:
 
       {editing ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-5 shadow-lg">
+          <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl bg-white p-5 shadow-lg">
             <h3 className="text-lg font-medium">Atur: @{editing}</h3>
             <p className="mt-1 text-xs text-slate-500">
-              Centang halaman yang boleh dibuka user (Opsi B). Gudang mempengaruhi filter data OCR/SKU.
+              Pilih section <strong>Gudang</strong> dan/atau <strong>Customer</strong>, lalu centang halaman yang
+              boleh dibuka. Nama gudang hanya untuk filter data di section Gudang.
             </p>
 
-            <fieldset className="mt-4">
-              <legend className="text-sm font-medium text-slate-800">Gudang</legend>
+            <fieldset className="mt-4 rounded-lg border border-slate-200 p-3">
+              <legend className="px-1 text-sm font-semibold text-slate-900">Section Gudang</legend>
+              <p className="text-xs text-slate-500">Nama gudang (filter OCR / SKU)</p>
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                {SUPPLIER_GUDANG_OPTIONS.map((g) => (
+                {SUPPLIER_GUDANG_WAREHOUSE_OPTIONS.map((g) => (
                   <label key={g} className="flex items-center gap-2 text-sm">
                     <input
                       type="checkbox"
@@ -268,18 +298,38 @@ export function InternalUsersAdmin({ currentUsername = "" }: { currentUsername?:
                   </label>
                 ))}
               </div>
-            </fieldset>
-
-            <fieldset className="mt-4">
-              <legend className="text-sm font-medium text-slate-800">Halaman yang boleh diakses</legend>
-              <div className="mt-2 max-h-48 space-y-2 overflow-y-auto">
-                {ASSIGNABLE_NAV_MODULES.map((m) => (
+              <p className="mt-3 text-xs text-slate-500">Halaman portal Gudang</p>
+              <div className="mt-2 max-h-40 space-y-2 overflow-y-auto">
+                {ASSIGNABLE_GUDANG_MODULES.map((m) => (
                   <label key={m.module} className="flex items-center gap-2 text-sm">
                     <input
                       type="checkbox"
-                      checked={draftModules.includes(m.module)}
+                      checked={draftGudangModules.includes(m.module)}
                       onChange={(e) => {
-                        setDraftModules((prev) =>
+                        setDraftGudangModules((prev) =>
+                          e.target.checked
+                            ? [...prev, m.module]
+                            : prev.filter((x) => x !== m.module)
+                        );
+                      }}
+                    />
+                    {m.label}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+
+            <fieldset className="mt-4 rounded-lg border border-slate-200 p-3">
+              <legend className="px-1 text-sm font-semibold text-slate-900">Section Customer</legend>
+              <p className="text-xs text-slate-500">Halaman portal Customer (data SJ tab Customer)</p>
+              <div className="mt-2 max-h-40 space-y-2 overflow-y-auto">
+                {ASSIGNABLE_CUSTOMER_MODULES.map((m) => (
+                  <label key={m.module} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={draftCustomerModules.includes(m.module)}
+                      onChange={(e) => {
+                        setDraftCustomerModules((prev) =>
                           e.target.checked
                             ? [...prev, m.module]
                             : prev.filter((x) => x !== m.module)
@@ -303,12 +353,17 @@ export function InternalUsersAdmin({ currentUsername = "" }: { currentUsername?:
               </button>
               <button
                 type="button"
-                disabled={saving || !draftGudang.length}
+                disabled={
+                  saving ||
+                  (!draftGudangModules.length && !draftCustomerModules.length) ||
+                  (draftGudangModules.length > 0 && draftGudang.length === 0)
+                }
                 className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
                 onClick={() =>
                   void patchUser(editing, {
                     gudang: draftGudang,
-                    allowedModules: draftModules,
+                    allowedModulesGudang: draftGudangModules,
+                    allowedModulesCustomer: draftCustomerModules,
                     status: "ACTIVE",
                   })
                 }

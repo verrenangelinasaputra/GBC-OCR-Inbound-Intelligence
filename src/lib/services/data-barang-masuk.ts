@@ -17,7 +17,10 @@ function enrichDriveLinks(
   });
 }
 
-export async function loadDataBarangMasukView(gudangFilter?: string[]): Promise<{
+export async function loadDataBarangMasukView(
+  gudangFilter?: string[],
+  options?: { ocrReviewBase?: string }
+): Promise<{
   groups: DbmInboundAggregate[];
   rows: DbmInboundRecord[];
   summary: ReturnType<typeof summarizeInboundTotals>;
@@ -35,7 +38,7 @@ export async function loadDataBarangMasukView(gudangFilter?: string[]): Promise<
   });
 
   const enriched = enrichDriveLinks(filtered, docDrive);
-  const groups = aggregateDbmInboundRecords(enriched);
+  const groups = aggregateDbmInboundRecords(enriched, { ocrReviewBase: options?.ocrReviewBase });
   const rows = [...enriched].sort((a, b) => {
     const t = b.tanggalSj.localeCompare(a.tanggalSj, "id");
     if (t !== 0) return t;

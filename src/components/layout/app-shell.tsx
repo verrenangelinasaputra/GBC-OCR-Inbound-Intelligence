@@ -12,7 +12,11 @@ export async function AppShell({ children, title }: { children: React.ReactNode;
       title={title}
       subtitle="GBC Inbound Intelligence"
       sidebar={
-        <AppSidebar roles={session?.roles ?? []} allowedModules={session?.allowedModules} />
+        <AppSidebar
+          roles={session?.roles ?? []}
+          allowedModulesGudang={session?.allowedModulesGudang ?? session?.allowedModules}
+          allowedModulesCustomer={session?.allowedModulesCustomer ?? session?.allowedModules}
+        />
       }
       headerEnd={
         <>

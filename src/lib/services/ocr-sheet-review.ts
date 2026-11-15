@@ -1,4 +1,3 @@
-import { google } from "googleapis";
 import {
   type OcrReviewStatus,
   DEFAULT_OCR_REVIEW_STATUS,
@@ -6,11 +5,9 @@ import {
 } from "@/lib/ocr-review/workflow-status";
 import { ocrWorkflowTimestamp } from "@/lib/ocr-review/workflow-timestamp";
 import type { OcrSheetRowFields } from "@/lib/providers/google-workspace/ocr-sheet-columns";
-import { createGoogleAuthClient, resolveSheetTabName } from "@/lib/providers/google-workspace/client";
-import { getGoogleExportConfigOptional } from "@/lib/providers/google-workspace";
+import { readOcrSheetMatrixForDocKey } from "@/lib/services/ocr-sheet-matrix";
 import {
   mapOcrSheetRow,
-  ocrSheetFullColumnsRange,
   OCR_SHEET_RANGE_COL,
   ocrSheetRowToValues,
 } from "@/lib/providers/google-workspace/ocr-sheet-columns";
@@ -19,19 +16,6 @@ import {
   firstRowIsOcrHeader,
   sheetRowMatchesDocKey,
 } from "@/lib/services/ocr-sheet-keys";
-
-async function readMatrix() {
-  const config = getGoogleExportConfigOptional();
-  if (!config) throw new Error("Google export tidak dikonfigurasi");
-  const auth = createGoogleAuthClient(config);
-  const sheets = google.sheets({ version: "v4", auth });
-  const sheetTab = await resolveSheetTabName(config);
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: config.sheetId,
-    range: ocrSheetFullColumnsRange(sheetTab),
-  });
-  return { config, sheets, sheetTab, rows: res.data.values ?? [] };
-}
 
 function stampWorkflowTimestamp(fields: OcrSheetRowFields, status: OcrReviewStatus): void {
   const now = ocrWorkflowTimestamp();
@@ -59,7 +43,7 @@ export async function setOcrDocumentReviewStatus(params: {
   linkRevisi?: string;
 }): Promise<void> {
   const rawKey = decodeOcrSheetDocKey(params.docKey);
-  const { config, sheets, sheetTab, rows } = await readMatrix();
+  const { config, sheets, sheetTab, rows } = await readOcrSheetMatrixForDocKey(params.docKey);
   const updates: { range: string; values: string[][] }[] = [];
 
   for (let i = 0; i < rows.length; i += 1) {
@@ -87,7 +71,7 @@ export async function setOcrDocumentReviewStatus(params: {
 /** Buka detail = ditinjau (hanya dari BELUM → SUDAH). */
 export async function markOcrDocumentOpened(docKey: string): Promise<void> {
   const rawKey = decodeOcrSheetDocKey(docKey);
-  const { rows } = await readMatrix();
+  const { rows } = await readOcrSheetMatrixForDocKey(docKey);
   let needs = false;
   for (let i = 1; i < rows.length; i += 1) {
     const row = rows[i] ?? [];

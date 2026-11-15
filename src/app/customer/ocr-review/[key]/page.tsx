@@ -1,0 +1,1 @@
+export { default } from "@/app/ocr-review/[key]/page";

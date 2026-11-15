@@ -113,7 +113,7 @@ Lihat [.env.example](./.env.example).
 3. **Share** folder Drive dan spreadsheet di atas ke **`gbc-inbound-export@gbc-inbound-intelligence.iam.gserviceaccount.com`** (atau email SA Anda) sebagai **Editor**.
 4. `GOOGLE_EXPORT_ENABLED=true` **atau** `SHEET_ONLY_MODE=true` (export otomatis aktif di mode pilot).
 5. Cek: `npm run google:test` → menu **Integrations** menampilkan status Google.
-6. Tab utama **`Data Compilation`** (rename dari Sheet1): kolom **Supplier** di samping Gudang. Setup monitoring: `npm run sheet:monitoring` — formula memakai **`;`** (locale Indonesia), referensi tab aktif (`Data Compilation` atau `Sheet1`).
+6. Tab utama **`Data Compilation`** (rename dari Sheet1): kolom **Supplier** di samping Gudang. Tab **`Customer`** (setup: `npm run sheet:customer`) — layout sama; upload dengan gudang tujuan Customer ditulis ke tab ini. Setup monitoring: `npm run sheet:monitoring` — formula memakai **`;`** (locale Indonesia), referensi tab aktif (`Data Compilation` atau `Sheet1`).
 7. Setelah upload supplier + OCR Gemini: **baris per item** di sheet + **foto** di Drive dengan struktur:
    - Gudang: `[GOOGLE_DRIVE_FOLDER_ID]/Gudang <nama>/YYYY-MM-DD - <No SJ> - <Nama Supplier>/`
    - **Customer** (gudang tujuan = `Customer` + isi nama customer): default `[GOOGLE_DRIVE_FOLDER_ID]/Customer/{Nama Customer}/Surat Jalan/…` — atau set **`GOOGLE_DRIVE_CUSTOMER_FOLDER_ID`** ke folder Customer yang sudah ada (contoh `1_KffN0…`) supaya isinya langsung `{Nama Customer}/Surat Jalan/…` tanpa subfolder `Customer` ganda. **Jangan** set `GOOGLE_DRIVE_FOLDER_ID` ke folder Customer itu sendiri.

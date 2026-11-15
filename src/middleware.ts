@@ -18,7 +18,12 @@ const INTERNAL_ROLES = ["SUPER_ADMIN", "DBM_OPERATOR", "WAREHOUSE_OPERATOR", "MA
 
 function nextWithPath(request: NextRequest) {
   const headers = new Headers(request.headers);
-  headers.set("x-gbc-path", request.nextUrl.pathname);
+  const { pathname } = request.nextUrl;
+  headers.set("x-gbc-path", pathname);
+  headers.set(
+    "x-gbc-audience",
+    pathname === "/customer" || pathname.startsWith("/customer/") ? "customer" : "gudang"
+  );
   return NextResponse.next({ request: { headers } });
 }
 
@@ -75,7 +80,7 @@ export async function middleware(request: NextRequest) {
 
     if (session) {
       if (isInternalStaff(session.roles)) {
-        if (!canAccessRoute(session.roles, pathname, session.allowedModules)) {
+        if (!canAccessRoute(session.roles, pathname, session.allowedModules, session)) {
           const fallback = isRetiredPortalPath(pathname) ? "/dashboard" : NO_MODULE_ACCESS_PATH;
           return NextResponse.redirect(new URL(fallback, request.url));
         }

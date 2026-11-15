@@ -19,9 +19,38 @@ import { ensureInboundMonitoringWorkbook } from "./inbound-monitoring-layout";
 import {
   DATA_COMPILATION_TAB_NAME,
   getOcrExportCustomerDriveFolderId,
+  OCR_CUSTOMER_TAB_NAME,
 } from "@/lib/config/ocr-export-target";
 
 const resolvedOcrTabBySpreadsheet = new Map<string, string>();
+
+function resolvedTabCacheKey(config: GoogleExportConfig): string {
+  return `${config.sheetId}\0${config.sheetTab}`;
+}
+
+export async function ensureSpreadsheetTabExists(
+  sheets: ReturnType<typeof google.sheets>,
+  spreadsheetId: string,
+  title: string
+): Promise<number> {
+  const meta = await sheets.spreadsheets.get({
+    spreadsheetId,
+    fields: "sheets.properties(sheetId,title)",
+  });
+  const existing = meta.data.sheets?.find((s) => s.properties?.title === title);
+  if (existing?.properties?.sheetId != null) return existing.properties.sheetId;
+
+  const res = await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [{ addSheet: { properties: { title } } }],
+    },
+  });
+  const sheetId = res.data.replies?.[0]?.addSheet?.properties?.sheetId;
+  if (sheetId == null) throw new Error(`Gagal membuat tab sheet: ${title}`);
+  resolvedOcrTabBySpreadsheet.delete(`${spreadsheetId}\0${title}`);
+  return sheetId;
+}
 
 function driveScopes(config: GoogleExportConfig): string[] {
   return [
@@ -168,6 +197,9 @@ export async function ensureOcrSheetHeaders(config: GoogleExportConfig): Promise
 
   const auth = createGoogleAuthClient(config);
   const sheets = google.sheets({ version: "v4", auth });
+  if (config.sheetTab === OCR_CUSTOMER_TAB_NAME) {
+    await ensureSpreadsheetTabExists(sheets, config.sheetId, OCR_CUSTOMER_TAB_NAME);
+  }
   const sheetTab = await resolveSheetTabName(config);
   const sheetId = await resolveSheetGridId(sheets, config.sheetId, sheetTab);
 
@@ -228,7 +260,8 @@ export async function ensureOcrSheetHeaders(config: GoogleExportConfig): Promise
 }
 
 export async function resolveSheetTabName(config: GoogleExportConfig): Promise<string> {
-  const cached = resolvedOcrTabBySpreadsheet.get(config.sheetId);
+  const cacheKey = resolvedTabCacheKey(config);
+  const cached = resolvedOcrTabBySpreadsheet.get(cacheKey);
   if (cached) return cached;
 
   const auth = createGoogleAuthClient(config);
@@ -240,10 +273,13 @@ export async function resolveSheetTabName(config: GoogleExportConfig): Promise<s
   const titles = meta.data.sheets?.map((s) => s.properties?.title).filter(Boolean) as string[];
   let tab = config.sheetTab;
   if (titles.includes(config.sheetTab)) tab = config.sheetTab;
-  else if (titles.includes(DATA_COMPILATION_TAB_NAME)) tab = DATA_COMPILATION_TAB_NAME;
+  else if (config.sheetTab === OCR_CUSTOMER_TAB_NAME) {
+    await ensureSpreadsheetTabExists(sheets, config.sheetId, OCR_CUSTOMER_TAB_NAME);
+    tab = OCR_CUSTOMER_TAB_NAME;
+  } else if (titles.includes(DATA_COMPILATION_TAB_NAME)) tab = DATA_COMPILATION_TAB_NAME;
   else if (titles.includes("Sheet1")) tab = "Sheet1";
   else if (titles[0]) tab = titles[0];
-  resolvedOcrTabBySpreadsheet.set(config.sheetId, tab);
+  resolvedOcrTabBySpreadsheet.set(cacheKey, tab);
   return tab;
 }
 

@@ -30,16 +30,18 @@ function StatusCard({
   gudang,
   bucket,
   count,
+  ocrReviewBase,
 }: {
   gudang: string;
   bucket: OcrReviewDashboardBucket;
   count: number;
+  ocrReviewBase: string;
 }) {
   const tone = ocrReviewDashboardBucketTone(bucket);
   const mappedTone = tone === "neutral" ? "neutral" : tone;
   return (
     <Link
-      href={buildOcrReviewHref(gudang, bucket)}
+      href={buildOcrReviewHref(gudang, bucket, ocrReviewBase)}
       className={`block rounded-xl border bg-white p-4 shadow-sm transition ${CARD_SURFACE[mappedTone] ?? CARD_SURFACE.neutral}`}
     >
       <p className="text-xs font-medium text-slate-600">{ocrReviewDashboardBucketLabel(bucket)}</p>
@@ -53,8 +55,10 @@ function StatusCard({
 
 export function GudangReviewStatusCards({
   sections,
+  ocrReviewBase = "/ocr-review",
 }: {
   sections: { gudang: string; counts: GudangDashboardCounts }[];
+  ocrReviewBase?: string;
 }) {
   if (!sections.length) {
     return (
@@ -71,7 +75,13 @@ export function GudangReviewStatusCards({
           <h2 className="text-sm font-semibold text-slate-900">{gudang}</h2>
           <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             {OCR_REVIEW_DASHBOARD_BUCKETS.map((bucket) => (
-              <StatusCard key={bucket} gudang={gudang} bucket={bucket} count={counts[bucket]} />
+              <StatusCard
+                key={bucket}
+                gudang={gudang}
+                bucket={bucket}
+                count={counts[bucket]}
+                ocrReviewBase={ocrReviewBase}
+              />
             ))}
           </div>
         </section>

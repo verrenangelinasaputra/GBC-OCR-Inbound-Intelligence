@@ -33,11 +33,15 @@ export function parseDashboardBucketFilter(raw: string | undefined | null): OcrR
   return null;
 }
 
-export function buildOcrReviewHref(gudang: string, bucket: OcrReviewDashboardBucket): string {
+export function buildOcrReviewHref(
+  gudang: string,
+  bucket: OcrReviewDashboardBucket,
+  ocrReviewBase = "/ocr-review"
+): string {
   const params = new URLSearchParams();
   params.set("gudang", gudang);
   params.set("status", bucket);
-  return `/ocr-review?${params.toString()}`;
+  return `${ocrReviewBase}?${params.toString()}`;
 }
 
 export type GudangDashboardCounts = Record<OcrReviewDashboardBucket, number>;

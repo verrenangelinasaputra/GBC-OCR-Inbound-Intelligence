@@ -44,6 +44,15 @@ export function ocrExportSheetUrl(sheetId = getOcrExportSheetId()): string {
 
 export const DATA_COMPILATION_TAB_NAME = "Data Compilation";
 
+/** Tab data OCR khusus Surat Jalan gudang tujuan Customer (layout sama dengan Data Compilation). */
+export const OCR_CUSTOMER_TAB_NAME = "Customer";
+
 export function getOcrExportSheetTab(): string {
   return process.env.GOOGLE_SHEET_TAB?.trim() || DATA_COMPILATION_TAB_NAME;
+}
+
+export function ocrUploadSheetTabForGudang(gudang?: string | null): string {
+  const g = gudang?.trim();
+  if (g === OCR_CUSTOMER_TAB_NAME) return OCR_CUSTOMER_TAB_NAME;
+  return getOcrExportSheetTab();
 }

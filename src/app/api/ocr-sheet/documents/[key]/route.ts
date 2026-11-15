@@ -1,5 +1,4 @@
-import { jsonError, requireApiSession } from "@/lib/api/auth-context";
-import { requirePermission } from "@/lib/rbac/permissions";
+import { jsonError, requireApiPermission } from "@/lib/api/auth-context";
 import { isSheetOnlyMode } from "@/lib/config/app-mode";
 import { hasDatabase } from "@/lib/db";
 import {
@@ -15,17 +14,8 @@ function sheetReviewEnabled(): boolean {
   return isSheetOnlyMode() || !hasDatabase();
 }
 
-async function requireOcrSheetEdit() {
-  const session = await requireApiSession();
-  requirePermission(session.roles, "ocr_review", "EDIT", session.allowedModules);
-  return session;
-}
-
-async function requireOcrSheetView() {
-  const session = await requireApiSession();
-  requirePermission(session.roles, "ocr_review", "VIEW", session.allowedModules);
-  return session;
-}
+const requireOcrSheetEdit = () => requireApiPermission("ocr_review", "EDIT");
+const requireOcrSheetView = () => requireApiPermission("ocr_review", "VIEW");
 
 export async function GET(_request: Request, context: { params: Promise<{ key: string }> }) {
   if (!sheetReviewEnabled()) {

@@ -53,4 +53,34 @@ export function normalizeGudangSelection(raw: unknown): string {
   return unique.join("; ");
 }
 
+/** Hanya gudang fisik (tanpa Customer) — untuk profil internal / admin. */
+export function normalizeWarehouseGudangSelection(raw: unknown, options?: { allowEmpty?: boolean }): string {
+  const items: string[] = [];
+  if (Array.isArray(raw)) {
+    for (const entry of raw) {
+      const g = String(entry ?? "").trim();
+      if (g) items.push(g);
+    }
+  } else {
+    const text = String(raw ?? "").trim();
+    if (text) {
+      for (const part of text.split(/[;|]/)) {
+        const g = part.trim();
+        if (g) items.push(g);
+      }
+    }
+  }
+  const unique = [...new Set(items.filter((g) => g !== SUPPLIER_CUSTOMER_DESTINATION))];
+  if (!unique.length) {
+    if (options?.allowEmpty) return "";
+    throw new Error("Pilih minimal satu gudang untuk akses section Gudang.");
+  }
+  for (const g of unique) {
+    if (!SUPPLIER_GUDANG_WAREHOUSE_OPTIONS.includes(g as SupplierGudangWarehouse)) {
+      throw new Error("Pilih gudang tujuan yang valid.");
+    }
+  }
+  return unique.join("; ");
+}
+
 export const SUPPLIER_MAX_SJ_FILES = 10;

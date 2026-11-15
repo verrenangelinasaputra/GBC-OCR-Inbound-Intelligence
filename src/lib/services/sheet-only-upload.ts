@@ -3,6 +3,7 @@ import type { GeminiSJPayload } from "@/lib/providers/ocr/gemini-surat-jalan";
 import {
   getOcrExportCustomerDriveFolderId,
   ocrExportSheetUrl,
+  ocrUploadSheetTabForGudang,
 } from "@/lib/config/ocr-export-target";
 import {
   driveOAuthRefreshHint,
@@ -246,7 +247,11 @@ export async function processSheetOnlyUpload(params: {
   });
 
   await report("sheet", `Menulis ${rows.length} baris hasil OCR ke spreadsheet…`);
-  const sheetAppend = await appendRowsToSheet({ config, rows });
+  const sheetTabTarget = ocrUploadSheetTabForGudang(gudangLabel);
+  const sheetAppend = await appendRowsToSheet({
+    config: { ...config, sheetTab: sheetTabTarget },
+    rows,
+  });
   await report(
     "done",
     result.suratJalanNumber

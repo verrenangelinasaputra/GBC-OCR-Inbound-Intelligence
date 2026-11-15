@@ -1,4 +1,5 @@
 import { verifyPassword } from "@/lib/auth/password";
+import { portalModulesFromCells } from "@/lib/rbac/portal-module-access";
 import { SupplierAuthError } from "@/lib/supplier-auth/errors";
 import { findInternalUserByUsername, markInternalLogin } from "./directory";
 
@@ -36,11 +37,19 @@ export async function loginInternalFromSheet(usernameRaw: string, password: stri
   const roles = account.roles.length ? account.roles : ["SUPER_ADMIN"];
   await markInternalLogin(account.rowNumber);
 
+  const access = portalModulesFromCells({
+    legacy: account.allowedModules,
+    gudang: account.allowedModulesGudang,
+    customer: account.allowedModulesCustomer,
+  });
+
   return {
     userId: account.userId || `internal:${account.username}`,
     username: account.username,
     fullName: account.fullName,
     roles,
-    allowedModules: account.allowedModules,
+    allowedModules: access.union,
+    allowedModulesGudang: access.gudang,
+    allowedModulesCustomer: access.customer,
   };
 }

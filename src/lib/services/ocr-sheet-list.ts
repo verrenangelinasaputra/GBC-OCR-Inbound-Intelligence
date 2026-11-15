@@ -1,12 +1,14 @@
-import { google } from "googleapis";
-import { createGoogleAuthClient, resolveSheetTabName } from "@/lib/providers/google-workspace/client";
 import { getGoogleExportConfigOptional } from "@/lib/providers/google-workspace";
+import {
+  ocrReadTabTitlesForGudangFilter,
+  readOcrSheetTabs,
+} from "@/lib/services/ocr-sheet-matrix";
 import {
   normalizeOcrReviewStatus,
   pickDominantReviewStatus,
   type OcrReviewStatus,
 } from "@/lib/ocr-review/workflow-status";
-import { mapOcrSheetRow, ocrSheetFullColumnsRange } from "@/lib/providers/google-workspace/ocr-sheet-columns";
+import { mapOcrSheetRow } from "@/lib/providers/google-workspace/ocr-sheet-columns";
 import { encodeOcrSheetDocKey, isMeaningfulOcrDataRow } from "@/lib/services/ocr-sheet-keys";
 import { submissionDocRawKey } from "@/lib/services/ocr-sheet-submissions-shared";
 
@@ -38,55 +40,50 @@ export async function listOcrDocumentsFromSheet(
   const config = getGoogleExportConfigOptional();
   if (!config) return [];
 
-  const auth = createGoogleAuthClient(config);
-  const sheets = google.sheets({ version: "v4", auth });
-  const sheetTab = await resolveSheetTabName(config);
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: config.sheetId,
-    range: ocrSheetFullColumnsRange(sheetTab),
-  });
-
-  const rows = res.data.values ?? [];
+  const tabTitles = ocrReadTabTitlesForGudangFilter(gudangFilter);
+  const { rowsByTab } = await readOcrSheetTabs(config, tabTitles);
   const map = new Map<
     string,
     OcrSheetDocument & { statuses: Set<string>; reviewStatuses: Set<OcrReviewStatus> }
   >();
 
-  for (let i = 1; i < rows.length; i += 1) {
-    const row = rows[i] ?? [];
-    if (!isMeaningfulOcrDataRow(row)) continue;
-    const fields = mapOcrSheetRow(row);
-    const key = submissionDocRawKey(fields);
-    const existing = map.get(key);
-    const status = fields.status || "OK";
-    const review = normalizeOcrReviewStatus(fields.statusReview);
-    if (existing) {
-      existing.lineCount += 1;
-      if (status) existing.statuses.add(status);
-      existing.reviewStatuses.add(review);
-      continue;
+  for (const rows of rowsByTab.values()) {
+    for (let i = 1; i < rows.length; i += 1) {
+      const row = rows[i] ?? [];
+      if (!isMeaningfulOcrDataRow(row)) continue;
+      const fields = mapOcrSheetRow(row);
+      const key = submissionDocRawKey(fields);
+      const existing = map.get(key);
+      const status = fields.status || "OK";
+      const review = normalizeOcrReviewStatus(fields.statusReview);
+      if (existing) {
+        existing.lineCount += 1;
+        if (status) existing.statuses.add(status);
+        existing.reviewStatuses.add(review);
+        continue;
+      }
+      map.set(key, {
+        docKey: encodeOcrSheetDocKey(key),
+        exportTimestamp: fields.exportTimestamp,
+        tanggal: fields.tanggal,
+        noSuratJalan: fields.noSuratJalan,
+        noKendaraan: fields.noKendaraan,
+        fileName: fields.fileName,
+        fileUrl: fields.fileUrl.startsWith("http") ? fields.fileUrl : "",
+        lineCount: 1,
+        lineStatus: status,
+        gudang: fields.gudang,
+        supplier: fields.supplier,
+        statusReview: review,
+        tsKirimSupplier: fields.tsKirimSupplier,
+        tsDitinjauGudang: fields.tsDitinjauGudang,
+        tsRevisiGudang: fields.tsRevisiGudang,
+        tsApproveGudang: fields.tsApproveGudang,
+        tsKonfirmasiSupplier: fields.tsKonfirmasiSupplier,
+        statuses: new Set(status ? [status] : []),
+        reviewStatuses: new Set([review]),
+      });
     }
-    map.set(key, {
-      docKey: encodeOcrSheetDocKey(key),
-      exportTimestamp: fields.exportTimestamp,
-      tanggal: fields.tanggal,
-      noSuratJalan: fields.noSuratJalan,
-      noKendaraan: fields.noKendaraan,
-      fileName: fields.fileName,
-      fileUrl: fields.fileUrl.startsWith("http") ? fields.fileUrl : "",
-      lineCount: 1,
-      lineStatus: status,
-      gudang: fields.gudang,
-      supplier: fields.supplier,
-      statusReview: review,
-      tsKirimSupplier: fields.tsKirimSupplier,
-      tsDitinjauGudang: fields.tsDitinjauGudang,
-      tsRevisiGudang: fields.tsRevisiGudang,
-      tsApproveGudang: fields.tsApproveGudang,
-      tsKonfirmasiSupplier: fields.tsKonfirmasiSupplier,
-      statuses: new Set(status ? [status] : []),
-      reviewStatuses: new Set([review]),
-    });
   }
 
   let docs = Array.from(map.values()).map(({ statuses, reviewStatuses, ...doc }) => ({

@@ -1,4 +1,4 @@
-import { jsonError, requireApiSession } from "@/lib/api/auth-context";
+import { apiAllowedModules, jsonError, requireApiSession } from "@/lib/api/auth-context";
 import { hasPermission } from "@/lib/rbac/permissions";
 import { isSheetOnlyMode } from "@/lib/config/app-mode";
 import { hasDatabase } from "@/lib/db";
@@ -13,10 +13,11 @@ function enabled(): boolean {
   return isSheetOnlyMode() || !hasDatabase();
 }
 
-function canWrite(session: Awaited<ReturnType<typeof requireApiSession>>): boolean {
+async function canWrite(session: Awaited<ReturnType<typeof requireApiSession>>): Promise<boolean> {
+  const mods = await apiAllowedModules(session);
   return (
-    hasPermission(session.roles, "supplier_data_mapping", "CREATE", session.allowedModules) ||
-    hasPermission(session.roles, "supplier_data_mapping", "EDIT", session.allowedModules)
+    hasPermission(session.roles, "supplier_data_mapping", "CREATE", mods) ||
+    hasPermission(session.roles, "supplier_data_mapping", "EDIT", mods)
   );
 }
 
@@ -24,7 +25,8 @@ export async function GET() {
   if (!enabled()) return jsonError(new Error("Mode spreadsheet tidak aktif"), 404);
   try {
     const session = await requireApiSession();
-    if (!hasPermission(session.roles, "supplier_data_mapping", "VIEW", session.allowedModules)) {
+    const mods = await apiAllowedModules(session);
+    if (!hasPermission(session.roles, "supplier_data_mapping", "VIEW", mods)) {
       return jsonError(new Error("FORBIDDEN"), 403);
     }
     const rows = await loadSupplierMasterDataRows(true);
@@ -38,7 +40,7 @@ export async function POST(request: Request) {
   if (!enabled()) return jsonError(new Error("Mode spreadsheet tidak aktif"), 404);
   try {
     const session = await requireApiSession();
-    if (!canWrite(session)) return jsonError(new Error("FORBIDDEN"), 403);
+    if (!(await canWrite(session))) return jsonError(new Error("FORBIDDEN"), 403);
 
     const body = await request.json();
     const tipeSupplier = String(body.tipeSupplier ?? "").trim();
@@ -59,7 +61,7 @@ export async function PATCH(request: Request) {
   if (!enabled()) return jsonError(new Error("Mode spreadsheet tidak aktif"), 404);
   try {
     const session = await requireApiSession();
-    if (!canWrite(session)) return jsonError(new Error("FORBIDDEN"), 403);
+    if (!(await canWrite(session))) return jsonError(new Error("FORBIDDEN"), 403);
 
     const body = await request.json();
     const sheetRow = Number(body.sheetRow);
@@ -93,7 +95,7 @@ export async function DELETE(request: Request) {
   if (!enabled()) return jsonError(new Error("Mode spreadsheet tidak aktif"), 404);
   try {
     const session = await requireApiSession();
-    if (!canWrite(session)) return jsonError(new Error("FORBIDDEN"), 403);
+    if (!(await canWrite(session))) return jsonError(new Error("FORBIDDEN"), 403);
 
     const body = await request.json();
     const sheetRow = Number(body.sheetRow);

@@ -43,7 +43,8 @@ export default async function UsersPage() {
           >
             {getInternalUsersTab()}
           </a>{" "}
-          (<code>allowed_modules</code> dipisah <code>;</code>). Tab <strong>Supplier</strong>: cocokkan nama akun
+          (<code>allowed_modules_gudang</code> / <code>allowed_modules_customer</code> kolom M–N, pisah{" "}
+          <code>;</code>). Tab <strong>Supplier</strong>: cocokkan nama akun
           portal dengan kode di{" "}
           <a href="/supplier-data-mapping" className="text-blue-600 hover:underline">
             Mapping Data Supplier
