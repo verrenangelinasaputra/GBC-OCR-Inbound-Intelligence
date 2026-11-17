@@ -68,9 +68,10 @@ export async function readOcrSheetTabs(
   const rowsByTab = new Map<string, string[][]>();
 
   for (const title of tabTitles) {
-    if (!existing.includes(title)) continue;
     const tabConfig = { ...config, sheetTab: title };
     const sheetTab = await resolveSheetTabName(tabConfig);
+    // resolve dulu (mis. env "Data Compilation" → tab aktual "Sheet1"), baru cek ada/tidak
+    if (!existing.includes(sheetTab)) continue;
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: config.sheetId,
       range: ocrSheetFullColumnsRange(sheetTab),
