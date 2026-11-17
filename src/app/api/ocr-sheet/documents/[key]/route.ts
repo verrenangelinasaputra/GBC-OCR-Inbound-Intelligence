@@ -1,4 +1,4 @@
-import { jsonError, requireApiPermission } from "@/lib/api/auth-context";
+import { jsonError, requireApiPermissionOcrReview } from "@/lib/api/auth-context";
 import { isSheetOnlyMode } from "@/lib/config/app-mode";
 import { hasDatabase } from "@/lib/db";
 import {
@@ -14,8 +14,8 @@ function sheetReviewEnabled(): boolean {
   return isSheetOnlyMode() || !hasDatabase();
 }
 
-const requireOcrSheetEdit = () => requireApiPermission("ocr_review", "EDIT");
-const requireOcrSheetView = () => requireApiPermission("ocr_review", "VIEW");
+const requireOcrSheetEdit = () => requireApiPermissionOcrReview("EDIT");
+const requireOcrSheetView = () => requireApiPermissionOcrReview("VIEW");
 
 export async function GET(_request: Request, context: { params: Promise<{ key: string }> }) {
   if (!sheetReviewEnabled()) {

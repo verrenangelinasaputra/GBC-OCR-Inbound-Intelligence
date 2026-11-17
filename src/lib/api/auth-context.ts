@@ -28,6 +28,16 @@ export async function requireApiPermission(module: AppModule, action: Permission
   return session;
 }
 
+/** OCR sheet: izin dari union modul Gudang + Customer (API path selalu `/api/...`, bukan `/customer/...`). */
+export async function requireApiPermissionOcrReview(action: PermissionAction) {
+  const session = await requireApiSession();
+  const gudang = allowedModulesForAudience(session, "gudang");
+  const customer = allowedModulesForAudience(session, "customer");
+  const union = [...new Set([...gudang, ...customer])];
+  requirePermission(session.roles, "ocr_review", action, union);
+  return session;
+}
+
 export async function requireSuperAdmin() {
   const session = await requireApiSession();
   if (!session.roles.includes("SUPER_ADMIN")) {

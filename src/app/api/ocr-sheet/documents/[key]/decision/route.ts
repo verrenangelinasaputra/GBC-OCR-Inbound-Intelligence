@@ -1,4 +1,4 @@
-import { jsonError, requireApiPermission } from "@/lib/api/auth-context";
+import { jsonError, requireApiPermissionOcrReview } from "@/lib/api/auth-context";
 import { isSheetOnlyMode } from "@/lib/config/app-mode";
 import { hasDatabase } from "@/lib/db";
 import { getGoogleExportConfigOptional } from "@/lib/providers/google-workspace";
@@ -28,7 +28,7 @@ export async function POST(request: Request, context: { params: Promise<{ key: s
     return jsonError(new Error("Mode spreadsheet tidak aktif"), 404);
   }
   try {
-    await requireApiPermission("ocr_review", "EDIT");
+    await requireApiPermissionOcrReview("EDIT");
     const { key } = await context.params;
     const body = await request.json();
     const decision = String(body.decision ?? "").trim().toLowerCase();

@@ -174,7 +174,15 @@ export function hasPermission(
 ): boolean {
   if (roles.includes("SUPER_ADMIN")) return true;
   if (usesPerUserModuleAccess(roles)) {
-    return (allowedModules ?? []).includes(module);
+    const list = allowedModules ?? [];
+    if (!list.length) {
+      for (const role of roles as RoleCode[]) {
+        const perms = ROLE_MATRIX[role];
+        if (perms?.includes(`${module}:${action}` as PermissionKey)) return true;
+      }
+      return false;
+    }
+    return list.includes(module);
   }
   if (allowedModules && allowedModules.length > 0) {
     return allowedModules.includes(module);

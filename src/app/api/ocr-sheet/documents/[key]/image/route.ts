@@ -1,4 +1,4 @@
-import { jsonError, requireApiPermission } from "@/lib/api/auth-context";
+import { jsonError, requireApiPermissionOcrReview } from "@/lib/api/auth-context";
 import { isSheetOnlyMode } from "@/lib/config/app-mode";
 import { hasDatabase } from "@/lib/db";
 import { contentDispositionAttachment } from "@/lib/http/content-disposition";
@@ -13,7 +13,7 @@ export async function GET(request: Request, context: { params: Promise<{ key: st
     return jsonError(new Error("Mode spreadsheet tidak aktif"), 404);
   }
   try {
-    await requireApiPermission("ocr_review", "VIEW");
+    await requireApiPermissionOcrReview("VIEW");
     const { key } = await context.params;
     const url = new URL(request.url);
     const asDownload = url.searchParams.get("download") === "1";

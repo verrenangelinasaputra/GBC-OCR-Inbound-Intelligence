@@ -16,13 +16,19 @@ const PUBLIC_PATHS = [
 
 const INTERNAL_ROLES = ["SUPER_ADMIN", "DBM_OPERATOR", "WAREHOUSE_OPERATOR", "MANAGEMENT_VIEWER"] as const;
 
+function resolveRequestAudience(pathname: string, referer: string | null): "customer" | "gudang" {
+  if (pathname === "/customer" || pathname.startsWith("/customer/")) return "customer";
+  if (pathname.startsWith("/api/ocr-sheet") && referer?.includes("/customer/")) return "customer";
+  return "gudang";
+}
+
 function nextWithPath(request: NextRequest) {
   const headers = new Headers(request.headers);
   const { pathname } = request.nextUrl;
   headers.set("x-gbc-path", pathname);
   headers.set(
     "x-gbc-audience",
-    pathname === "/customer" || pathname.startsWith("/customer/") ? "customer" : "gudang"
+    resolveRequestAudience(pathname, request.headers.get("referer"))
   );
   return NextResponse.next({ request: { headers } });
 }

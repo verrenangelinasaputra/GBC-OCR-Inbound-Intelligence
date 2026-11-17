@@ -264,7 +264,7 @@ export function SheetOcrReviewPanel({
       }
       if (res.status === 403) {
         setImageError(
-          "Akun tidak punya akses ocr_review — ubah kolom roles di spreadsheet Users (mis. DBM_OPERATOR) atau minta admin."
+          "Akun tidak punya akses Review Surat Jalan untuk memuat foto. Minta Super Admin centang halaman ocr_review di kolom allowed_modules_gudang (spreadsheet Users), lalu login ulang."
         );
         return;
       }
